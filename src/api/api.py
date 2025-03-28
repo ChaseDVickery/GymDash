@@ -5,6 +5,8 @@ from fastapi.responses import JSONResponse
 from random import randint
 import numpy as np
 
+from .internals.usage import get_usage_simple, get_usage_detailed
+
 
 # Setup our API
 app = FastAPI(title="GymDash", description="API for interacting with active simulation environments", version="0.0.1")
@@ -13,10 +15,6 @@ app = FastAPI(title="GymDash", description="API for interacting with active simu
 # communication from our frontend
 origins = [
     # "*"
-    # "http://localhost",
-    # "http://localhost/*",
-    # "http://127.0.0.1:8000/random",
-    # "http://127.0.0.1*",
 ]
 regex_origins = r"^((.*127.0.0.1.*)|(.*localhost.*))$"
 app.add_middleware(
@@ -57,14 +55,22 @@ async def thinking_of_a_number2():
     }
 
 @app.get("/big-data100000")
-async def thinking_of_a_number2():
+async def thinking_of_a_number3():
     return {
         "value": np.random.random(100_000).flatten().tolist()
     }
 
 # https://stackoverflow.com/questions/73921756/how-to-add-gzip-middleware-for-the-fastapi
 @app.get("/big-data1000000")
-async def thinking_of_a_number3():
+async def thinking_of_a_number4():
     return {
         "value": np.random.random((100, 100, 100)).flatten().tolist()
     }
+
+@app.get("/resource-usage-simple")
+async def get_resource_usage_simple():
+    return get_usage_simple()
+
+@app.get("/resource-usage-detailed")
+async def get_resource_usage_detailed():
+    return get_usage_detailed()

@@ -1,9 +1,11 @@
-
+// import { resourceUsageUtils } from "./utils/usage.js";
 
 const tryBtn        = document.querySelector("#try-api-btn");
 const tryBtnOut     = document.querySelector("#try-api-out");
 const testBtn       = document.querySelector("#test-api-btn");
 const testBtnOut    = document.querySelector("#test-api-out");
+const resourceBtn       = document.querySelector("#resource-usage-btn");
+const resourceBtnOut    = document.querySelector("#resource-usage-out");
 
 
 function call_random() {
@@ -77,5 +79,50 @@ function testNumberAPI() {
     });
 }
 
+function displayResourceUsage() {
+    resourceUsageUtils.getResourceUsageDetailed()
+    // resourceUsageUtils.getResourceUsageSimple()
+        .then((usageValues) => {
+            let usageString = "";
+            for (const [key, value] of Object.entries(usageValues)) {
+                usageString += `\t${key} = ${value}`;
+            }
+            usageString += `\tcpu=${(usageValues.cpus_percent.reduce((sum, value) => { return sum + value})/usageValues.cpus_percent.length).toFixed(2)}%`;
+            usageString += `\tmemory=${((usageValues.memory_total - usageValues.memory_available)*100 / usageValues.memory_total).toFixed(2)}%`;
+            usageString += `\tdisk=${((usageValues.disk_total - usageValues.disk_available)*100 / usageValues.disk_total).toFixed(2)}%`;
+            resourceBtnOut.textContent = usageString;
+        });
+}
+
 tryBtn.addEventListener("click", getNumber);
 testBtn.addEventListener("click", testNumberAPI);
+resourceBtn.addEventListener("click", displayResourceUsage);
+
+
+
+
+
+
+
+const resourceUsageUtils = (
+    function() {
+        const fetchResourceUsageDetailed    = () => {return fetch("http://127.0.0.1:8000/resource-usage-detailed");}
+        const fetchResourceUsageSimple      = () => {return fetch("http://127.0.0.1:8000/resource-usage-simple");}
+
+        const getResourceUsageDetailed = function() {
+            return fetchResourceUsageDetailed()
+                .then((response) => {
+                    return response.json();
+                });
+        }
+
+        const getResourceUsageSimple = function() {
+            return fetchResourceUsageSimple()
+                .then((response) => {
+                    return response.json();
+                });
+        }
+
+        return { getResourceUsageDetailed, getResourceUsageSimple };
+    }
+)();
