@@ -17,5 +17,32 @@
 
     <button id="resource-usage-btn">Get Resource Usage</button>
     <p>Your usage stats are: <span style="overflow-wrap: break-word" id="resource-usage-out"></span></p>
+
+    <div class="resource-preview">
+        <div class="resource-infos">
+            <div class="resource-preview-info">
+                <span class="resource-preview-text" id=resource-preview-cpu-text></span><meter id="resource-preview-cpu" class="resource-preview-meter" value="0.0" min="0" max="1"></meter>
+            </div>
+            <div class="resource-preview-info">
+                <span class="resource-preview-text" id=resource-preview-mem-text></span><meter id="resource-preview-mem" class="resource-preview-meter" value="0.0" min="0" max="1"></meter>
+            </div>
+            <div class="resource-preview-info">
+                <span class="resource-preview-text" id=resource-preview-dsk-text></span><meter id="resource-preview-dsk" class="resource-preview-meter" value="0.0" min="0" max="1"></meter>
+            </div>
+        </div>
+        <!-- <button id="resource-preview-show-settings">Settings</button> -->
+        <div class="settings-wrapper">
+            <div class="settings">
+                <div class="setting">
+                    <label for="resource-preview-toggle-auto">Auto-Refresh</label>
+                    <input type="checkbox" id="resource-preview-toggle-auto">
+                </div>
+                <div class="setting">
+                    <label for="resource-preview-toggle-show-values">Show Values</label>
+                    <input type="checkbox" id="resource-preview-toggle-show-values">
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
