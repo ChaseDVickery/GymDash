@@ -5,7 +5,7 @@ from fastapi.responses import JSONResponse
 from random import randint
 import numpy as np
 
-from .internals.usage import get_usage_simple, get_usage_detailed
+from .internals.usage import get_usage_simple, get_usage_detailed, get_usage_gpu
 
 
 # Setup our API
@@ -74,3 +74,7 @@ async def get_resource_usage_simple():
 @app.get("/resource-usage-detailed")
 async def get_resource_usage_detailed():
     return get_usage_detailed()
+
+@app.get("/resource-usage-gpu")
+async def get_resource_usage_gpu():
+    return get_usage_gpu()

@@ -109,14 +109,18 @@ const resourceUsageUtils = (
         const bToGiBConstant = 1 / Math.pow(2, 30);
 
         // DOM Elements
-        const resourcePreviewElement = document.querySelector(".resource-preview");
-        const resourceInfosElement   = resourcePreviewElement.querySelector(".resource-infos");
-        const cpuPreviewMeter   = resourcePreviewElement.querySelector("#resource-preview-cpu");
-        const memPreviewMeter   = resourcePreviewElement.querySelector("#resource-preview-mem");
-        const dskPreviewMeter   = resourcePreviewElement.querySelector("#resource-preview-dsk");
-        const cpuPreviewText    = resourcePreviewElement.querySelector("#resource-preview-cpu-text");
-        const memPreviewText    = resourcePreviewElement.querySelector("#resource-preview-mem-text");
-        const dskPreviewText    = resourcePreviewElement.querySelector("#resource-preview-dsk-text");
+        const resourcePreviewElement= document.querySelector(".resource-preview");
+        const resourceInfosElement  = resourcePreviewElement.querySelector(".resource-infos");
+        const cpuPreviewMeter       = resourcePreviewElement.querySelector("#resource-preview-cpu");
+        const memPreviewMeter       = resourcePreviewElement.querySelector("#resource-preview-mem");
+        const dskPreviewMeter       = resourcePreviewElement.querySelector("#resource-preview-dsk");
+        const gpumemPreviewMeter    = resourcePreviewElement.querySelector("#resource-preview-gpumem");
+        const gpuloadPreviewMeter   = resourcePreviewElement.querySelector("#resource-preview-gpuload");
+        const cpuPreviewText        = resourcePreviewElement.querySelector("#resource-preview-cpu-text");
+        const memPreviewText        = resourcePreviewElement.querySelector("#resource-preview-mem-text");
+        const dskPreviewText        = resourcePreviewElement.querySelector("#resource-preview-dsk-text");
+        const gpumemPreviewText     = resourcePreviewElement.querySelector("#resource-preview-gpumem-text");
+        const gpuloadPreviewText    = resourcePreviewElement.querySelector("#resource-preview-gpuload-text");
         
         const settingsBtn       = resourcePreviewElement.querySelector("#resource-preview-show-settings");
         const settingToggleAuto = resourcePreviewElement.querySelector("#resource-preview-toggle-auto");
@@ -125,13 +129,15 @@ const resourceUsageUtils = (
 
 
         // Internal Settings
-        let autoUpdateResourcePreview       = false;
+        let autoUpdateResourcePreview       = true;
         let autoUpdateResourcePreviewTime   = 1000;     // Auto-update time in ms;
         let autoUpdateResourcePreviewID;
         
+        let gpusAvailable;
 
         const fetchResourceUsageDetailed    = () => {return fetch("http://127.0.0.1:8000/resource-usage-detailed");}
         const fetchResourceUsageSimple      = () => {return fetch("http://127.0.0.1:8000/resource-usage-simple");}
+        const fetchResourceUsageGPU         = () => {return fetch("http://127.0.0.1:8000/resource-usage-gpu");}
 
         // Public Utilities
         const getResourceUsageDetailed = function() {
@@ -146,8 +152,14 @@ const resourceUsageUtils = (
                     return response.json();
                 });
         }
+        const getResourceUsageGPU = function() {
+            return fetchResourceUsageGPU()
+                .then((response) => {
+                    return response.json();
+                });
+        }
         const updateResourcePreview = function() {
-            return getResourceUsageSimple()
+            getResourceUsageSimple()
                 .then((response) => {
                     const cpu = response.cpu_percent;
                     const mem = bytesToGibibytes(response.memory_total - response.memory_available);
@@ -161,6 +173,17 @@ const resourceUsageUtils = (
                     dskPreviewText.textContent = `DSK: ${(dsk).toFixed(1)}/${bytesToGibibytes(response.disk_total).toFixed(1)} GiB`;
                     return response;
                 });
+            getResourceUsageGPU()
+                .then((response) => {
+                    const mem   = bytesToGibibytes(response.memory_total - response.memory_available);
+                    const load  = response.load;
+                    gpumemPreviewMeter.value    = mem;
+                    gpuloadPreviewMeter.value   = load;
+
+                    gpumemPreviewText.textContent = `VRAM: ${(mem).toFixed(1)}/${bytesToGibibytes(response.memory_total).toFixed(1)} GiB`;
+                    gpuloadPreviewText.textContent = `LOAD: ${(load).toFixed(1)}%`;
+                    return response;
+                })
         }
         // General Settings
         const toggleSettings = function() {
@@ -182,6 +205,10 @@ const resourceUsageUtils = (
             const showing = toggleElementShowing(cpuPreviewText) &
                             toggleElementShowing(memPreviewText) &
                             toggleElementShowing(dskPreviewText);
+            if (gpusAvailable) {
+                toggleElementShowing(gpumemPreviewText);
+                toggleElementShowing(gpuloadPreviewText);
+            }
             settingToggleShow.checked = elementShowing(cpuPreviewText);
             return showing;
         }
@@ -243,19 +270,34 @@ const resourceUsageUtils = (
                 updateResourcePreview();
                 return response;
             });
+        getResourceUsageGPU()
+            .then((response) => {
+                console.log("We have " + response.gpu_count + " gpus");
+                // Hide GPU lines if we have none
+                // Show GPU lines if we have some
+                if (response.gpu_count === 0) {
+                    gpusAvailable = false;
+                    toggleElementShowing(gpumemPreviewMeter.parentElement);
+                    toggleElementShowing(gpuloadPreviewMeter.parentElement);
+                } else {
+                    gpusAvailable = true;
+                    gpumemPreviewMeter.min = 0;
+                    gpumemPreviewMeter.max = Math.round(bytesToGibibytes(response.memory_total));
+                    gpuloadPreviewMeter.min = 0.0;
+                    gpuloadPreviewMeter.max = 100.0;
+                }
+                return response;
+            });
         handlePreviewAutoUpdate();
         // Setup settings menu
         toggleSettings();
-        // togglePreviewAutoUpdate();
-        // togglePreviewShowValues();
+        togglePreviewAutoUpdate();
+        togglePreviewAutoUpdate();
+        togglePreviewShowValues();
+        togglePreviewShowValues();
 
         settingToggleShow.checked = elementShowing(cpuPreviewText);
-
-        document.addEventListener("keypress", (e) => {
-            if(e.key === "e"){
-                togglePreviewAutoUpdate();
-            }
-        });
+        
         resourceInfosElement.addEventListener("click", (e) => {
             toggleSettings();
         });
