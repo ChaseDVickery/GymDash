@@ -8,7 +8,7 @@ const resourceBtn       = document.querySelector("#resource-usage-btn");
 const resourceBtnOut    = document.querySelector("#resource-usage-out");
 
 const apiAddr = "http://127.0.0.1";
-const apiPort = 8000;
+const apiPort = 8887;
 
 function _apiURL() {
     return apiAddr + ":" + apiPort;
