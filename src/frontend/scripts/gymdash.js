@@ -1,4 +1,7 @@
 // import { resourceUsageUtils } from "./utils/usage.js";
+import { testUtils } from "./utils/usage.js";
+
+testUtils.testLog();
 
 const tryBtn        = document.querySelector("#try-api-btn");
 const tryBtnOut     = document.querySelector("#try-api-out");
@@ -55,8 +58,6 @@ function timeGetNumber() {
                 throw new Error("Network response was not ok");
             }
             let time = Date.now() - start;
-            console.log(response.value);
-            // console.log(`Got random response after ${time}ms`);
             return Promise.resolve({time});
         });
 }

@@ -23,3 +23,15 @@
 
 
 // export { resourceUsageUtils };
+
+const testUtils = (
+    function() {
+        const testLog = function() {
+            console.log("Logging test function");
+        }
+
+        return { testLog };
+    }
+)();
+
+export { testUtils };
