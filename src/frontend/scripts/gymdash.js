@@ -1,4 +1,4 @@
-import { resourceUsageUtils } from "./utils/usage.js";
+import { resourceUsageUtils, resourceUsageDisplayUtils } from "./utils/usage.js";
 import { apiURL } from "./utils/api_link.js";
 
 const tryBtn        = document.querySelector("#try-api-btn");
@@ -91,6 +91,8 @@ function displayResourceUsage() {
             resourceBtnOut.textContent = usageString;
         });
 }
+
+resourceUsageDisplayUtils.setupResourceUsageDisplay();
 
 tryBtn.addEventListener("click", getNumber);
 testBtn.addEventListener("click", testNumberAPI);
