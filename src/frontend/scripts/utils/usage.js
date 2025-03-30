@@ -78,9 +78,10 @@ const resourceUsageDisplayUtils = (
             const gpumemPreviewText     = resourcePreviewElement.querySelector("#resource-preview-gpumem-text");
             const gpuloadPreviewText    = resourcePreviewElement.querySelector("#resource-preview-gpuload-text");
             
-            const settingToggleAuto = resourcePreviewElement.querySelector("#resource-preview-toggle-auto");
-            const settingToggleShow = resourcePreviewElement.querySelector("#resource-preview-toggle-show-values");
-            const settingsWrapper   = resourcePreviewElement.querySelector(".settings-wrapper");
+            const settingToggleAuto         = resourcePreviewElement.querySelector("#resource-preview-toggle-auto");
+            const settingToggleShow         = resourcePreviewElement.querySelector("#resource-preview-toggle-show-values");
+            const settingSliderRefreshTime  = resourcePreviewElement.querySelector("#resource-preview-refresh-time");
+            const settingsWrapper           = resourcePreviewElement.querySelector(".settings-wrapper");
 
             // Perform check before doing anything else
             if (
@@ -97,6 +98,7 @@ const resourceUsageDisplayUtils = (
                 gpuloadPreviewText      === null ||
                 settingToggleAuto       === null ||
                 settingToggleShow       === null ||
+                settingSliderRefreshTime=== null ||
                 settingsWrapper         === null
             ) {
                 console.error(`One or more of the following selectors could not be found in the DOM. Unable to setup resource usage display:
@@ -113,6 +115,7 @@ const resourceUsageDisplayUtils = (
                 .resource-preview #resource-preview-gpuload-text
                 .resource-preview #resource-preview-toggle-auto
                 .resource-preview #resource-preview-toggle-show-values
+                .resource-preview #resource-preview-refresh-time
                 .resource-preview .settings-wrapper
                 `);
                 return;
@@ -164,8 +167,8 @@ const resourceUsageDisplayUtils = (
                 settingToggleAuto.checked = autoUpdateResourcePreview;
                 return autoUpdateResourcePreview;
             }
-            const setPreviewAutoUpdateTime = function(newTime) {
-                autoUpdateResourcePreviewTime = newTime;
+            const setRefreshTime = function(newTimeMS) {
+                autoUpdateResourcePreviewTime = Number(newTimeMS);
                 handlePreviewAutoUpdate();
             }
             const togglePreviewShowValues = function() {
@@ -270,6 +273,9 @@ const resourceUsageDisplayUtils = (
                 togglePreviewShowValues();
                 // settingToggleAuto.checked = autoUpdateResourcePreview;
                 // settingToggleShow.checked = !togglePreviewShowValues();
+            });
+            settingSliderRefreshTime.addEventListener("change", (e) => {
+                setRefreshTime(1000*Number(e.target.value));
             });
         }
         
