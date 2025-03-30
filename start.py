@@ -25,16 +25,16 @@ def check_port(port):
 def setup_frontend(args):
     # Alter the original javascript file to accept the
     # specified API port
-    js_main_path    = os.path.join("src", "frontend", "scripts", "gymdash.js")
-    js_new_path     = os.path.join("src", "frontend", "scripts", "gymdash_link.js")
+    js_main_path    = os.path.join("src", "frontend", "scripts", "utils", "api.js")
+    js_new_path     = os.path.join("src", "frontend", "scripts", "utils", "api_link.js")
     if (not os.path.exists(js_main_path)):
         print(f"Cannot start frontend because template JS file '{js_main_path}' does not exist")
         return
     else:
         with open(js_main_path, "r") as f:
             new_content = f.read() \
-                            .replace(r"apiAddr = \"http://127.0.0.1\";", "apiAddr = \"" + args.apiaddr + "\";") \
-                            .replace(r"apiPort = 8000;", "apiPort = " + str(args.apiport) + ";")
+                            .replace(r"<<api_addr>>", "http://" + str(args.apiaddr)) \
+                            .replace(r"<<api_port>>", str(args.apiport))
             with open(js_new_path, "w") as output_file:
                 output_file.write(new_content)
 
