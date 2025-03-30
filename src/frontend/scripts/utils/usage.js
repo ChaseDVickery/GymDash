@@ -1,10 +1,5 @@
 import { apiURL } from "./api_link.js";
-
-const bToGiBConstant = 1 / Math.pow(2, 30);
-
-const bytesToGibibytes = function(numBytes) {
-    return numBytes * bToGiBConstant;
-}
+import { byteConversions as bc } from "./conversions.js";
 
 const resourceUsageUtils = (
     function() {
@@ -134,25 +129,25 @@ const resourceUsageDisplayUtils = (
                 resourceUsageUtils.getResourceUsageSimple()
                     .then((response) => {
                         const cpu = response.cpu_percent;
-                        const mem = bytesToGibibytes(response.memory_total - response.memory_available);
-                        const dsk = bytesToGibibytes(response.disk_total - response.disk_available);
+                        const mem = bc.B2GiB(response.memory_total - response.memory_available);
+                        const dsk = bc.B2GiB(response.disk_total - response.disk_available);
                         cpuPreviewMeter.value = cpu;
                         memPreviewMeter.value = mem;
                         dskPreviewMeter.value = dsk;
 
                         cpuPreviewText.textContent = `CPU: ${(cpu).toFixed(1)}%`;
-                        memPreviewText.textContent = `RAM: ${(mem).toFixed(1)}/${bytesToGibibytes(response.memory_total).toFixed(1)} GiB`;
-                        dskPreviewText.textContent = `DSK: ${(dsk).toFixed(1)}/${bytesToGibibytes(response.disk_total).toFixed(1)} GiB`;
+                        memPreviewText.textContent = `RAM: ${(mem).toFixed(1)}/${bc.B2GiB(response.memory_total).toFixed(1)} GiB`;
+                        dskPreviewText.textContent = `DSK: ${(dsk).toFixed(1)}/${bc.B2GiB(response.disk_total).toFixed(1)} GiB`;
                         return response;
                     });
                     resourceUsageUtils.getResourceUsageGPU()
                     .then((response) => {
-                        const mem   = bytesToGibibytes(response.memory_total - response.memory_available);
+                        const mem   = bc.B2GiB(response.memory_total - response.memory_available);
                         const load  = response.load;
                         gpumemPreviewMeter.value    = mem;
                         gpuloadPreviewMeter.value   = load;
 
-                        gpumemPreviewText.textContent = `VRAM: ${(mem).toFixed(1)}/${bytesToGibibytes(response.memory_total).toFixed(1)} GiB`;
+                        gpumemPreviewText.textContent = `VRAM: ${(mem).toFixed(1)}/${bc.B2GiB(response.memory_total).toFixed(1)} GiB`;
                         gpuloadPreviewText.textContent = `LOAD: ${(load).toFixed(1)}%`;
                         return response;
                     })
@@ -188,7 +183,7 @@ const resourceUsageDisplayUtils = (
             // Private Utilities
             const setupSpaceMeter = function(meter, maxBytes) {
                 meter.min = 0.0;
-                meter.max = Math.round(bytesToGibibytes(maxBytes));
+                meter.max = Math.round(bc.B2GiB(maxBytes));
             }
             const handlePreviewAutoUpdate = function() {
                 autoUpdateResourcePreviewID = handleAutoUpdateChange(
@@ -241,7 +236,6 @@ const resourceUsageDisplayUtils = (
                 });
             resourceUsageUtils.getResourceUsageGPU()
                 .then((response) => {
-                    console.log("We have " + response.gpu_count + " gpus");
                     // Hide GPU lines if we have none
                     // Show GPU lines if we have some
                     if (response.gpu_count === 0) {
@@ -249,7 +243,7 @@ const resourceUsageDisplayUtils = (
                         toggleElementShowing(gpuloadPreviewMeter.parentElement);
                     } else {
                         gpumemPreviewMeter.min = 0;
-                        gpumemPreviewMeter.max = Math.round(bytesToGibibytes(response.memory_total));
+                        gpumemPreviewMeter.max = Math.round(bc.B2GiB(response.memory_total));
                         gpuloadPreviewMeter.min = 0.0;
                         gpuloadPreviewMeter.max = 100.0;
                     }
