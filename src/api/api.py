@@ -78,3 +78,9 @@ async def get_resource_usage_detailed():
 @app.get("/resource-usage-gpu")
 async def get_resource_usage_gpu():
     return get_usage_gpu()
+
+
+@app.get("/read-test")
+async def get_read_test():
+    return {}
+    pass

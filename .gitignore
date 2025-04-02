@@ -2,3 +2,6 @@
 venv/
 info.txt
 *_link.js*
+.pybrokercache/
+*.zip
+*.log
