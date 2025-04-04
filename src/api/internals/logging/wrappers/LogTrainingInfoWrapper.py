@@ -7,7 +7,7 @@ from typing import Any, Optional, SupportsFloat, Union, Dict, List
 
 from collections.abc import Callable
 
-from .StatLog import StatLog
+from ..StatLog import StatLog
 
 import gymnasium as gym
 import pandas

@@ -1,4 +1,5 @@
 import { resourceUsageUtils, resourceUsageDisplayUtils } from "./utils/usage.js";
+import { dataUtils } from "./utils/data.js";
 import { apiURL } from "./utils/api_link.js";
 
 const tryBtn        = document.querySelector("#try-api-btn");
@@ -7,6 +8,8 @@ const testBtn       = document.querySelector("#test-api-btn");
 const testBtnOut    = document.querySelector("#test-api-out");
 const resourceBtn       = document.querySelector("#resource-usage-btn");
 const resourceBtnOut    = document.querySelector("#resource-usage-out");
+const scalarDataTestBtn       = document.querySelector("#scalar-test-btn");
+const scalarDataTestBtnOut    = document.querySelector("#scalar-test-out");
 
 function call_random() {
     return fetch(apiURL("random"));
@@ -92,11 +95,20 @@ function displayResourceUsage() {
         });
 }
 
+function displayScalarDataTest() {
+    dataUtils.getAllNewScalars()
+        .then((results) => {
+            scalarDataTestBtnOut.textContent = `Recent logged results: ${results}`;
+            console.log(results);
+        });
+}
+
 resourceUsageDisplayUtils.setupResourceUsageDisplay();
 
 tryBtn.addEventListener("click", getNumber);
 testBtn.addEventListener("click", testNumberAPI);
 resourceBtn.addEventListener("click", displayResourceUsage);
+scalarDataTestBtn.addEventListener("click", displayScalarDataTest);
 
 
 

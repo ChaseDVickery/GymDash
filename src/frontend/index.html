@@ -10,6 +10,7 @@
     <!-- ALL OF THE SCRIPTS NEED type="module", APPARENTLY... -->
     <script type="module" src="./scripts/utils/api_link.js" defer></script>
     <script type="module" src="./scripts/utils/usage.js" defer></script>
+    <script type="module" src="./scripts/utils/data.js" defer></script>
     <script type="module" src="./scripts/gymdash.js" defer></script>
     <!-- <script src="scripts/gymdash.js" defer></script> -->
     
@@ -22,6 +23,11 @@
 
     <button id="resource-usage-btn">Get Resource Usage</button>
     <p>Your usage stats are: <span style="overflow-wrap: break-word" id="resource-usage-out"></span></p>
+
+    
+
+    <button id="scalar-test-btn">Test Scalar Retrieval</button>
+    <p>Newly logged: <span style="overflow-wrap: break-word" id="scalar-test-out"></span></p>
 
     <div class="resource-preview">
         <div class="resource-infos">

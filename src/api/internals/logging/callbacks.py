@@ -3,6 +3,8 @@ from typing import List, Dict
 from collections.abc import Callable
 from .StatLog import StatLog
 from stable_baselines3.common.callbacks import BaseCallback
+from src.api.internals.wrapper_utils import WrapperUtils
+from src.api.internals.logging.wrappers.TensorboardStreamWrapper import TensorboardStreamWrapper
 
 # https://stable-baselines.readthedocs.io/en/master/guide/callbacks.html
 class LogTrainingInfoCallback(BaseCallback):
@@ -114,3 +116,20 @@ class LogTrainingInfoCallback(BaseCallback):
     #             stat_log.append(default_value)
     #         return False
     
+
+class TensorboardPathCorrectionCallback(BaseCallback):
+    def __init__(self, verbose: int = 0):
+        super().__init__(verbose)
+
+    def _on_step(self) -> bool:
+        return super()._on_step()
+
+    def _on_training_start(self) -> None:
+        """
+        This method is called before the first rollout starts.
+        """
+        if (self.model):
+            tb_log_wrapper = WrapperUtils.get_wrapper_of_type(self.model.env, TensorboardStreamWrapper)
+            if tb_log_wrapper:
+                print(f"Setting wrapper log path to '{self.model.logger.get_dir()}'")
+                tb_log_wrapper.set_log_path(self.model.logger.get_dir())

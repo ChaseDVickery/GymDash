@@ -5,6 +5,13 @@ from fastapi.responses import JSONResponse
 from random import randint
 import numpy as np
 
+import traceback
+
+from threading import Thread
+from src.tests.stock.train import train
+
+from src.api.internals.logging.streamables.StreamerRegistry import StreamerRegistry
+
 from .internals.usage import get_usage_simple, get_usage_detailed, get_usage_gpu
 
 
@@ -35,6 +42,14 @@ app.add_middleware(
     # Compression level 1-9 (1 lowest compression, 9 highest compression)
     compresslevel=1
 )
+
+def start_test_simulation():
+    train()
+def setup_backend():
+    sim_listener_thread = Thread(target=start_test_simulation)
+    sim_listener_thread.start()
+
+setup_backend()
 
 @app.get("/")
 async def test():
@@ -80,7 +95,27 @@ async def get_resource_usage_gpu():
     return get_usage_gpu()
 
 
-@app.get("/read-test")
-async def get_read_test():
-    return {}
-    pass
+@app.get("/read-key/")
+async def get_read_test(exp_key: str, key: str, recent: bool = True):
+    """
+    Parameters:
+        exp_key:    The experiment key. Points towards the
+            internal tb file containing the stats.
+        key:        The scalar stat key to query.
+        recent:     If true, only queries and returns the
+            most recently acquired values from the key.
+            If false, returns the entire data sequence.
+    """
+    streamer = StreamerRegistry.get_streamer(exp_key)
+    print(streamer)
+    if not streamer:
+        return {}
+    else:
+        try:
+            recent = streamer.get_all_recent()
+            print(recent)
+            return recent
+        except Exception as e:
+            print(f"caught exception: {e}")
+            traceback.print_exc()
+        return {}
