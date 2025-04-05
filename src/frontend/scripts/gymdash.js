@@ -13,7 +13,10 @@ const scalarDataTestBtn       = document.querySelector("#scalar-test-btn");
 const scalarDataTestBtnOut    = document.querySelector("#scalar-test-out");
 const imageTestOut    = document.querySelector("#test-image");
 const imageTestBtn    = document.querySelector("#image-test-btn");
+const startSimTestBtn    = document.querySelector("#start-test-sim-btn");
+const simTestTimestepsSlider = document.querySelector("#test-sim-steps-slider")
 
+let testSimTimesteps = Number(simTestTimestepsSlider.value)
 
 function call_random() {
     return fetch(apiURL("random"));
@@ -116,6 +119,30 @@ function displayVideoTest() {
         });
 }
 
+function startSimTest() {
+    const data = {
+        name: "cartpole",
+        kwargs: {
+            "num_steps": testSimTimesteps,
+        }
+    };
+    fetch(apiURL("start-new-test"), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+    })
+        .then((response) => {
+            info = response.json();
+            console.log(info);
+            return info;
+        })
+        .catch((error) => {
+            console.error("Error: " + error);
+        });
+}
+
 
 resourceUsageDisplayUtils.setupResourceUsageDisplay();
 
@@ -124,7 +151,10 @@ testBtn.addEventListener("click", testNumberAPI);
 resourceBtn.addEventListener("click", displayResourceUsage);
 scalarDataTestBtn.addEventListener("click", displayScalarDataTest);
 imageTestBtn.addEventListener("click", displayVideoTest);
+startSimTestBtn.addEventListener("click", startSimTest);
 
 
 
-
+simTestTimestepsSlider.addEventListener("change", (e) => {
+    testSimTimesteps = Number(e.target.value);
+});

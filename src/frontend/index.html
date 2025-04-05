@@ -28,6 +28,18 @@
     <button id="scalar-test-btn">Test Scalar Retrieval</button>
     <p>Newly logged: <span style="overflow-wrap: break-word" id="scalar-test-out"></span></p>
 
+    <button id="start-test-sim-btn">Start Sim</button>
+    <label for="test-sim-steps-slider">Total Timesteps</label>
+    <input type="range" id="test-sim-steps-slider" list="markers" min="0" max="50000" value="5000" step="5000">
+    <datalist id="markers">
+        <option value="0"></option>
+        <option value="10000"></option>
+        <option value="20000"></option>
+        <option value="30000"></option>
+        <option value="40000"></option>
+        <option value="50000"></option>
+    </datalist>
+
     <button id="image-test-btn">Test Image/Video Retrieval</button>
     <p>Test Image:</p>
     <img id="test-image" src="" alt="">

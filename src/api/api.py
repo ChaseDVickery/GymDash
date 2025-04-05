@@ -13,8 +13,16 @@ from src.tests.stock.train import train, train_cartpole
 from src.api.internals.logging.streamables.StreamerRegistry import StreamerRegistry
 import src.api.internals.stat_tags as tags
 
+from src.api.api_models import SimulationStartConfig
+from src.api.internals.extensions.patch import apply_extension_patches
+
 from .internals.usage import get_usage_simple, get_usage_detailed, get_usage_gpu
 
+
+
+
+
+apply_extension_patches()
 
 # Setup our API
 app = FastAPI(title="GymDash", description="API for interacting with active simulation environments", version="0.0.1")
@@ -44,15 +52,21 @@ app.add_middleware(
     compresslevel=1
 )
 
-def start_test_simulation():
-    # train()
-    train_cartpole()
+def run_test_simulation(config: SimulationStartConfig):
+    if not SimulationStartConfig:
+        raise ValueError("No SimulationStartConfig provided")
+    else:
+        if (config.name == "cartpole"):
+            train_cartpole(**config.kwargs)
+        elif (config.name == "stock"):
+            train()
+        else:
+            raise ValueError(f"SimulationStartConfig name '{config.name}' is not recognized. Try one of (cartpole, stock)")
+    
 
-def setup_backend():
-    sim_listener_thread = Thread(target=start_test_simulation)
+def start_test_simulation(config: SimulationStartConfig):
+    sim_listener_thread = Thread(target=run_test_simulation, args=(config,))
     sim_listener_thread.start()
-
-setup_backend()
 
 @app.get("/")
 async def test():
@@ -102,13 +116,24 @@ async def get_all_recent_images():
     for streamer in StreamerRegistry.streamers():
         # print(streamer)
         recent = streamer.get_recent_from_tag(tags.TB_IMAGES)
+        all = streamer.get_all_from_tag(tags.TB_IMAGES)
+        print(f"api total test things count: {len(recent['episode_video'])}")
         print(f"api new test things count: {len(recent['episode_video'])}")
+        if (len(recent["episode_video"]) > 0):
+            for i in range(len(recent["episode_video"])):
+                d = recent['episode_video'][i]
+                print(f"api image values: wall_time={d.wall_time}, step={d.step}, width={d.width}, height={d.height}, encoded_len={len(d.encoded_image_string)}")
+        # return {}
         if (len(recent['episode_video']) < 1):
             return {}
         response = Response(content=recent["episode_video"][0].encoded_image_string, media_type="image/gif")
         # response = Response(content=recent["episode_video"][0].encoded_image_string, media_type="application/octet-stream")
         return response
         # return recent
+    
+@app.post("/start-new-test")
+async def start_new_simulation_call(config: SimulationStartConfig):
+    start_test_simulation(config)
     
 @app.get("/all-recent-scalars")
 async def get_all_recent_scalars():

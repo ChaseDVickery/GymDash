@@ -36,7 +36,7 @@ class RecordVideoToTensorboard(RecordVideo):
             vid_tensor = th.from_numpy(frame_stack)
             print(f"Adding video tensor: {vid_tensor.shape}")
             # self.logger.add_video(self.tag, vid_tensor, self.episode_id, fps=30)
-            self.logger.add_video(self.tag, vid_tensor, None, fps=30)
+            self.logger.add_video(self.tag, vid_tensor, self.episode_id, fps=30)
                 
             # try:
             #     from moviepy.video.io.ImageSequenceClip import ImageSequenceClip

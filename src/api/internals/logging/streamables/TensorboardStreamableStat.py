@@ -21,6 +21,7 @@ class TensorboardStreamableStat(StreamableStat):
         self._cached_key_tag= None
         self.associated_tags = set()
         self._cached_data_access_method = None
+        self._cached_reservoir_access_method = None
         # if key not in self.ea.Tags(tag_types.SCALARS):
         #     raise KeyError(f"TensorboardStreamableStat, key '{key}' was not found in the EventAccumulator")
 
@@ -57,6 +58,7 @@ class TensorboardStreamableStat(StreamableStat):
         print(f"TensorboardStreamableStat finalizing key={self.key} tag={self._cached_key_tag}")
         if tag == tag_types.TENSORS:
             self._cached_data_access_method = self.ea.Tensors
+            self._cached_reservoir_access_method = self.ea.TensorsR
         elif tag == tag_types.GRAPH:
             self._cached_data_access_method = self.ea.Graph
         elif tag == tag_types.META_GRAPH:
@@ -65,14 +67,19 @@ class TensorboardStreamableStat(StreamableStat):
             self._cached_data_access_method = self.ea.RunMetadata
         elif tag == tag_types.COMPRESSED_HISTOGRAMS:
             self._cached_data_access_method = self.ea.CompressedHistograms
+            self._cached_reservoir_access_method = self.ea.CompressedHistogramsR
         elif tag == tag_types.HISTOGRAMS:
             self._cached_data_access_method = self.ea.Histograms
+            self._cached_reservoir_access_method = self.ea.HistogramsR
         elif tag == tag_types.IMAGES:
             self._cached_data_access_method = self.ea.Images
+            self._cached_reservoir_access_method = self.ea.ImagesR
         elif tag == tag_types.AUDIO:
             self._cached_data_access_method = self.ea.Audio
+            self._cached_reservoir_access_method = self.ea.AudioR
         elif tag == tag_types.SCALARS:
             self._cached_data_access_method = self.ea.Scalars
+            self._cached_reservoir_access_method = self.ea.ScalarsR
         else:
             raise RuntimeError(f"The key '{self.key}' was found in the EventAccumulator under tag {tag}, but this tag is not associated with any EventAccumulator retrieval method.")
 
@@ -90,6 +97,30 @@ class TensorboardStreamableStat(StreamableStat):
     def __str__(self) -> str:
         return f"BasicStreamableStat(last_read={self._last_read_index}, values={self.get_values()})"
     
+    def get_recent(self):
+        # Also want to clear the Reservoirs on the TB backend
+        # since we clear the reservoir every time we read recent.
+        # Basically, set last index to read everything
+        # Then read everything,
+        # Then clear on the backend
+        if self.key_exists and self._cached_reservoir_access_method:
+            self._last_read_index = -1
+        values = super().get_recent()
+        # Keep all points with unique step values
+        # For any repeat step values, check which wall_time is greatest
+        step_map = {}
+        for event in values:
+            if event.step in step_map:
+                if event.wall_time > step_map[event.step].wall_time:
+                    step_map[event.step] = event
+            else:
+                step_map[event.step] = event
+        values = sorted([event for event in step_map.values()], key=lambda e: e.step, reverse=False)
+        # Now clear on the backend
+        if self.key_exists and self._cached_reservoir_access_method:
+            self._cached_reservoir_access_method().Clear(self.key)
+        return values
+    
     def _get_values(self):
         # return self.ea.Tags(tag_types.SCALARS)[self.key]
         # return self.ea.Scalars(self.key)
@@ -97,7 +128,7 @@ class TensorboardStreamableStat(StreamableStat):
     def get_values(self):
         self.ea.Reload()
         if self.key_exists:
-            print(f"TensorboardStreamableStat has {len(self._get_values())} values.")
+            print(f"TensorboardStreamableStat ({self.key}) has {len(self._get_values())} values.")
             return self._get_values()
         return []
     

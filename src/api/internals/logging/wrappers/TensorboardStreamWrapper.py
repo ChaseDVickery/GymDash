@@ -67,8 +67,13 @@ class TensorboardStreamWrapper(gym.Wrapper):
         #     tag_types.AUDIO:                    {},
         #     tag_types.SCALARS:                  {},
         # }
-        if not StreamerRegistry.register(self.tb_log_path, self):
-            raise KeyError(f"Cannot register streamer with name '{tb_log}' because it already exists in the registry")
+
+        # if not StreamerRegistry.register(self.tb_log_path, self):
+        #     raise KeyError(f"Cannot register streamer with name '{tb_log}' because it already exists in the registry")
+        
+    @property
+    def streamer_name(self):
+        return self.tb_log_path
         
     def add_tag_keys(self, tag_key_map:Dict[str, Iterable[str]]):
         # Combine the input tag key map
@@ -118,7 +123,8 @@ class TensorboardStreamWrapper(gym.Wrapper):
         if (not self.tb_log_path): return False
         # Setup using new EventAccumulator
         self._ea = event_accumulator.EventAccumulator(
-            self.tb_log_path
+            self.tb_log_path,
+            size_guidance=event_accumulator.STORE_EVERYTHING_SIZE_GUIDANCE
         )
         # Create new TensorboardStreamableStats for all keys under each tag
         for tag, keys in self.tag_key_map.items():
@@ -136,6 +142,11 @@ class TensorboardStreamWrapper(gym.Wrapper):
         # [stat for stat in self.streamed.values() if stat.found_key_tag==tag]
         # return self.streamed_tag_exclusive[tag].union(self.streamed_tag_exclusive[ANY_TAG])
         return [stat for stat in self.streamed.values() if stat.found_key_tag==tag]
+    
+    def get_all_from_tag(self, tag: str):
+        if self.check_tb():
+            self._ea.Reload()
+            return {stat.key: stat.get_values() for stat in self._valid_stats(tag)}
     
     def get_all_recent(self):
         if self.check_tb():
