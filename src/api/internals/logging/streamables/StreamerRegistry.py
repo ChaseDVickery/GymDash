@@ -13,3 +13,6 @@ class StreamerRegistry:
         StreamerRegistry.log_map[tb_log] = streamer
         print(f"Register streamer '{tb_log}'")
         return True
+    @staticmethod
+    def streamers():
+        return StreamerRegistry.log_map.values()

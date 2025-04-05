@@ -1,16 +1,17 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response, FileResponse, StreamingResponse
 from random import randint
 import numpy as np
 
 import traceback
 
 from threading import Thread
-from src.tests.stock.train import train
+from src.tests.stock.train import train, train_cartpole
 
 from src.api.internals.logging.streamables.StreamerRegistry import StreamerRegistry
+import src.api.internals.stat_tags as tags
 
 from .internals.usage import get_usage_simple, get_usage_detailed, get_usage_gpu
 
@@ -44,7 +45,9 @@ app.add_middleware(
 )
 
 def start_test_simulation():
-    train()
+    # train()
+    train_cartpole()
+
 def setup_backend():
     sim_listener_thread = Thread(target=start_test_simulation)
     sim_listener_thread.start()
@@ -94,6 +97,24 @@ async def get_resource_usage_detailed():
 async def get_resource_usage_gpu():
     return get_usage_gpu()
 
+@app.get("/all-recent-images")
+async def get_all_recent_images():
+    for streamer in StreamerRegistry.streamers():
+        # print(streamer)
+        recent = streamer.get_recent_from_tag(tags.TB_IMAGES)
+        print(f"api new test things count: {len(recent['episode_video'])}")
+        if (len(recent['episode_video']) < 1):
+            return {}
+        response = Response(content=recent["episode_video"][0].encoded_image_string, media_type="image/gif")
+        # response = Response(content=recent["episode_video"][0].encoded_image_string, media_type="application/octet-stream")
+        return response
+        # return recent
+    
+@app.get("/all-recent-scalars")
+async def get_all_recent_scalars():
+    for streamer in StreamerRegistry.streamers():
+        recent = streamer.get_recent_from_tag(tags.TB_SCALARS)
+        return recent
 
 @app.get("/read-key/")
 async def get_read_test(exp_key: str, key: str, recent: bool = True):
@@ -107,8 +128,9 @@ async def get_read_test(exp_key: str, key: str, recent: bool = True):
             If false, returns the entire data sequence.
     """
     streamer = StreamerRegistry.get_streamer(exp_key)
-    print(streamer)
+    print(f"Got streamer: '{streamer}'")
     if not streamer:
+        print(f"No streamer '{exp_key}'")
         return {}
     else:
         try:

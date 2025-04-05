@@ -11,6 +11,7 @@
     <script type="module" src="./scripts/utils/api_link.js" defer></script>
     <script type="module" src="./scripts/utils/usage.js" defer></script>
     <script type="module" src="./scripts/utils/data.js" defer></script>
+    <script type="module" src="./scripts/utils/media_utils.js" defer></script>
     <script type="module" src="./scripts/gymdash.js" defer></script>
     <!-- <script src="scripts/gymdash.js" defer></script> -->
     
@@ -22,12 +23,14 @@
     <p>Your retrieval times were: <span style="overflow-wrap: break-word" id="test-api-out"></span></p>
 
     <button id="resource-usage-btn">Get Resource Usage</button>
-    <p>Your usage stats are: <span style="overflow-wrap: break-word" id="resource-usage-out"></span></p>
-
-    
+    <p>Your usage stats are: <span style="overflow-wrap: break-word" id="resource-usage-out"></span></p>    
 
     <button id="scalar-test-btn">Test Scalar Retrieval</button>
     <p>Newly logged: <span style="overflow-wrap: break-word" id="scalar-test-out"></span></p>
+
+    <button id="image-test-btn">Test Image/Video Retrieval</button>
+    <p>Test Image:</p>
+    <img id="test-image" src="" alt="">
 
     <div class="resource-preview">
         <div class="resource-infos">

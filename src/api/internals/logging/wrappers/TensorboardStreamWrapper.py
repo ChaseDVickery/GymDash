@@ -3,7 +3,7 @@ import json
 import os
 import time
 from glob import glob
-from typing import Any, Optional, SupportsFloat, Union, Dict, List
+from typing import Any, Optional, SupportsFloat, Union, Dict, List, Set, Iterable
 from tensorboard.backend.event_processing import event_accumulator, tag_types
 
 from collections.abc import Callable
@@ -12,21 +12,87 @@ from ..StatLog import StatLog
 from ..streamables.StreamableStat import StreamableStat
 from ..streamables.TensorboardStreamableStat import TensorboardStreamableStat
 from ..streamables.StreamerRegistry import StreamerRegistry
+from src.api.internals.logging.streamables.Streamer import Streamer
 
 import gymnasium as gym
 import pandas
 from gymnasium.core import ActType, ObsType
+from src.api.internals.stat_tags import ANY_TAG
 
 class TensorboardStreamWrapper(gym.Wrapper):
-    def __init__(self, env: gym.Env, tb_log: str, keys: Union[List[str],None]):
+    
+
+    def __init__(self, env: gym.Env, tb_log: str, keys: Union[List[str],None]=None, tag_key_map: Union[Dict[str,List[str]],None]=None):
         super().__init__(env)
         self.tb_log_path: str                           = tb_log
         self._tb_exists: bool                           = False
         self._ea: event_accumulator.EventAccumulator    = None
-        self.keys: List[str]                            = keys if keys else []
+        self.keys: Set[str]                             = set(keys) if keys else []
+
+        self.tag_key_map: Dict[str, Set[str]] = {
+            ANY_TAG: set(keys),
+            tag_types.TENSORS:                  set(),
+            # tag_types.GRAPH:                    set(),    # bool
+            # tag_types.META_GRAPH:               set(),    # bool
+            tag_types.RUN_METADATA:             set(),
+            tag_types.COMPRESSED_HISTOGRAMS:    set(),
+            tag_types.HISTOGRAMS:               set(),
+            tag_types.IMAGES:                   set(),
+            tag_types.AUDIO:                    set(),
+            tag_types.SCALARS:                  set(),
+        }
+        self.key_tag_map: Dict[str, Set[str]] = {
+            key: set((ANY_TAG,)) for key in keys
+        }
+        self.add_tag_keys(tag_key_map)
+
         self.streamed: Dict[str, TensorboardStreamableStat] = {}
+        # streamed_tag_exclusive is EXCLUSIVE in the sense that a streamable stat
+        # is only under a SINGLE tag in streamed_tag_exclusive even if that stat
+        # has multiple associated_tags.
+        self.streamed_tag_exclusive: Dict[str, Set[TensorboardStreamableStat]] = {}
+        # # streamed_tag_inclusive is INCLUSIVE in the sense that a streamable stat
+        # # is under EVERY tag in streamed_tag_inclusive where it is marked as an
+        # # associated_tags.
+        # self.streamed_tag_inclusive: Dict[str, Set[TensorboardStreamableStat]] = {}
+        # self.streamed: Dict[str, Dict[str, TensorboardStreamableStat]] = {
+        #     ANY_TAG:                            {},
+        #     tag_types.TENSORS:                  {},
+        #     tag_types.GRAPH:                    {},
+        #     tag_types.META_GRAPH:               {},
+        #     tag_types.RUN_METADATA:             {},
+        #     tag_types.COMPRESSED_HISTOGRAMS:    {},
+        #     tag_types.HISTOGRAMS:               {},
+        #     tag_types.IMAGES:                   {},
+        #     tag_types.AUDIO:                    {},
+        #     tag_types.SCALARS:                  {},
+        # }
         if not StreamerRegistry.register(self.tb_log_path, self):
             raise KeyError(f"Cannot register streamer with name '{tb_log}' because it already exists in the registry")
+        
+    def add_tag_keys(self, tag_key_map:Dict[str, Iterable[str]]):
+        # Combine the input tag key map
+        if tag_key_map:
+            for tag in tag_key_map.keys():
+                keys = tag_key_map[tag]
+                # Extend the current key set
+                self.keys.update(keys)
+                # Extend the tag -> keys map
+                if tag in self.tag_key_map:
+                    self.tag_key_map[tag].update(keys)
+                else:
+                    self.tag_key_map[tag] = set(keys)
+            for tag in tag_key_map.keys():
+                keys = tag_key_map[tag]
+                print(f"Adding keys: {keys}")
+                # Extend the key -> tags map
+                for key in keys:
+                    if key in self.key_tag_map:
+                        self.key_tag_map[key].add(tag)
+                    else:
+                        self.key_tag_map[key] = set(tag)
+        print(f"New tag_key_map: {self.tag_key_map}")
+        print(f"New key_tag_map: {self.key_tag_map}")
         
     def reset(self, **kwargs) -> tuple[Any, dict[str, Any]]:
         return self.env.reset(**kwargs)
@@ -44,6 +110,7 @@ class TensorboardStreamWrapper(gym.Wrapper):
         self.tb_log_path = new_path
         self._tb_exists = False
         self.streamed.clear()
+        self.streamed_tag_exclusive.clear()
 
     # https://github.com/tensorflow/tensorboard/blob/master/tensorboard/backend/event_processing/event_accumulator.py#L940
     def check_tb(self):
@@ -53,32 +120,38 @@ class TensorboardStreamWrapper(gym.Wrapper):
         self._ea = event_accumulator.EventAccumulator(
             self.tb_log_path
         )
-        for key in self.keys:
-            self.streamed[key] = TensorboardStreamableStat(self._ea, key)
+        # Create new TensorboardStreamableStats for all keys under each tag
+        for tag, keys in self.tag_key_map.items():
+            self.streamed_tag_exclusive[tag] = set()
+            for key in keys:
+                streamed_stat = TensorboardStreamableStat(self._ea, key, self.key_tag_map[key])
+                self.streamed[key] = streamed_stat
+                self.streamed_tag_exclusive[tag].add(streamed_stat)
+
         self._tb_exists = True
         return True
+    
+    def _valid_stats(self, tag: str):
+        """Returns stats whose determined tag is tag."""
+        # [stat for stat in self.streamed.values() if stat.found_key_tag==tag]
+        # return self.streamed_tag_exclusive[tag].union(self.streamed_tag_exclusive[ANY_TAG])
+        return [stat for stat in self.streamed.values() if stat.found_key_tag==tag]
     
     def get_all_recent(self):
         if self.check_tb():
             self._ea.Reload()
-            return {key: self._get_recent(key) for key in self.keys}
+            return {key: self.streamed[key].get_recent() for key in self.keys}
         return {key: [] for key in self.keys}
-
-    def _get_recent(self, key:str):
-        return self.streamed[key].get_recent()
-        # scalars = self._ea.Tags()[tag_types.SCALARS]
-        # print(f"Scalars= '{self._ea.Tags()[tag_types.SCALARS]}'")
-        # print(f"Checking key '{key}' in scalar records")
-        # if key in scalars:
-        #     print(f"Found key '{key}' in scalar records")
-        #     print(self._ea.Scalars(key))
-        #     return self._ea.Scalars(key)
-        # else:
-        #     print(f"Missing key '{key}' in scalar records")
-        #     return []
-
-    def get_recent(self, key:str):
+    
+    def get_recent_from_tag(self, tag: str):
+        # print(f"TensorboardStreamWrapper get_recent_from_tag: '{tag}'")
+        # print(f"TensorboardStreamWrapper streamed_tag: '{self.streamed_tag_exclusive}'")
         if self.check_tb():
             self._ea.Reload()
-            return self._get_recent(key)
-            
+            return {stat.key: stat.get_recent() for stat in self._valid_stats(tag)}
+        return {key: [] for key in self.streamed_tag_exclusive[tag]}
+
+    def get_recent_from_key(self, key:str):
+        if self.check_tb():
+            self._ea.Reload()
+            return self.streamed[key].get_recent()

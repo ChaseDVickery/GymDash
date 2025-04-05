@@ -1,5 +1,6 @@
 import { resourceUsageUtils, resourceUsageDisplayUtils } from "./utils/usage.js";
 import { dataUtils } from "./utils/data.js";
+import { mediaUtils } from "./utils/media_utils.js";
 import { apiURL } from "./utils/api_link.js";
 
 const tryBtn        = document.querySelector("#try-api-btn");
@@ -10,6 +11,9 @@ const resourceBtn       = document.querySelector("#resource-usage-btn");
 const resourceBtnOut    = document.querySelector("#resource-usage-out");
 const scalarDataTestBtn       = document.querySelector("#scalar-test-btn");
 const scalarDataTestBtnOut    = document.querySelector("#scalar-test-out");
+const imageTestOut    = document.querySelector("#test-image");
+const imageTestBtn    = document.querySelector("#image-test-btn");
+
 
 function call_random() {
     return fetch(apiURL("random"));
@@ -103,13 +107,23 @@ function displayScalarDataTest() {
         });
 }
 
+function displayVideoTest() {
+    dataUtils.getAllNewImages()
+        .then((results) => {
+            console.log(results);
+            const gif_src = mediaUtils.binaryToGIF(results);
+            imageTestOut.src = gif_src;
+        });
+}
+
+
 resourceUsageDisplayUtils.setupResourceUsageDisplay();
 
 tryBtn.addEventListener("click", getNumber);
 testBtn.addEventListener("click", testNumberAPI);
 resourceBtn.addEventListener("click", displayResourceUsage);
 scalarDataTestBtn.addEventListener("click", displayScalarDataTest);
-
+imageTestBtn.addEventListener("click", displayVideoTest);
 
 
 
