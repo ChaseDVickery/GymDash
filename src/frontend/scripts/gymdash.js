@@ -2,6 +2,12 @@ import { resourceUsageUtils, resourceUsageDisplayUtils } from "./utils/usage.js"
 import { dataUtils } from "./utils/data.js";
 import { mediaUtils } from "./utils/media_utils.js";
 import { apiURL } from "./utils/api_link.js";
+// import * as d3 from "./libraries/d3.js";
+// import { range } from "./libraries/d3.js";
+
+console.log(d3);
+console.log(JSZip);
+// console.log(range);
 
 const tryBtn        = document.querySelector("#try-api-btn");
 const tryBtnOut     = document.querySelector("#try-api-out");
@@ -158,3 +164,93 @@ startSimTestBtn.addEventListener("click", startSimTest);
 simTestTimestepsSlider.addEventListener("change", (e) => {
     testSimTimesteps = Number(e.target.value);
 });
+
+
+function polyline(T, Y, tscale, yscale) {
+    return T.map((t, i) => tscale(t).toFixed(1) + "," + yscale(Y[i]).toFixed(1)).join(
+        " "
+    );
+}
+
+function test() {
+    const margin = {top: 30, right: 30, bottom: 30, left: 60};
+    const n = 10;
+    const x = d3.range(0, n);
+    const y = x.map((t) => 0.5 * Math.pow(t, 1.5));
+
+    const extentY = d3.extent(y);
+
+    const width = 500;
+    const height = 500;
+    const svg = d3
+        .select("body")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height)
+        .style("border", "1px solid black");
+
+    const xScale = d3
+        .scaleLinear()
+        .domain([x[0], x[x.length - 1]])
+        .range([margin.left, width - margin.right]);
+    const yScale = d3
+        .scaleLinear()
+        .domain(extentY)
+        .nice()
+        .range([height - margin.bottom, margin.top]);
+    console.log("xScale: " + xScale);
+    console.log("yScale: " + yScale);
+
+    const xAxis = svg
+        .append("g")
+        .attr("transform", `translate(0,${margin.top})`)
+        .call(d3.axisTop(xScale));
+    const yAxis = svg
+        .append("g")
+        .attr("transform", `translate(${margin.left - 1}, 0)`)
+        .call(d3.axisLeft(yScale));
+
+    const pline = svg
+        .append("polyline")
+        .attr("fill", "none")
+        .attr("stroke", "steelblue")
+        .attr("stroke-width", 1.5)
+        .attr("points", polyline(x, y, xScale, yScale));
+
+    // d3.select("body").append("svg", svg.node());
+}
+
+// test();
+
+// Got this function from Google AI overview,
+// so... be careful...
+async function unpackZip(file) {
+    try {
+        const zip = await JSZip.loadAsync(file);
+        const files = [];
+
+        zip.forEach((relativePath, zipEntry) => {
+        if (!zipEntry.dir) {
+            files.push(zipEntry.async('blob').then(blob => ({
+            name: relativePath,
+            data: blob
+            })));
+        }
+        });
+
+        return Promise.all(files);
+    } catch (e) {
+        console.error("Error unpacking zip file:", e);
+        throw e;
+    }
+}
+
+
+function plotVideosTest() {
+    dataUtils.getAllNewImages()
+        .then((results) => {
+            console.log(results);
+            const gif_src = mediaUtils.binaryToGIF(results);
+            imageTestOut.src = gif_src;
+        });
+}

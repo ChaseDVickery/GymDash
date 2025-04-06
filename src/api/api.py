@@ -15,6 +15,7 @@ import src.api.internals.stat_tags as tags
 
 from src.api.api_models import SimulationStartConfig
 from src.api.internals.extensions.patch import apply_extension_patches
+import src.api.api_utils as api_utils
 
 from .internals.usage import get_usage_simple, get_usage_detailed, get_usage_gpu
 
@@ -113,23 +114,26 @@ async def get_resource_usage_gpu():
 
 @app.get("/all-recent-images")
 async def get_all_recent_images():
-    for streamer in StreamerRegistry.streamers():
-        # print(streamer)
-        recent = streamer.get_recent_from_tag(tags.TB_IMAGES)
-        all = streamer.get_all_from_tag(tags.TB_IMAGES)
-        print(f"api total test things count: {len(recent['episode_video'])}")
-        print(f"api new test things count: {len(recent['episode_video'])}")
-        if (len(recent["episode_video"]) > 0):
-            for i in range(len(recent["episode_video"])):
-                d = recent['episode_video'][i]
-                print(f"api image values: wall_time={d.wall_time}, step={d.step}, width={d.width}, height={d.height}, encoded_len={len(d.encoded_image_string)}")
-        # return {}
-        if (len(recent['episode_video']) < 1):
-            return {}
-        response = Response(content=recent["episode_video"][0].encoded_image_string, media_type="image/gif")
-        # response = Response(content=recent["episode_video"][0].encoded_image_string, media_type="application/octet-stream")
-        return response
-        # return recent
+    # print(get_recent_media(tags.TB_IMAGES, "episode_video"))
+    return StreamingResponse(content=api_utils.get_recent_media_generator(tags.TB_IMAGES, "episode_video"), media_type="application/zip")
+
+    # for streamer in StreamerRegistry.streamers():
+    #     # print(streamer)
+    #     recent = streamer.get_recent_from_tag(tags.TB_IMAGES)
+    #     all = streamer.get_all_from_tag(tags.TB_IMAGES)
+    #     print(f"api total test things count: {len(recent['episode_video'])}")
+    #     print(f"api new test things count: {len(recent['episode_video'])}")
+    #     if (len(recent["episode_video"]) > 0):
+    #         for i in range(len(recent["episode_video"])):
+    #             d = recent['episode_video'][i]
+    #             print(f"api image values: wall_time={d.wall_time}, step={d.step}, width={d.width}, height={d.height}, encoded_len={len(d.encoded_image_string)}")
+    #     # return {}
+    #     if (len(recent['episode_video']) < 1):
+    #         return {}
+    #     response = Response(content=recent["episode_video"][0].encoded_image_string, media_type="image/gif")
+    #     # response = Response(content=recent["episode_video"][0].encoded_image_string, media_type="application/octet-stream")
+    #     return response
+    #     # return recent
     
 @app.post("/start-new-test")
 async def start_new_simulation_call(config: SimulationStartConfig):

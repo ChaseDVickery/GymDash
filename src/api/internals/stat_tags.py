@@ -22,6 +22,11 @@ TENSORBOARD_TAG_SET = set((
     TB_SCALARS,
 ))
 
+MEDIA_TAG_SET = set((
+    TB_IMAGES,
+    TB_AUDIO,
+))
+
 EVERY_TAG_SET = set((
     ANY_TAG,
 )).union(

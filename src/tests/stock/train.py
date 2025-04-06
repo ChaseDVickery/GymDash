@@ -75,7 +75,7 @@ def train_cartpole(**kwargs):
     model.save("ppo_aapl")
 
 
-    print(WrapperUtils.get_wrapper_of_type(env, LogTrainingInfoWrapper).episode_logs)
+    # print(WrapperUtils.get_wrapper_of_type(env, LogTrainingInfoWrapper).episode_logs)
 
 if __name__ == "__main__":
     train()
