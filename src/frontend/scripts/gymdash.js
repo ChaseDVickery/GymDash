@@ -22,6 +22,8 @@ const imageTestBtn    = document.querySelector("#image-test-btn");
 const startSimTestBtn    = document.querySelector("#start-test-sim-btn");
 const simTestTimestepsSlider = document.querySelector("#test-sim-steps-slider")
 
+const testImageOutputs = []
+
 let testSimTimesteps = Number(simTestTimestepsSlider.value)
 
 function call_random() {
@@ -116,12 +118,23 @@ function displayScalarDataTest() {
         });
 }
 
+function setImageOutput(index, imgSrc) {
+    while (index >= testImageOutputs.length) {
+        const img = document.createElement("img");
+        document.body.appendChild(img);
+        testImageOutputs.push(img);
+    }
+    testImageOutputs[index].src = imgSrc;
+}
 function displayVideoTest() {
     dataUtils.getAllNewImages()
         .then((results) => {
-            console.log(results);
-            const gif_src = mediaUtils.binaryToGIF(results);
-            imageTestOut.src = gif_src;
+            for (let i = 0; i < results.length; i++) {
+                setImageOutput(i, results[i]);
+            }
+            // console.log(results);
+            // const gif_src = mediaUtils.binaryToGIF(results);
+            // imageTestOut.src = gif_src;
         });
 }
 
@@ -140,7 +153,7 @@ function startSimTest() {
         body: JSON.stringify(data),
     })
         .then((response) => {
-            info = response.json();
+            const info = response.json();
             console.log(info);
             return info;
         })
@@ -221,29 +234,6 @@ function test() {
 }
 
 // test();
-
-// Got this function from Google AI overview,
-// so... be careful...
-async function unpackZip(file) {
-    try {
-        const zip = await JSZip.loadAsync(file);
-        const files = [];
-
-        zip.forEach((relativePath, zipEntry) => {
-        if (!zipEntry.dir) {
-            files.push(zipEntry.async('blob').then(blob => ({
-            name: relativePath,
-            data: blob
-            })));
-        }
-        });
-
-        return Promise.all(files);
-    } catch (e) {
-        console.error("Error unpacking zip file:", e);
-        throw e;
-    }
-}
 
 
 function plotVideosTest() {

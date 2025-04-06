@@ -5,6 +5,7 @@ import GPUtil
 from pydantic import BaseModel
 
 mega2bytes = pow(2, 20)
+usage_interval = None
 
 # Detailed usage statistics measure the usage
 # of this process against the total resources
@@ -42,8 +43,8 @@ def get_usage_detailed():
     # Speedup data retrievel with oneshot context
     with p.oneshot():
         return UsageStatsDetailed(
-            cpus_percent        = psutil.cpu_percent(interval=None, percpu=True),
-            cpu_percent_proc    = p.cpu_percent(interval=None),
+            cpus_percent        = psutil.cpu_percent(interval=usage_interval, percpu=True),
+            cpu_percent_proc    = p.cpu_percent(interval=usage_interval),
             cpu_count           = psutil.cpu_count(),
             memory_phys_proc    = p.memory_info().rss,
             memory_virt_proc    = p.memory_info().vms,
@@ -55,7 +56,7 @@ def get_usage_detailed():
     
 def get_usage_simple():
     return UsageStatsSimple(
-        cpu_percent         = psutil.cpu_percent(interval=None, percpu=False),
+        cpu_percent         = psutil.cpu_percent(interval=usage_interval, percpu=False),
         memory_total        = psutil.virtual_memory().total,
         memory_available    = psutil.virtual_memory().available,
         disk_total          = shutil.disk_usage(__file__).total,

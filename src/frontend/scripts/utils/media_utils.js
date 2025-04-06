@@ -20,8 +20,12 @@ const mediaUtils = (
             }
         )();
 
+        const createMediaSourceURL = function(mime_whole, base64) {
+            return `data:${mime_whole};base64,${base64}`;
+        }
+
         const createImageMediaSourceURL = function(mime, base64) {
-            return `data:image/${mime};base64,${base64}`;
+            return createMediaSourceURL(`image/${mime}`, base64);
         }
 
         const binaryToImageMediaSourceURL = function(mime, binary) {
@@ -42,6 +46,7 @@ const mediaUtils = (
             binaryToPNG,
             binaryToJPEG,
             binaryToTIFF,
+            createMediaSourceURL,
             conversionUtils
         };
     }
