@@ -20,9 +20,6 @@ import src.api.api_utils as api_utils
 from .internals.usage import get_usage_simple, get_usage_detailed, get_usage_gpu
 
 
-
-
-
 apply_extension_patches()
 
 # Setup our API

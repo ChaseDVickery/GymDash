@@ -3,6 +3,7 @@ import os
 import subprocess
 import http.server
 import multiprocessing
+from src.api.config import set_global_config
 
 # https://stackoverflow.com/questions/2470971/fast-way-to-test-if-a-port-is-in-use-using-python
 def socket_used(port) -> bool:
@@ -88,4 +89,5 @@ if __name__ == "__main__":
     check_port(args.apiport)
 
     # Start the servers
+    set_global_config(args)
     start(args)

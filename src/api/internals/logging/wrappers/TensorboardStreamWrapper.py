@@ -6,6 +6,8 @@ from glob import glob
 from typing import Any, Optional, SupportsFloat, Union, Dict, List, Set, Iterable
 from tensorboard.backend.event_processing import event_accumulator, tag_types
 
+from src.api.config import TB_CONFIG_SIZE_GUIDANCE
+
 from collections.abc import Callable
 
 from ..StatLog import StatLog
@@ -13,6 +15,7 @@ from ..streamables.StreamableStat import StreamableStat
 from ..streamables.TensorboardStreamableStat import TensorboardStreamableStat
 from ..streamables.StreamerRegistry import StreamerRegistry
 from src.api.internals.logging.streamables.Streamer import Streamer
+from src.api.config import get_config
 
 import gymnasium as gym
 import pandas
@@ -124,7 +127,7 @@ class TensorboardStreamWrapper(gym.Wrapper):
         # Setup using new EventAccumulator
         self._ea = event_accumulator.EventAccumulator(
             self.tb_log_path,
-            size_guidance=event_accumulator.STORE_EVERYTHING_SIZE_GUIDANCE
+            size_guidance=get_config().tb_size_guidance
         )
         # Create new TensorboardStreamableStats for all keys under each tag
         for tag, keys in self.tag_key_map.items():
