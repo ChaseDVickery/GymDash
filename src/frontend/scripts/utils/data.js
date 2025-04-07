@@ -21,9 +21,6 @@ const dataUtils = (
                     // The backend already sent a zip blob,
                     // we just need to interpret it as a zip.
                     const blob = response.blob();
-                    // const buff = response.blob();
-                    // console.log(buff);
-                    // return buff;
                     const zip = new JSZip();
                     const indexFilename = "index.json";
                     const loader = zip.loadAsync(blob)
@@ -63,6 +60,9 @@ const dataUtils = (
                     // return zip.generateAsync({ type: 'blob' });
 
                     // return blob;
+                })
+                .catch((error) => {
+
                 });
                 // .then((zipBlob) => {
                 //     const url = URL.createObjectURL(zipBlob);

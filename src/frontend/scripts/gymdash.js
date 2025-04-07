@@ -135,6 +135,9 @@ function displayVideoTest() {
             // console.log(results);
             // const gif_src = mediaUtils.binaryToGIF(results);
             // imageTestOut.src = gif_src;
+        })
+        .catch((error) => {
+
         });
 }
 
