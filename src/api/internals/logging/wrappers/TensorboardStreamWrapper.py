@@ -49,6 +49,7 @@ class TensorboardStreamWrapper(gym.Wrapper):
         }
         self.add_tag_keys(tag_key_map)
 
+        # Streamed maps key names to StreamableStats
         self.streamed: Dict[str, TensorboardStreamableStat] = {}
         # streamed_tag_exclusive is EXCLUSIVE in the sense that a streamable stat
         # is only under a SINGLE tag in streamed_tag_exclusive even if that stat
@@ -158,8 +159,8 @@ class TensorboardStreamWrapper(gym.Wrapper):
         return {key: [] for key in self.keys}
     
     def get_recent_from_tag(self, tag: str):
-        # print(f"TensorboardStreamWrapper get_recent_from_tag: '{tag}'")
-        # print(f"TensorboardStreamWrapper streamed_tag: '{self.streamed_tag_exclusive}'")
+        print(f"TensorboardStreamWrapper get_recent_from_tag: '{tag}'")
+        print(f"TensorboardStreamWrapper valid stats: '{self._valid_stats(tag)}'")
         if self.check_tb():
             self._ea.Reload()
             return {stat.key: stat.get_recent() for stat in self._valid_stats(tag)}
@@ -168,4 +169,7 @@ class TensorboardStreamWrapper(gym.Wrapper):
     def get_recent_from_key(self, key:str):
         if self.check_tb():
             self._ea.Reload()
-            return self.streamed[key].get_recent()
+            if key in self.streamed:
+                return {key: self.streamed[key].get_recent()}
+            else:
+                return {key: []}

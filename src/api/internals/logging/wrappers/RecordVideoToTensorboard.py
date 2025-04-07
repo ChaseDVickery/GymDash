@@ -12,15 +12,15 @@ import numpy as np
 class RecordVideoToTensorboard(RecordVideo):
     def __init__(self, env: Env, video_folder: str, episode_trigger: Union[Callable[[int], bool], None] = None, step_trigger: Union[Callable[[int], bool], None] = None, video_length: int = 0, name_prefix: str = "rl-video", fps: Union[int, None] = None, disable_logger: bool = True):
         super().__init__(env, video_folder, episode_trigger, step_trigger, video_length, name_prefix, fps, disable_logger)
-        self.logger = None
-        self.tag = None
+        self.logger: SummaryWriter  = None
+        self.tag: str               = None
 
-    def configure_recorder(self, tag, writer):
+    def configure_recorder(self, tag: str, writer: SummaryWriter):
         self.tag = tag
         self._set_summary_writer(writer)
 
-    def _set_summary_writer(self, writer):
-        self.logger: SummaryWriter = writer
+    def _set_summary_writer(self, writer: SummaryWriter):
+        self.logger = writer
 
     def stop_recording(self):
         """Stop current recording and saves the video into Tensorboard logger."""
@@ -37,6 +37,7 @@ class RecordVideoToTensorboard(RecordVideo):
             print(f"Adding video tensor: {vid_tensor.shape}")
             # self.logger.add_video(self.tag, vid_tensor, self.episode_id, fps=30)
             self.logger.add_video(self.tag, vid_tensor, self.episode_id, fps=30)
+            self.logger.add_image(self.tag+"_thumbnail", vid_tensor[0, 0, :, :, :], self.episode_id)
                 
             # try:
             #     from moviepy.video.io.ImageSequenceClip import ImageSequenceClip

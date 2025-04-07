@@ -2,7 +2,7 @@ import src.api.internals.stat_tags as tags
 from tensorboard.backend.event_processing.event_accumulator import DEFAULT_SIZE_GUIDANCE, STORE_EVERYTHING_SIZE_GUIDANCE
 from typing import Dict, List, Any, Union
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 CUSTOM_SIZE_GUIDANCE = {
     tags.TB_COMPRESSED_HISTOGRAMS: 500,
@@ -17,7 +17,7 @@ TB_CONFIG_SIZE_GUIDANCE = STORE_EVERYTHING_SIZE_GUIDANCE
 
 @dataclass
 class GDConfig:
-    tb_size_guidance: Dict[str, int] = TB_CONFIG_SIZE_GUIDANCE
+    tb_size_guidance: Dict[str, int] = field(default_factory=lambda: TB_CONFIG_SIZE_GUIDANCE)
 
 CONFIG: GDConfig = GDConfig()
 
