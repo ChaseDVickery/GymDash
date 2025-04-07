@@ -1,6 +1,24 @@
-from typing import Dict, Iterable, Set, List
+from typing import Dict, Iterable, Set, List, Literal, Union
 from dataclasses import dataclass, field
 from collections import defaultdict
+
+@dataclass
+class FileFormat:
+    extension:str = None
+    mimetype:str = None
+
+    @property
+    def mime(self):
+        return self.mimetype
+    @property
+    def ext(self):
+        return self.extension
+    @property
+    def has_mimetype(self):
+        return self.mimetype is not None
+    @property
+    def has_extension(self):
+        return self.extension is not None
 
 @dataclass
 class SignatureBytes:
@@ -47,8 +65,7 @@ class SignatureBytes:
 class Signature:
     def __init__(self, sig_bytes: SignatureBytes, extension="<no_extension>", mime="<no_mime>") -> None:
         self.signature = sig_bytes
-        self.extension = extension
-        self.mimetype = mime
+        self.format = FileFormat(extension, mime)
 
     @property
     def data(self):
@@ -59,6 +76,12 @@ class Signature:
     @property
     def offset(self):
         return self.signature.offset
+    @property
+    def extension(self):
+        return self.format.extension
+    @property
+    def mimetype(self):
+        return self.format.mimetype
     
     def compare(self, other:bytes):
         return self.signature.compare(other)
@@ -84,10 +107,9 @@ class SignatureMap:
         for sig in signatures:
             self.signatures[sig.offset][sig.data[0].to_bytes(1, "big")].append(sig)
 
-    def guess_type(self, other: bytes, mime=True):
+    def guess_format(self, other: bytes) -> FileFormat:
         other_len = len(other)
         if other_len < 1: return None
-        
         
         for offset in self.unique_offsets:
             # Ignore checking signatures where the offset 
@@ -99,7 +121,7 @@ class SignatureMap:
                 continue
             for signature in self.signatures[offset][first_byte]:
                 if (signature.compare(other)):
-                    return signature.mimetype if mime else signature.extension
+                    return signature.format
 
         return None
     
@@ -128,7 +150,17 @@ signatures = [
 ]
 signature_map = SignatureMap(signatures)
 
-def format_from_bytes(file_bytes, mime=True):
+def format_from_bytes(file_bytes) -> Union[FileFormat, None]:
     if not isinstance(file_bytes, bytes):
         return None
-    return signature_map.guess_type(file_bytes, mime)
+    return signature_map.guess_format(file_bytes)
+def extension_from_bytes(file_bytes) -> Union[str, None]:
+    fformat = format_from_bytes(file_bytes)
+    if fformat is None:
+        return None
+    return fformat.ext
+def mimetype_from_bytes(file_bytes) -> Union[str, None]:
+    fformat = format_from_bytes(file_bytes)
+    if fformat is None:
+        return None
+    return fformat.mime
