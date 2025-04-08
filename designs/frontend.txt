@@ -1,0 +1,22 @@
+Title:      Frontend Design Doc
+Author:     Chase Vickery
+Date:       April 8, 2025
+
+Description:
+    This document discusses the kinds of features desired on the frontend
+    display for GymDash. Needs may change and grow as I experiment with the
+    package, so this will not be a static document.
+
+Desired Features:
+    -Create and store configs for your project. Configs describe the simulations
+    that should run on the backend.
+    -Simulation Interaction:
+        -Begin simulations (through custom or stored configs)
+        -Abort simulations
+        -Query simulations
+            -progress
+        -On-demand recording
+            -Ex. ask a simulation to record a video of its current episode.
+            -Ex. ask a simulation to return a specially evaluated value.
+    -Display scalar plots.
+    -Provide an easy-to-use API for querying for stats from the backend.

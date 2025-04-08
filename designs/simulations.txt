@@ -1,0 +1,58 @@
+Title:      Simulation Design Doc
+Author:     Chase Vickery
+Date:       April 8, 2025
+
+Description:
+    This document discusses how simulations are managed in the GymDash (GD) and
+    the design goals for the simulations.
+
+Simulations:
+    In GymDash (GD), simulations can be anything, but they are intended to
+    represent some long-running process (simulation) that can be executed in
+    the backend. The unique intent of GD simulations is to allow arbitrary
+    logging options as well as arbitrary interaction options.
+
+Logging:
+    At the moment, GD logging is very loose. The goal is to subclass whatever
+    custom data-logging solution you have from a Streamer base class. The
+    Streamer should then basically hold a structure of keys which each
+    correspond to a StreamableStat. Each StreamableStat, in turn, is responsible
+    for keeping track of all the new information logged under a certain key.
+    Consequently, when queried, the Streamer can gather up all the new values
+    from each StreamableStat, and return them in a structured dictionary. This
+    is useful for updating the current frontend display with only the necessary
+    new information, minimizing network traffic and frontend delays.
+
+    Ex.
+        Included is a basic implementation of TensorboardStreamWrapper. When
+        initialized with a tensorboard log path and a set of keys, this streamer
+        reads from the corresponding TB log using EventAccumulator and, when
+        queried, outputs all the newly logged stats since the last query. Using
+        this, you can continue to log your runs with tensorboard while being
+        able to query for new log values from the API/frontend. Though it does
+        not currently subclass Streamer, that is a future goal.
+
+Interaction:
+    The other goal of abstracting simulations in GD is to provide an interface
+    for interacting with running (and completed) simulations. This is
+    accomplished by subclassing a Simulation base class. Each Simulation has a
+    SimulationInteractor which is responsible for monitoring and triggering
+    information inputs and outputs through specific channels. In essence, when
+    the user attempts to interact with a simulation, the SimulationInteractor
+    sets various flags depending on the query, and the actual running simulation
+    can then check for those flags (and any argument values), gather the
+    relevant information, and set the channel's outgoing flags, which the
+    SimulationTracker can then poll, collect, and return to the frontend user.
+    As needs grow, more information channels can be arbitrarily added to the
+    SimulationInteractor and more optional information can be passed to/from
+    running simulations.
+
+    Ex.
+        Stable baselines provides a way to perform special functionality when
+        running models by using callbacks and wrappers. GD can hook into a
+        stable baselines model learning process. First, create a custom
+        Simulation by subclassing Simulation. This will only need your main
+        model setup/running logic. When calling run() on the simulation,
+        include a new SimulationInteractionCallback instance as a callback. This
+        way, the callback can read and change information channels as your
+        model runs.

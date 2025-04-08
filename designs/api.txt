@@ -1,0 +1,9 @@
+Title:      API Design Doc
+Author:     Chase Vickery
+Date:       April 8, 2025
+
+Description:
+    This document tracks the API endpoints that should be available in GymDash.
+
+Desired Endpoints:
+    

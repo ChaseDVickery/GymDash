@@ -1,0 +1,33 @@
+Title:      Layout Design Doc
+Author:     Chase Vickery
+Date:       April 8, 2025
+
+Description:
+    This document discusses how the project should be laid out to provide some
+    modularity and help future development. The project should be able to be
+    packaged into a PyPi package in the future, including optional dependencies.
+
+Source Layout:
+
+/src/                          :All source code
+    |-gym-dash/                :All package operational source code
+        |-frontend/            :All code for rendering the GUI in browser
+            |-index.html       :"Main" HTML file for GUI
+            |-pages/           :Other HTML pages
+            |-styles/          :CSS
+            |-scripts/         :JS
+                |-gymdash.js   :"Main" JS file that sets up/connects utilities
+                |-libs/        :External JS libraries (D3, JSZip, etc.)
+                |-utils/       :All custom JS file utilities (API, utils, etc.)
+        |-backend/             :All code for managing backend/API
+            |-main.py          :"Main" for API server (uvicorn/FastAPI)
+            |-core/            :Base functionality of backend
+                |-api/         :All API tools, including streaming, logging
+                    |stream/   :Manage what new content is streamed.
+                |-patch/       :Tools for patching in extension methods
+                |-utils/       :Misc utils (file formats, usage, etc).
+                |-simulation/  :Simulation management
+            |-stable_baselines/:Implementations for stable_baselines hooks
+            |-tensorboard/     :Implementations for tensorboard hooks
+            |-gymnasium/       :Implementations for gymnasium hooks
+/tests/                        :All unit testing code
