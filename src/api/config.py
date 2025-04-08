@@ -21,8 +21,5 @@ class GDConfig:
 
 CONFIG: GDConfig = GDConfig()
 
-def get_config():
-    return CONFIG
-
 def set_global_config(args):
     CONFIG = GDConfig()

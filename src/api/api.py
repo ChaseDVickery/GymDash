@@ -1,11 +1,15 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse, Response, FileResponse, StreamingResponse
 from random import randint
 import numpy as np
+import asyncio
+
+from contextlib import asynccontextmanager
 
 import traceback
+import logging
 
 from threading import Thread
 from src.tests.stock.train import train, train_cartpole
@@ -13,17 +17,39 @@ from src.tests.stock.train import train, train_cartpole
 from src.api.internals.logging.streamables.StreamerRegistry import StreamerRegistry
 import src.api.internals.stat_tags as tags
 
-from src.api.api_models import SimulationStartConfig
+from src.api.api_models import SimulationStartConfig, SimulationInteractionModel, InteractorChannelModel
 from src.api.internals.extensions.patch import apply_extension_patches
 import src.api.api_utils as api_utils
+from src.api.api_utils_thread import SimulationTracker
 
 from .internals.usage import get_usage_simple, get_usage_detailed, get_usage_gpu
 
+sim_logger = logging.getLogger("simulation")
 
+simulation_tracker = SimulationTracker()
 apply_extension_patches()
 
+async def manage_simulation_loop():
+    while True:
+        simulation_tracker.purge_finished_sims()
+        await asyncio.sleep(0.1)
+
+# App main
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Executed right before we handle requests
+    asyncio.create_task(manage_simulation_loop())
+    yield
+    # Executed right before app shutdown
+    pass
+
 # Setup our API
-app = FastAPI(title="GymDash", description="API for interacting with active simulation environments", version="0.0.1")
+app = FastAPI(
+    title="GymDash",
+    description="API for interacting with active simulation environments",
+    version="0.0.1",
+    lifespan=lifespan
+)
 
 # Setup CORS middleware so that our API will accept
 # communication from our frontend
@@ -63,9 +89,11 @@ def run_test_simulation(config: SimulationStartConfig):
             raise ValueError(f"SimulationStartConfig name '{config.name}' is not recognized. Try one of (cartpole, stock)")
     
 
-def start_test_simulation(config: SimulationStartConfig):
-    sim_listener_thread = Thread(target=run_test_simulation, args=(config,))
-    sim_listener_thread.start()
+# def start_test_simulation(config: SimulationStartConfig) -> Thread:
+#     sim_listener_thread = Thread(target=run_test_simulation, args=(config,))
+#     sim_listener_thread.start()
+#     return sim_listener_thread
+
 
 @app.get("/")
 async def test():
@@ -127,7 +155,24 @@ async def get_all_recent_images():
     
 @app.post("/start-new-test")
 async def start_new_simulation_call(config: SimulationStartConfig):
-    start_test_simulation(config)
+    print(f"API called start-new-test with config: {config}")
+    id, _ = simulation_tracker.start_sim(config)
+    if simulation_tracker.is_running(id):
+        return { "id": str(id) }
+    else:
+        raise HTTPException(status_code=410, detail="Simulation not started")
+
+# @app.post("/stop-test")
+# async def stop_simulation_call(sim_query: SimulationInteractionModel):
+#     success = await simulation_tracker.post_interaction()
+
+@app.post("/query-sim")
+async def get_sim_progress(sim_query: SimulationInteractionModel):
+    sim_logger.warning(f"Ignoring simulation query ID '{sim_query.id}' and replacing with a testing ID: {simulation_tracker.testing_first_id}")
+    sim_query.id = simulation_tracker.testing_first_id
+    query_response = await simulation_tracker.fulfill_query_interaction(sim_query)
+    return query_response
+
     
 @app.get("/all-recent-scalars")
 async def get_all_recent_scalars():

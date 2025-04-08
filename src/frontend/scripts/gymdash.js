@@ -21,6 +21,7 @@ const imageTestOut    = document.querySelector("#test-image");
 const imageTestBtn    = document.querySelector("#image-test-btn");
 const startSimTestBtn    = document.querySelector("#start-test-sim-btn");
 const simTestTimestepsSlider = document.querySelector("#test-sim-steps-slider")
+const queryProgressTestBtn = document.querySelector("#query-test-btn");
 
 const testImageOutputs = []
 
@@ -144,6 +145,8 @@ function displayVideoTest() {
 function startSimTest() {
     const data = {
         name: "cartpole",
+        sim_family: "stable_baselines",
+        sim_type: "CartPole-v1",
         kwargs: {
             "num_steps": testSimTimesteps,
         }
@@ -155,14 +158,41 @@ function startSimTest() {
         },
         body: JSON.stringify(data),
     })
-        .then((response) => {
-            const info = response.json();
-            console.log(info);
-            return info;
-        })
-        .catch((error) => {
-            console.error("Error: " + error);
-        });
+    .then((response) => {
+        const info = response.json();
+        console.log(info);
+        return info;
+    })
+    .catch((error) => {
+        console.error("Error: " + error);
+    });
+}
+
+function testQueryProgress() {
+    const simulationQuery = {
+        id: "dummy_id",
+        timeout: 0.0,
+        stop_simulation: {}, // This would contain fields 'triggered' and 'value'
+        progress: {
+            triggered: true,
+            value: "give me this information, please",
+        } // This would contain fields 'triggered' and 'value'
+    };
+    fetch(apiURL("query-sim"), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(simulationQuery),
+    })
+    .then((response) => {
+        const info = response.json();
+        console.log(info);
+        return info;
+    })
+    .catch((error) => {
+        console.error("Error: " + error);
+    })
 }
 
 
@@ -174,7 +204,7 @@ resourceBtn.addEventListener("click", displayResourceUsage);
 scalarDataTestBtn.addEventListener("click", displayScalarDataTest);
 imageTestBtn.addEventListener("click", displayVideoTest);
 startSimTestBtn.addEventListener("click", startSimTest);
-
+queryProgressTestBtn.addEventListener("click", testQueryProgress);
 
 
 simTestTimestepsSlider.addEventListener("change", (e) => {

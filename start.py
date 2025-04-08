@@ -3,7 +3,8 @@ import os
 import subprocess
 import http.server
 import multiprocessing
-from src.api.config import set_global_config
+from src.api.api_utils_thread import SimulationTracker
+from src.api.config import set_global_config, CONFIG
 
 # https://stackoverflow.com/questions/2470971/fast-way-to-test-if-a-port-is-in-use-using-python
 def socket_used(port) -> bool:

@@ -15,7 +15,7 @@ from ..streamables.StreamableStat import StreamableStat
 from ..streamables.TensorboardStreamableStat import TensorboardStreamableStat
 from ..streamables.StreamerRegistry import StreamerRegistry
 from src.api.internals.logging.streamables.Streamer import Streamer
-from src.api.config import get_config
+from src.api.config import CONFIG
 
 import gymnasium as gym
 import pandas
@@ -35,8 +35,6 @@ class TensorboardStreamWrapper(gym.Wrapper):
         self.tag_key_map: Dict[str, Set[str]] = {
             ANY_TAG: set(keys),
             tag_types.TENSORS:                  set(),
-            # tag_types.GRAPH:                    set(),    # bool
-            # tag_types.META_GRAPH:               set(),    # bool
             tag_types.RUN_METADATA:             set(),
             tag_types.COMPRESSED_HISTOGRAMS:    set(),
             tag_types.HISTOGRAMS:               set(),
@@ -55,25 +53,6 @@ class TensorboardStreamWrapper(gym.Wrapper):
         # is only under a SINGLE tag in streamed_tag_exclusive even if that stat
         # has multiple associated_tags.
         self.streamed_tag_exclusive: Dict[str, Set[TensorboardStreamableStat]] = {}
-        # # streamed_tag_inclusive is INCLUSIVE in the sense that a streamable stat
-        # # is under EVERY tag in streamed_tag_inclusive where it is marked as an
-        # # associated_tags.
-        # self.streamed_tag_inclusive: Dict[str, Set[TensorboardStreamableStat]] = {}
-        # self.streamed: Dict[str, Dict[str, TensorboardStreamableStat]] = {
-        #     ANY_TAG:                            {},
-        #     tag_types.TENSORS:                  {},
-        #     tag_types.GRAPH:                    {},
-        #     tag_types.META_GRAPH:               {},
-        #     tag_types.RUN_METADATA:             {},
-        #     tag_types.COMPRESSED_HISTOGRAMS:    {},
-        #     tag_types.HISTOGRAMS:               {},
-        #     tag_types.IMAGES:                   {},
-        #     tag_types.AUDIO:                    {},
-        #     tag_types.SCALARS:                  {},
-        # }
-
-        # if not StreamerRegistry.register(self.tb_log_path, self):
-        #     raise KeyError(f"Cannot register streamer with name '{tb_log}' because it already exists in the registry")
         
     @property
     def streamer_name(self):
@@ -93,15 +72,15 @@ class TensorboardStreamWrapper(gym.Wrapper):
                     self.tag_key_map[tag] = set(keys)
             for tag in tag_key_map.keys():
                 keys = tag_key_map[tag]
-                print(f"Adding keys: {keys}")
+                print(f"TensorboardStreamWrapper Adding keys: {keys}")
                 # Extend the key -> tags map
                 for key in keys:
                     if key in self.key_tag_map:
                         self.key_tag_map[key].add(tag)
                     else:
                         self.key_tag_map[key] = set(tag)
-        print(f"New tag_key_map: {self.tag_key_map}")
-        print(f"New key_tag_map: {self.key_tag_map}")
+        print(f"TensorboardStreamWrapper New tag_key_map: {self.tag_key_map}")
+        print(f"TensorboardStreamWrapper New key_tag_map: {self.key_tag_map}")
         
     def reset(self, **kwargs) -> tuple[Any, dict[str, Any]]:
         return self.env.reset(**kwargs)
@@ -128,7 +107,7 @@ class TensorboardStreamWrapper(gym.Wrapper):
         # Setup using new EventAccumulator
         self._ea = event_accumulator.EventAccumulator(
             self.tb_log_path,
-            size_guidance=get_config().tb_size_guidance
+            size_guidance=CONFIG.tb_size_guidance
         )
         # Create new TensorboardStreamableStats for all keys under each tag
         for tag, keys in self.tag_key_map.items():
