@@ -1,8 +1,16 @@
-
-from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
-from tensorboard.backend.event_processing.reservoir import Reservoir, _ReservoirBucket
+try:
+    from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
+    from tensorboard.backend.event_processing.reservoir import Reservoir, _ReservoirBucket
+except ImportError:
+    _has_tensorboard = False
+else:
+    _has_tensorboard = True
 
 def patch():
+
+    if not _has_tensorboard:
+        raise ImportError("tensorboard is required to patch tensorboard_extensions.")
+
     # _ReservoirBucket
     def Clear(self):
         with self._mutex:
