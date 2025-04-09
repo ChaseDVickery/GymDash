@@ -2,14 +2,20 @@ import asyncio
 import logging
 from abc import abstractmethod
 from collections import defaultdict
-from threading import Thread
+from threading import Thread, Lock
 from typing import Any, Dict, Iterable, List, Set, Tuple, Union, Callable
 from uuid import UUID, uuid4
 
 from src.gymdash.backend.core.api.models import (SimulationInteractionModel,
                                                  SimulationStartConfig)
 
-logger = logging.getLogger("simulation")
+logger = logging.getLogger("gymdash-simulation")
+logging.basicConfig(
+    filename="gymdash-simulation.log",
+    filemode="w",
+    encoding='utf-8',
+    level=logging.DEBUG
+)
 logger.setLevel(logging.DEBUG)
 
 class InteractorFlag:
@@ -21,10 +27,10 @@ class InteractorFlag:
     def reset(self):
         self.value = self.default_value
         self.triggered = self.default_status
-        print(f"InteractorFlag resetting value to default value: {self.default_value}")
+        logger.debug(f"InteractorFlag resetting value to default value: {self.default_value}, default status: {self.default_status} (now value=({self.value}), triggered={self.triggered})")
 
     def trigger_with(self, new_value: Any):
-        print(f"InteractorFlag setting value to new value: {new_value}")
+        logger.debug(f"InteractorFlag setting value to new value: {new_value}")
         # traceback.print_stack()
         self.value = new_value
         self.triggered = True
@@ -47,7 +53,7 @@ class InteractorFlagChannel:
         return self.incoming.triggered
     @property
     def has_outgoing(self):
-        return self.incoming.triggered
+        return self.outgoing.triggered
     
     def set_in(self, value: Any): self.set_incoming(value)
     def set_out(self, value: Any): self.set_outgoing(value)
@@ -56,15 +62,11 @@ class InteractorFlagChannel:
     def set_outgoing(self, value: Any):
         print(f"InteractorFlagChannel set_outgoing value to new value: {value}")
         self.outgoing.trigger_with(value)
-    # def consume_incoming(self) -> None:
-    #     return self.incoming.consume_trigger()
-    # def consume_outgoing(self) -> None:
-    #     return self.incoming.consume_trigger()
 
-    def consume_immediate_in(self) -> Any:
-        return self.incoming.consume_trigger()
-    def consume_immediate_out(self) -> Any:
-        return self.incoming.consume_trigger()
+    # def consume_immediate_in(self) -> Any:
+    #     return self.incoming.consume_trigger()
+    # def consume_immediate_out(self) -> Any:
+    #     return self.incoming.consume_trigger()
     def get_in(self):
         self._consume_in_queued = True
         return (self.incoming.triggered, self.incoming.value)
@@ -141,14 +143,16 @@ class InteractorFlagChannel:
     def reset(self):
         self.reset_outgoing()
         self.reset_incoming()
-    def reset_outgoing(self): self.outgoing.reset()
-    def reset_incoming(self): self.incoming.reset()
+    def reset_outgoing(self):
+        self.outgoing.reset()
+    def reset_incoming(self): 
+        self.incoming.reset()
 
-    def update(self):
-        self.incoming.consume_trigger()
-        self.outgoing.consume_trigger()
-        self._consume_in_queued = False
-        self._consume_out_queued = False
+    # def update(self):
+    #     self.incoming.consume_trigger()
+    #     self.outgoing.consume_trigger()
+    #     self._consume_in_queued = False
+    #     self._consume_out_queued = False
 
 
 class SimulationInteractor:
@@ -163,6 +167,9 @@ class SimulationInteractor:
         self.channels: Dict[str, InteractorFlagChannel] = {
             channel_key:  InteractorFlagChannel() for channel_key in SimulationInteractor.ALL_CHANNELS
         }
+        self._channel_locks: Dict[str, Lock] = {
+            channel_key:  Lock() for channel_key in SimulationInteractor.ALL_CHANNELS
+        }
         self.triggered_in   = []
         self.triggered_out  = []
 
@@ -172,21 +179,45 @@ class SimulationInteractor:
     @property
     def incoming(self):
         return { channel_key: channel for channel_key, channel in self.channels.items() if channel.incoming.triggered }
+    
+    def _aquire_all_locks(self):
+        for lock in self._channel_locks.values():
+            lock.acquire()
+    def _release_all_locks(self):
+        for lock in self._channel_locks.values():
+            lock.release()
+    def _aquire_locks(self, channel_keys: Iterable[str]):
+        for key in channel_keys:
+            self._channel_locks[key].acquire()
+    def _release_locks(self, channel_keys: Iterable[str]):
+        for key in channel_keys:
+            self._channel_locks[key].release()
+    def _aquire(self, channel_key: str):
+        self._channel_locks[channel_key].acquire()
+    def _release(self, channel_key: str):
+        self._channel_locks[channel_key].release()
+            
 
-    def update(self):
-        for channel in self.channels.values():
-            channel.update()
+    # def update(self):
+    #     for channel in self.channels.values():
+    #         channel.update()
     def reset(self):
+        self._aquire_all_locks()
         for channel in self.channels.values():
             channel.reset()
+        self._release_all_locks()
     def reset_outgoing_channels(self, channel_keys: Iterable[str]):
         for key in channel_keys:
             if key in self.channels:
+                self._aquire(key)
                 self.channels[key].reset_outgoing()
+                self._release(key)
     def reset_incoming_channels(self, channel_keys: Iterable[str]):
         for key in channel_keys:
             if key in self.channels:
+                self._aquire(key)
                 self.channels[key].reset_incoming()
+                self._release(key)
 
     def _try_get_channel(self, key):
         if key in self.channels:
@@ -219,22 +250,54 @@ class SimulationInteractor:
     
     def set_out(self, channel_key: str, out_value: Any):
         found, channel = self._try_get_channel(channel_key)
-        if found: channel.set_out(out_value)
+        if found:
+            self._aquire(channel_key)
+            channel.set_out(out_value)
+            self._release(channel_key)
+            
     def set_in(self, channel_key: str, in_value: Any):
         found, channel = self._try_get_channel(channel_key)
-        if found: channel.set_in(in_value)
-    def set_out_if_in(self, channel_key: str, out_value: Any):
+        if found:
+            self._aquire(channel_key)
+            channel.set_in(in_value)
+            self._release(channel_key)
+            
+    def set_out_if_in(self, channel_key: str, out_value: Any) -> bool:
         found, channel = self._try_get_channel(channel_key)
-        return channel.set_out_if_in(out_value) if found else False
-    def set_in_if_out(self, channel_key: str, in_value: Any):
+        if found:
+            self._aquire(channel_key)
+            was_set = channel.set_out_if_in(out_value)
+            self._release(channel_key)
+            return was_set
+        else:
+            return False
+    def set_in_if_out(self, channel_key: str, in_value: Any) -> bool:
         found, channel = self._try_get_channel(channel_key)
-        return channel.set_in_if_out(in_value) if found else False
+        if found:
+            self._aquire(channel_key)
+            was_set = channel.set_in_if_out(in_value)
+            self._release(channel_key)
+            return was_set
+        else:
+            return False
     def set_out_if_in_value(self, channel_key: str, out_value: Any, comparison: Any):
         found, channel = self._try_get_channel(channel_key)
-        return channel.set_out_if_in_value(out_value, comparison) if found else False
+        if found:
+            self._aquire(channel_key)
+            was_set = channel.set_out_if_in_value(out_value, comparison)
+            self._release(channel_key)
+            return was_set
+        else:
+            return False
     def set_in_if_out_value(self, channel_key: str, in_value: Any, comparison: Any):
         found, channel = self._try_get_channel(channel_key)
-        return channel.set_in_if_out_value(in_value, comparison) if found else False
+        if found:
+            self._aquire(channel_key)
+            was_set = channel.set_in_if_out_value(in_value, comparison)
+            self._release(channel_key)
+            return was_set
+        else:
+            return False
         
 
 class Simulation():
@@ -441,7 +504,10 @@ class SimulationTracker:
         if not found: return
         used = set() if len(self._current_needed_outgoing[sim_key]) < 1 else set.union(*self._current_needed_outgoing[sim_key].values())
         to_reset = just_freed.difference(used)
+        logger.debug(f"SimulationTracker attempting to reset outgoing channels for {to_reset}")
+        logger.debug(f"SimulationTracker pre-reset status of outgoing channels {to_reset}: {[(item[0], item[1].outgoing.triggered) for item in sim.interactor.channels.items() if item[0] in to_reset]}")
         sim.interactor.reset_outgoing_channels(to_reset)
+        logger.debug(f"SimulationTracker post-reset status of outgoing channels {to_reset}: {[(item[0], item[1].outgoing.triggered) for item in sim.interactor.channels.items() if item[0] in to_reset]}")
 
     def _reset_free_incoming_response_triggers(self, sim_key: Union[str, UUID], just_freed: Set[str]):
         """
@@ -459,7 +525,10 @@ class SimulationTracker:
         if not found: return
         used = set() if len(self._current_needed_outgoing[sim_key]) < 1 else set.union(*self._current_needed_outgoing[sim_key].values())
         to_reset = just_freed.difference(used)
+        logger.debug(f"SimulationTracker attempting to reset incoming channels for {to_reset}")
+        logger.debug(f"SimulationTracker pre-reset status of incoming channels {to_reset}: {[(item[0], item[1].incoming.triggered) for item in sim.interactor.channels.items() if item[0] in to_reset]}")
         sim.interactor.reset_incoming_channels(to_reset)
+        logger.debug(f"SimulationTracker post-reset status of incoming channels {to_reset}: {[(item[0], item[1].incoming.triggered) for item in sim.interactor.channels.items() if item[0] in to_reset]}")
 
     async def fulfill_query_interaction(self, sim_query: SimulationInteractionModel):
         """
@@ -508,6 +577,7 @@ class SimulationTracker:
         timer = 0
         while not done:
             retrieved_values = sim.get_outgoing_values()
+            logger.debug(f"Simulation tracker retrieved outgoing values: {retrieved_values}")
             for channel_key, outgoing_value in retrieved_values.items():
                 # If the outgoing key was not part of this query, then ignore it
                 if channel_key not in needed_response_keys:
