@@ -3,6 +3,8 @@ import os
 import subprocess
 import http.server
 import multiprocessing
+import pickle
+from typing import Callable, Union, List, Tuple, Any
 from src.gymdash.backend.core.api.config.config import set_global_config
 
 # https://stackoverflow.com/questions/2470971/fast-way-to-test-if-a-port-is-in-use-using-python
@@ -26,8 +28,9 @@ def check_port(port):
 def setup_frontend(args):
     # Alter the original javascript file to accept the
     # specified API port
-    js_main_path    = os.path.join("src", "frontend", "scripts", "utils", "api.js")
-    js_new_path     = os.path.join("src", "frontend", "scripts", "utils", "api_link.js")
+    base_path = os.path.dirname(__file__)
+    js_main_path    = os.path.join(base_path, "frontend", "scripts", "utils", "api.js")
+    js_new_path     = os.path.join(base_path, "frontend", "scripts", "utils", "api_link.js")
     if (not os.path.exists(js_main_path)):
         print(f"Cannot start frontend because template JS file '{js_main_path}' does not exist")
         return
@@ -67,10 +70,15 @@ def run_backend_server(args):
     subprocess.run(["uvicorn", "src.gymdash.backend.main:app", "--host", str(args.apiaddr), "--port", str(args.apiport), "--workers", str(args.apiworkers)])
 
 # Starts the frontend and backend servers
-def start(args):
+def start(args, sim_registrations: Union[List[Tuple[str, Callable[[Any], Any]]],None] = None):
     # Check if ports are open
     check_port(args.port)
     check_port(args.apiport)
+
+    if sim_registrations is not None:
+        to_register = sim_registrations[0]
+        with open("registered_sim_info_test.pickle", "wb") as f:
+            pickle.dump((to_register[0], to_register[1]), f)
 
     # Start the servers
     set_global_config(args)
@@ -84,6 +92,7 @@ if __name__ == "__main__":
                     prog='GymDash',
                     description='Start GymDash environment and frontend',
                     epilog='Text at the bottom of help')
+    parser.add_argument("-d", "--project-dir",  default=".", type=str, help="Base relative path for the GymDash project")
     parser.add_argument("-p", "--port",         default=8888, type=int, help="Port for frontend interface")
     parser.add_argument("-b", "--apiport",      default=8887, type=int, help="Port for backend API")
     parser.add_argument("-a", "--apiaddr",      default="127.0.0.1", type=str, help="Address for backend API")

@@ -3,7 +3,7 @@ import logging
 from abc import abstractmethod
 from collections import defaultdict
 from threading import Thread
-from typing import Any, Dict, Iterable, List, Set, Tuple, Union
+from typing import Any, Dict, Iterable, List, Set, Tuple, Union, Callable
 from uuid import UUID, uuid4
 
 from src.gymdash.backend.core.api.models import (SimulationInteractionModel,
@@ -287,6 +287,37 @@ class Simulation():
         pass
 
 
+class SimulationRegistry:
+
+    registered = {}
+
+    @staticmethod
+    def register(key: str, creator: Callable[[SimulationStartConfig], Simulation]):
+        print(f"HERHEHEHERHERHERHERH: {key}")
+        if key in SimulationRegistry.registered:
+            print(f"Cannot register simulation at key '{key}' because \
+                           it is already registered.")
+            logger.warning(f"Cannot register simulation at key '{key}' because \
+                           it is already registered.")
+            return
+        print(f"Registering simulation at '{key}'")
+        logger.info(f"Registering simulation at '{key}'")
+        SimulationRegistry.registered[key] = creator
+
+
+    @staticmethod
+    def make(key: str, start_config: SimulationStartConfig):
+        if key not in SimulationRegistry.registered:
+            logger.error(f"Cannot make simulation at key '{key}' because it is \
+                         not currently registered")
+            return None
+        return SimulationRegistry.registered[key](start_config)
+    
+    @staticmethod
+    def list_simulations() -> List[str]:
+        return list(SimulationRegistry.registered.keys())
+
+
 class SimulationTracker:
 
     no_id = UUID('{00000000-0000-0000-0000-000000000000}')
@@ -341,12 +372,14 @@ class SimulationTracker:
         # Create a new simulation object
         # Setup the simulation object
         # Run the simulation object
-        if (config.sim_type == "CartPole-v1"):
-            simulation = StableBaselinesSimulation(config)
+        print(SimulationRegistry.list_simulations())
+        simulation = SimulationRegistry.make(config.sim_type, config)
+        if simulation is not None:
             simulation.start()
             self.add_running_sim(new_id, simulation)
             logger.info(f"Started simulation (key='{new_id}', family='{config.sim_family}', type='{config.sim_type}')")
             return (new_id, simulation)
+        
         logger.info(f"Could not start simulation (key='{new_id}', family='{config.sim_family}', type='{config.sim_type}')")
         return (SimulationTracker.no_id, None)
 
@@ -516,4 +549,3 @@ class SimulationTracker:
     def send_interactions(self, sim_key, interactions: Dict[str, Any]):
         """Send interactions"""
         pass
-

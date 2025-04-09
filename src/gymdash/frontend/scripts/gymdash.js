@@ -146,7 +146,7 @@ function startSimTest() {
     const data = {
         name: "cartpole",
         sim_family: "stable_baselines",
-        sim_type: "CartPole-v1",
+        sim_type: "custom_sb_simulation",
         kwargs: {
             "num_steps": testSimTimesteps,
         }

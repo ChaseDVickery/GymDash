@@ -7,3 +7,4 @@ info.txt
 *.log
 tb/
 quickstart.bat
+registered_sim_info_test.pickle

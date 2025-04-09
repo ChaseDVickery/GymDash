@@ -12,11 +12,12 @@ import traceback
 import logging
 
 from threading import Thread
+import pickle
 
 from src.gymdash.backend.core.api.config.config import tags
 from src.gymdash.backend.core.utils.usage import *
 from src.gymdash.backend.core.api.stream import StreamerRegistry
-from src.gymdash.backend.core.simulation import SimulationTracker
+from src.gymdash.backend.core.simulation import SimulationTracker, SimulationRegistry
 from src.gymdash.backend.core.api.models import SimulationStartConfig, SimulationInteractionModel
 from src.gymdash.backend.core.patch.patcher import apply_extension_patches
 from src.gymdash.backend.core.utils.zip import get_recent_media_generator_from_keys
@@ -32,10 +33,41 @@ from src.gymdash.backend.core.utils.zip import get_recent_media_generator_from_k
 
 # from src.api.internals.usage import get_usage_simple, get_usage_detailed, get_usage_gpu
 
+
+# python how to use importlib
+import importlib.util
+import sys
+import os
+def import_from_path(module_name, file_path):
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 sim_logger = logging.getLogger("simulation")
 
 simulation_tracker = SimulationTracker()
 apply_extension_patches()
+
+if os.path.exists("registered_sim_info_test.pickle"):
+
+    module = import_from_path(
+        "custom_sb_simulation_test",
+        "D:\\GymDash\\GymDash\\custom_sb_simulation_test.py"
+    )
+    simulation = module.StableBaselinesSimulation(None)
+    print(simulation)
+    importlib.invalidate_caches()
+    importlib.reload(module)
+    simulation = module.StableBaselinesSimulation(None)
+    print(simulation)
+
+    print("reading pickled registration file")
+    with open("registered_sim_info_test.pickle", "rb") as f:
+        (key, simulation_type) = pickle.load(f)
+        SimulationRegistry.register(key, simulation_type)
 
 async def manage_simulation_loop():
     while True:
