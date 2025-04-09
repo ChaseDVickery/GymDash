@@ -72,8 +72,6 @@ def run_backend_server(args):
 # Starts the frontend and backend servers
 def start(args, sim_registrations: Union[List[Tuple[str, Callable[[Any], Any]]],None] = None):
     # Check if ports are open
-    check_port(args.port)
-    check_port(args.apiport)
 
     if sim_registrations is not None:
         to_register = sim_registrations[0]
@@ -83,8 +81,12 @@ def start(args, sim_registrations: Union[List[Tuple[str, Callable[[Any], Any]]],
     # Start the servers
     set_global_config(args)
     setup_frontend(args)
-    multiprocessing.Process(target=run_backend_server, args=(args,)).start()
-    multiprocessing.Process(target=run_frontend_server, args=(args,)).start()
+    if not args.no_backend:
+        check_port(args.port)
+        multiprocessing.Process(target=run_backend_server, args=(args,)).start()
+    if not args.no_frontend:
+        check_port(args.apiport)
+        multiprocessing.Process(target=run_frontend_server, args=(args,)).start()
 
 if __name__ == "__main__":
 
@@ -97,6 +99,8 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--apiport",      default=8887, type=int, help="Port for backend API")
     parser.add_argument("-a", "--apiaddr",      default="127.0.0.1", type=str, help="Address for backend API")
     parser.add_argument("-w", "--apiworkers",   default=1, type=int, help="Number of workers for backend API")
+    parser.add_argument("--no-frontend",        action="store_true", help="Run without the frontend display")
+    parser.add_argument("--no-backend",         action="store_true", help="Run without the backend API server")
     args = parser.parse_args()
 
     start(args)

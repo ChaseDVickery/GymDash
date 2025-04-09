@@ -103,6 +103,9 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--apiport",      default=8887, type=int, help="Port for backend API")
     parser.add_argument("-a", "--apiaddr",      default="127.0.0.1", type=str, help="Address for backend API")
     parser.add_argument("-w", "--apiworkers",   default=1, type=int, help="Number of workers for backend API")
+    parser.add_argument("--no-frontend",        action="store_true", help="Run without the frontend display")
+    parser.add_argument("--no-backend",         action="store_true", help="Run without the backend API server")
+
     args = parser.parse_args()
 
     # SimulationRegistry.register("custom_sb_simulation", StableBaselinesSimulation)

@@ -11,5 +11,5 @@ HandlerClass.extensions_map['.mjs'] = 'application/javascript'
 print(HandlerClass.extensions_map)
 
 # Run the server (like `python -m http.server` does)
-httpd = http.server.HTTPServer(("localhost", 8080), HandlerClass)
+httpd = http.server.HTTPServer(("localhost", 8888), HandlerClass)
 httpd.serve_forever()
