@@ -23,7 +23,6 @@ Source Layout:
             |-main.py          :"Main" for API server (uvicorn/FastAPI)
             |-core/            :Base functionality of backend
                 |-api/         :All API tools, including streaming, logging
-                    |stream/   :Manage what new content is streamed.
                 |-patch/       :Tools for patching in extension methods
                 |-utils/       :Misc utils (file formats, usage, etc).
                 |-simulation/  :Simulation management
