@@ -196,7 +196,10 @@ function testQueryProgress() {
 }
 
 
-resourceUsageDisplayUtils.setupResourceUsageDisplay();
+const fullResourcePreview = document.querySelector(".resource-preview.full-preview")
+const miniResourcePreview = document.querySelector(".resource-preview.mini-preview")
+resourceUsageDisplayUtils.setupResourceUsageDisplay(fullResourcePreview);
+resourceUsageDisplayUtils.setupResourceUsageDisplay(miniResourcePreview, true);
 
 tryBtn.addEventListener("click", getNumber);
 testBtn.addEventListener("click", testNumberAPI);

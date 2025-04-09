@@ -1,0 +1,12 @@
+
+
+#header-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    overflow: visible;
+    height: 50px;
+    /* vertical-align: center;
+    text-align: center; */
+    
+}
