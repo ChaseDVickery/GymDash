@@ -1,6 +1,5 @@
 import psutil
 import shutil
-import os
 import GPUtil
 from pydantic import BaseModel
 

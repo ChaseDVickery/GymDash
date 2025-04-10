@@ -8,3 +8,8 @@ info.txt
 tb/
 quickstart.bat
 registered_sim_info_test.pickle
+package_install_test*.py
+dist/
+build/
+src/gymdash.egg-info/
+testvenv*/

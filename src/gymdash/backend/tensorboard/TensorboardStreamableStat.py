@@ -1,7 +1,15 @@
 from src.gymdash.backend.core.api.stream import StreamableStat
-from tensorboard.backend.event_processing import event_accumulator, tag_types
 from typing import Set
 from src.gymdash.backend.core.api.config.stat_tags import ANY_TAG, TENSORBOARD_TAG_SET
+try:
+    from tensorboard.backend.event_processing import event_accumulator, tag_types
+    _has_tensorboard = True
+except ImportError:
+    _has_tensorboard = False
+    
+
+if not _has_tensorboard:
+    raise ImportError("Install tensorboard to use TensorboardStreamableStat.")
 
 class TensorboardStreamableStat(StreamableStat):
     """

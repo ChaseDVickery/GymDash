@@ -100,12 +100,7 @@ def start(args, sim_registrations: Union[List[Tuple[str, Callable[[Any], Any]]],
         check_port(args.apiport)
         multiprocessing.Process(target=run_frontend_server, args=(args,)).start()
 
-if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(
-                    prog='GymDash',
-                    description='Start GymDash environment and frontend',
-                    epilog='Text at the bottom of help')
+def add_gymdash_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("-d", "--project-dir",  default=".", type=str, help="Base relative path for the GymDash project")
     parser.add_argument("-p", "--port",         default=8888, type=int, help="Port for frontend interface")
     parser.add_argument("-b", "--apiport",      default=8887, type=int, help="Port for backend API")
@@ -115,6 +110,16 @@ if __name__ == "__main__":
     parser.add_argument("--apiserver-ip",       default="127.0.0.1", type=str, help="The custom IP address through which the API should be accessible.")
     parser.add_argument("--no-frontend",        action="store_true", help="Run without the frontend display")
     parser.add_argument("--no-backend",         action="store_true", help="Run without the backend API server")
+    return parser
+
+
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(
+                    prog='GymDash',
+                    description='Start GymDash environment and frontend',
+                    epilog='Text at the bottom of help')
+    parser = add_gymdash_arguments(parser)
     args = parser.parse_args()
 
     start(args)

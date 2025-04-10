@@ -1,10 +1,34 @@
 
 from typing import Callable, Union
-from gymnasium import Env, logger
-from gymnasium.wrappers import RecordVideo
-from torch.utils.tensorboard import SummaryWriter
-import torch as th
+
 import numpy as np
+
+try:
+    from gymnasium import Env, logger
+    from gymnasium.wrappers import RecordVideo
+    _has_gym = True
+except ImportError:
+    _has_gym = False
+    
+try:
+    from torch.utils.tensorboard import SummaryWriter
+    _has_tensorboard = True
+except ImportError:
+    _has_tensorboard = False
+    
+try:
+    import torch as th
+    _has_torch = True
+except:
+    _has_torch = False
+    
+
+if not _has_gym:
+    raise ImportError("Install gymnasium to use gymdash environment wrappers.")
+if not _has_tensorboard:
+    raise ImportError("Install tensorboard to use gymdash environment wrappers.")
+if not _has_torch:
+    raise ImportError("Install torch to use gymdash environment wrappers.")
 
 
 class RecordVideoToTensorboard(RecordVideo):

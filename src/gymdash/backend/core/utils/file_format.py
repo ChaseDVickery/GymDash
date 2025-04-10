@@ -1,4 +1,4 @@
-from typing import Dict, Iterable, Set, List, Literal, Union
+from typing import Dict, Iterable, Set, List, Union
 from dataclasses import dataclass, field
 from collections import defaultdict
 

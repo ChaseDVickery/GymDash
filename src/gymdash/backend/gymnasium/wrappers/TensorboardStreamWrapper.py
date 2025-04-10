@@ -1,16 +1,33 @@
 from typing import Any, Dict, Iterable, List, Set, SupportsFloat, Union
 
-import gymnasium as gym
-from tensorboard.backend.event_processing import event_accumulator, tag_types
-
 from src.gymdash.backend.core.api.config.config import CONFIG
 from src.gymdash.backend.core.api.config.stat_tags import ANY_TAG
+
+try:
+    import gymnasium as gym
+    _has_gym = True
+except ImportError:
+    _has_gym = False
+    
+
+try:
+    from tensorboard.backend.event_processing import (event_accumulator,
+                                                      tag_types)
+    _has_tensorboard = True
+except ImportError:
+    _has_tensorboard = False
+    
+
 from src.gymdash.backend.tensorboard.TensorboardStreamableStat import \
     TensorboardStreamableStat
 
+if not _has_gym:
+    raise ImportError("Install gymnasium to use gymdash environment wrappers.")
+if not _has_tensorboard:
+    raise ImportError("Install tensorboard to use gymdash environment wrappers.")
+
 
 class TensorboardStreamWrapper(gym.Wrapper):
-    
 
     def __init__(self, env: gym.Env, tb_log: str, keys: Union[List[str],None]=None, tag_key_map: Union[Dict[str,List[str]],None]=None):
         super().__init__(env)

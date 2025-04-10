@@ -1,18 +1,29 @@
 import io
 import json
 import zipfile
+import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, List, Union
 
-from tensorboard.backend.event_processing.event_accumulator import (AudioEvent,
+try:
+    from tensorboard.backend.event_processing.event_accumulator import (AudioEvent,
                                                                     ImageEvent)
+    _has_tensorboard = True
+except ImportError:
+    _has_tensorboard = False
+    
+
 
 import src.gymdash.backend.core.api.config.stat_tags as tags
 from src.gymdash.backend.core.api.stream import StreamerRegistry
 from src.gymdash.backend.core.utils.file_format import (FileFormat,
                                                     format_from_bytes)
 from src.gymdash.backend.core.utils.json import DataclassJSONEncoder
+
+
+logger = logging.getLogger("utils")
+logger.setLevel(logging.DEBUG)
 
 
 @dataclass(frozen=True)
@@ -41,12 +52,25 @@ def tb_event_to_media_format(event) -> Union[FileFormat, None]:
     such event or if conversion cannot find suitable
     indicators of a particular type.
     """
+    if not _has_tensorboard:
+        return None
     # https://stackoverflow.com/questions/57785500/how-to-know-mime-type-of-a-file-from-base64-encoded-data-in-python
     fformat = None
     if isinstance(event, ImageEvent):
         fformat = format_from_bytes(event.encoded_image_string)
     elif isinstance(event, AudioEvent):
         fformat = format_from_bytes(event.encoded_audio_string)
+    return fformat
+
+def event_to_media_format(event) -> Union[FileFormat, None]:
+    fformat = None
+    if _has_tensorboard:
+        fformat = tb_event_to_media_format(event)
+    else:
+        # Finally, try to just directly guess format from event arg
+        fformat = format_from_bytes(event)
+    if fformat is None:
+        logger.warning(f"Cannot guess event media format for type '{type(event)}'. You may need to install tensorboard.")
     return fformat
     
 
@@ -75,7 +99,7 @@ def pack_streamer_media_to_zip(streamer_key: str, key_event_map: Dict[str, List[
         for key, media_events in key_event_map.items():
             file_prefix = f"{key}_"
             for i, event in enumerate(media_events):
-                media_format = tb_event_to_media_format(event)
+                media_format = event_to_media_format(event)
                 if media_format is None:
                     raise RuntimeError(f"No valid media format found for event '{event}' in from streamer '{streamer_key}' for key '{key}'")
                 mime_type = media_format.mime if media_format.has_mimetype else ""

@@ -1,10 +1,10 @@
 try:
     from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
     from tensorboard.backend.event_processing.reservoir import Reservoir, _ReservoirBucket
+    _has_tensorboard = True
 except ImportError:
     _has_tensorboard = False
-else:
-    _has_tensorboard = True
+    
 
 def patch():
 
