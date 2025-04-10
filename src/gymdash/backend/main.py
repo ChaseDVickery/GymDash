@@ -66,16 +66,16 @@ if os.path.exists("registered_sim_info_test.pickle"):
         (key, simulation_type) = pickle.load(f)
         SimulationRegistry.register(key, simulation_type)
 
-async def manage_simulation_loop():
-    while True:
-        simulation_tracker.purge_finished_sims()
-        await asyncio.sleep(0.1)
+# async def manage_simulation_loop():
+#     while True:
+#         simulation_tracker.purge_finished_sims()
+#         await asyncio.sleep(0.1)
 
 # App main
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Executed right before we handle requests
-    asyncio.create_task(manage_simulation_loop())
+    # asyncio.create_task(manage_simulation_loop())
     yield
     # Executed right before app shutdown
     pass

@@ -29,7 +29,7 @@ class StableBaselinesSimulation(Simulation):
     def __init__(self, config: SimulationStartConfig) -> None:
         super().__init__(config)
 
-    def setup(self, **kwargs):
+    def _setup(self):
         logger.info(f"setup {type(self)}")
         # self._check_kwargs_required(
         #     ["model", "run_args"],
@@ -39,7 +39,7 @@ class StableBaselinesSimulation(Simulation):
         # self.model = kwargs.model
         # self.run_args = kwargs.run_args
 
-    def run(self):
+    def _run(self):
         logger.info(f"run {type(self)}")
         # self._check_kwargs_required(
         #     ["model"],

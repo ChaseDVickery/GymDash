@@ -340,10 +340,18 @@ class Simulation():
 
     @abstractmethod
     def setup(self):
-        raise NotImplementedError
+        self._setup()
 
     @abstractmethod
     def run(self) -> None:
+        self._run()
+    
+    @abstractmethod
+    def _setup(self):
+        raise NotImplementedError
+
+    @abstractmethod
+    def _run(self) -> None:
         raise NotImplementedError
     
     def close(self) -> None:
@@ -356,14 +364,10 @@ class SimulationRegistry:
 
     @staticmethod
     def register(key: str, creator: Callable[[SimulationStartConfig], Simulation]):
-        print(f"HERHEHEHERHERHERHERH: {key}")
         if key in SimulationRegistry.registered:
-            print(f"Cannot register simulation at key '{key}' because \
-                           it is already registered.")
             logger.warning(f"Cannot register simulation at key '{key}' because \
                            it is already registered.")
             return
-        print(f"Registering simulation at '{key}'")
         logger.info(f"Registering simulation at '{key}'")
         SimulationRegistry.registered[key] = creator
 
@@ -392,6 +396,9 @@ class SimulationTracker:
         self._current_needed_incoming:  Dict[UUID, Dict[UUID, Set[str]]] = defaultdict(dict)
         self._fullfilling_query:        bool = False
         self._fullfilling_post:         bool = False
+
+        loop = asyncio.get_event_loop()
+        loop.create_task(self.purge_loop())
 
     def _to_key(self, key: Union[str, UUID]) -> UUID:
         # If UUID, we're good
@@ -435,7 +442,6 @@ class SimulationTracker:
         # Create a new simulation object
         # Setup the simulation object
         # Run the simulation object
-        print(SimulationRegistry.list_simulations())
         simulation = SimulationRegistry.make(config.sim_type, config)
         if simulation is not None:
             simulation.start()
@@ -455,6 +461,11 @@ class SimulationTracker:
         if sim_key in self.running_sim_map:
             raise ValueError(f"Already running simulation for key '{sim_key}'")
         self.running_sim_map[sim_key] = sim
+
+    async def purge_loop(self):
+        while True:
+            await asyncio.sleep(0.1)
+            self.purge_finished_sims()
 
     def purge_finished_sims(self):
         to_remove = []
