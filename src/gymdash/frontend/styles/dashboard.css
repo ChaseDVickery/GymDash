@@ -4,6 +4,10 @@
     margin: 0px;
 }
 
+html, body {
+    overscroll-behavior-y: contain;
+}
+
 h1 {
     margin: 0px;
 }
@@ -19,8 +23,8 @@ h1 {
     grid-template-columns: 1fr;
     row-gap: 1px; */
     padding: 5px 20px;
-    width: 500px;
-    resize: horizontal;
+    max-width: 100%;
+    resize: both;
     overflow: hidden;
     border-radius: 10px;
 
@@ -40,6 +44,7 @@ h1 {
             input[type="range"] {
                 min-width: 80px;
                 width: 80px;
+                touch-action: none;
                 /* min-width: 10px; */
             }
         }
@@ -76,7 +81,6 @@ h1 {
             input[type="range"] {
                 min-width: 40px;
                 width: 40px;
-                /* min-width: 10px; */
             }
         }
     }
@@ -99,7 +103,7 @@ h1 {
     /* -webkit-appearance: none; */
     appearance: none;
     width: 100%;
-    min-width: 30px;
+    min-width: 5px;
     height: 5px;
     border-radius: 10px;
 }

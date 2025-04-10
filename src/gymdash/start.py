@@ -3,6 +3,7 @@ import os
 import subprocess
 import http.server
 import multiprocessing
+import socket
 import pickle
 from typing import Callable, Union, List, Tuple, Any
 from src.gymdash.backend.core.api.config.config import set_global_config
@@ -31,13 +32,24 @@ def setup_frontend(args):
     base_path = os.path.dirname(__file__)
     js_main_path    = os.path.join(base_path, "frontend", "scripts", "utils", "api.js")
     js_new_path     = os.path.join(base_path, "frontend", "scripts", "utils", "api_link.js")
+    if args.apiserver == "dev":
+        final_host = "127.0.0.1"
+    elif args.apiserver == "lan":
+        # final_host = socket.gethostbyname(socket.gethostname())
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        final_host = s.getsockname()[0]
+        s.close()
+    elif args.apiserver == "custom_ip":
+        final_host = args.apiserver_ip
+    print(f"Frontend will query final host at '{final_host}'")
     if (not os.path.exists(js_main_path)):
         print(f"Cannot start frontend because template JS file '{js_main_path}' does not exist")
         return
     else:
         with open(js_main_path, "r") as f:
             new_content = f.read() \
-                            .replace(r"<<api_addr>>", "http://" + str(args.apiaddr)) \
+                            .replace(r"<<api_addr>>", "http://" + str(final_host)) \
                             .replace(r"<<api_port>>", str(args.apiport))
             with open(js_new_path, "w") as output_file:
                 output_file.write(new_content)
@@ -99,6 +111,8 @@ if __name__ == "__main__":
     parser.add_argument("-b", "--apiport",      default=8887, type=int, help="Port for backend API")
     parser.add_argument("-a", "--apiaddr",      default="127.0.0.1", type=str, help="Address for backend API")
     parser.add_argument("-w", "--apiworkers",   default=1, type=int, help="Number of workers for backend API")
+    parser.add_argument("--apiserver",          default="dev", choices=["dev", "lan", "custom_ip"], help="How the API should be exposed. dev=only exposed to localhost (127.0.0.1). lan=local IPv4 address (usually 192.168.x.xxx). custom_ip=specify the address that the frontend should query for API access.")
+    parser.add_argument("--apiserver-ip",       default="127.0.0.1", type=str, help="The custom IP address through which the API should be accessible.")
     parser.add_argument("--no-frontend",        action="store_true", help="Run without the frontend display")
     parser.add_argument("--no-backend",         action="store_true", help="Run without the backend API server")
     args = parser.parse_args()

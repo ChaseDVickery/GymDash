@@ -57,12 +57,9 @@ if os.path.exists("registered_sim_info_test.pickle"):
         "custom_sb_simulation_test",
         "D:\\GymDash\\GymDash\\custom_sb_simulation_test.py"
     )
-    simulation = module.StableBaselinesSimulation(None)
-    print(simulation)
     importlib.invalidate_caches()
     importlib.reload(module)
-    simulation = module.StableBaselinesSimulation(None)
-    print(simulation)
+    # simulation = module.StableBaselinesSimulation(None)
 
     print("reading pickled registration file")
     with open("registered_sim_info_test.pickle", "rb") as f:
@@ -94,9 +91,10 @@ app = FastAPI(
 # Setup CORS middleware so that our API will accept
 # communication from our frontend
 origins = [
-    # "*"
+    "*"
 ]
-regex_origins = r"^((.*127.0.0.1.*)|(.*localhost.*))$"
+regex_origins = None
+# regex_origins = r"^((.*127.0.0.1.*)|(.*localhost.*))$"
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
