@@ -1,7 +1,7 @@
 import unittest
 import random
 import logging
-from src.api.utils.file_format import *
+from src.gymdash.backend.core.utils.file_format import *
 
 gif1 = b'\x47\x49\x46\x38\x37\x61'
 gif2 = b'\x47\x49\x46\x38\x39\x61'
@@ -63,8 +63,8 @@ class TestMagicByteGuesser(unittest.TestCase):
         test_bytes = custom_test_bytes
         test_bytes += pad_end if pad_end else b''
         logger.info(f"Extension '{desired_extension}': test bytes='{test_bytes.hex(' ')}' vs signature bytes='{signature.signature.__str__()}'")
-        found_extension = format_from_bytes(test_bytes, False)
-        found_mimetype = format_from_bytes(test_bytes, True)
+        found_extension = extension_from_bytes(test_bytes)
+        found_mimetype = mimetype_from_bytes(test_bytes)
         self.assertEqual(found_extension, desired_extension, f"Bytes for desired extension '{desired_extension}' returned '{found_extension}' instead. Test bytes='{test_bytes.hex(' ')}'")
         self.assertEqual(found_mimetype, desired_mime, f"Bytes for desired mimetype '{desired_mime}' returned '{found_mimetype}' instead. Test bytes='{test_bytes.hex(' ')}'")
 
