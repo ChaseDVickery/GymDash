@@ -3,8 +3,10 @@ import logging
 from abc import abstractmethod
 from collections import defaultdict
 from threading import Thread, Lock
-from typing import Any, Dict, Iterable, List, Set, Tuple, Union, Callable
+from typing import Any, Dict, Iterable, List, Set, Tuple, Union, Callable, Literal, Protocol
+from typing_extensions import Self
 from uuid import UUID, uuid4
+import functools
 
 from src.gymdash.backend.core.api.models import (SimulationInteractionModel,
                                                  SimulationStartConfig)
@@ -301,11 +303,23 @@ class SimulationInteractor:
         
 
 class Simulation():
+
+    START_SETUP = "start_setup"
+    END_SETUP   = "end_setup"
+    START_RUN   = "start_run"
+    END_RUN     = "end_run"
+
     def __init__(self, config: SimulationStartConfig) -> None:
         self.config = config
         self.thread: Thread = None
         self.start_kwargs = None
         self.interactor = SimulationInteractor()
+        self._callback_map: Dict[str, List[Callable[[Simulation], Simulation]]] = {
+            Simulation.START_SETUP:     [],
+            Simulation.END_SETUP:       [],
+            Simulation.START_RUN:       [],
+            Simulation.END_RUN:         [],
+        }
 
     @property
     def is_done(self):
@@ -338,13 +352,52 @@ class Simulation():
     #     for channel_key, value in incoming_interactions:
     #         self.interactor.set_in(channel_key, value)
 
+    def _on_setup_start_callback(self) -> List[Callable[[], Self]]:
+        return self._callback_map[Simulation.START_SETUP]
+    def _on_setup_end_callback(self) -> List[Callable[[], Self]]:
+        return self._callback_map[Simulation.END_SETUP]
+    def _on_run_start_callback(self) -> List[Callable[[], Self]]:
+        return self._callback_map[Simulation.START_RUN]
+    def _on_run_end_callback(self) -> List[Callable[[], Self]]:
+        return self._callback_map[Simulation.END_RUN]
+    
+    def add_callback(
+        self,
+        event: Literal["start_setup", "end_setup","start_run","end_run"],
+        callback: Callable[[Self], Self]
+    ):
+        if event not in self._callback_map:
+            raise ValueError(f"Cannot add callback of event type '{event}'")
+        self._callback_map[event].append(callback)
+
+    def get_callbacks(
+        self,
+        event: Literal["start_setup", "end_setup","start_run","end_run"]
+    ) -> Callable[[Self], Self]:
+        if event not in self._callback_map:
+            raise ValueError(f"Cannot add callback of event type '{event}'")
+        return self._callback_map[event]
+    
+    def trigger_callbacks(
+        self,
+        event: Literal["start_setup", "end_setup","start_run","end_run"]
+    ) -> Self:
+        callbacks = self.get_callbacks(event)
+        for callback in callbacks:
+            callback()
+
+
     @abstractmethod
     def setup(self):
+        self.trigger_callbacks(Simulation.START_SETUP)
         self._setup()
+        self.trigger_callbacks(Simulation.END_SETUP)
 
     @abstractmethod
     def run(self) -> None:
+        self.trigger_callbacks(Simulation.START_RUN)
         self._run()
+        self.trigger_callbacks(Simulation.END_RUN)
     
     @abstractmethod
     def _setup(self):
@@ -360,30 +413,145 @@ class Simulation():
 
 class SimulationRegistry:
 
-    registered = {}
+    registered: Dict[
+        str, 
+        Tuple[Callable[[SimulationStartConfig], Simulation], Union[SimulationStartConfig, None]]
+    ] = {}
 
     @staticmethod
-    def register(key: str, creator: Callable[[SimulationStartConfig], Simulation]):
+    def register(
+        key: str,
+        creator: Callable[[SimulationStartConfig], Simulation],
+        default_config: Union[SimulationStartConfig, None]
+    ) -> None:
+        """
+        Adds the Simulation initializer and optional default configuration
+        to the registration map if provided key is not already used.
+
+        Args:
+            key: Registered name of the simulation type to register
+            creator: Initializer/type of the Simulation to register
+            start_config: Optional default configuration
+        """
         if key in SimulationRegistry.registered:
             logger.warning(f"Cannot register simulation at key '{key}' because \
                            it is already registered.")
             return
         logger.info(f"Registering simulation at '{key}'")
-        SimulationRegistry.registered[key] = creator
+        SimulationRegistry.registered[key] = (creator, default_config)
 
 
     @staticmethod
-    def make(key: str, start_config: SimulationStartConfig):
+    def make(key: str, start_config: Union[SimulationStartConfig, None] = None):
+        """
+        Instantiate and return a Simulation at the provided key
+        using either the provided configuration or the default
+        configuration specified during registration if none was
+        passed in.
+
+        Args:
+            key: Registered name of the simulation type to start
+            start_config: Optional start configuration
+        Returns:
+            New Simulation instance if success, None if failure.
+        """
         if key not in SimulationRegistry.registered:
             logger.error(f"Cannot make simulation at key '{key}' because it is \
                          not currently registered")
             return None
-        return SimulationRegistry.registered[key](start_config)
+        creator = SimulationRegistry.registered[key][0]
+        config = SimulationRegistry.registered[key][1]
+        start_config = start_config if start_config is not None else config
+        if start_config is None:
+            logger.error(f"Cannot make simulation at key '{key}' becayse it needs\
+                         at least a default config or a config passed into make()\
+                         as an argument")
+            return None
+        return creator(start_config)
     
     @staticmethod
     def list_simulations() -> List[str]:
+        """Returns a list of registered Simulation keys."""
         return list(SimulationRegistry.registered.keys())
+    
+class TriggeredCallback:
+    def __init__(self, num_req_triggers: int = 1) -> None:
+        self._callbacks:    List[Callable]  = []
+        self._req_triggers: int             = num_req_triggers
+        self._num_triggers: int             = 0
+        self.activated:     bool            = False
 
+    def add_callback(self, callback: Callable):
+        self._callbacks.append(callback)
+
+    def trigger(self, increment: int = 1):
+        self._num_triggers += increment
+        if (self._num_triggers >= self._req_triggers):
+            self.activate()
+
+    def activate(self):
+        self.activated = True
+        for callback in self._callbacks:
+            callback()
+
+class SimulationGroup:
+    def __init__(
+        self,
+        sim_infos: List[Tuple[UUID, Simulation]]
+    ) -> None:
+        self.id:    UUID                            = uuid4()
+        self.infos: List[Tuple[UUID, Simulation]]   = sim_infos
+        self.ids:   List[UUID]                      = [info[0] for info in self.infos]
+        self.sims:  List[Simulation]                = [info[1] for info in self.infos]
+        # self.triggered_callbacks:   Dict[UUID, TriggeredCallback] = {}
+        self.triggered_callback_all_run_start:  TriggeredCallback = TriggeredCallback(len(self.sims))
+        self.triggered_callback_all_run_end:    TriggeredCallback = TriggeredCallback(len(self.sims))
+
+        for sim in self.sims:
+            sim.add_callback(Simulation.START_RUN, self.triggered_callback_all_run_start.trigger)
+            sim.add_callback(Simulation.END_RUN, self.triggered_callback_all_run_end.trigger)
+
+    @property
+    def all_done(self):
+        for sim in self.sims:
+            if not sim.is_done:
+                return False
+        return True
+    @property
+    def any_running(self):
+        return not self.all_done
+
+    def add_on_all_run_start(self, callback: Callable) -> None:
+        """
+        Adds a callback to run once all simulations in the group
+        have started to run.
+        """
+        self.triggered_callback_all_run_start.add_callback(callback)
+    def add_on_all_run_end(self, callback: Callable) -> None:
+        """
+        Adds a callback to run once all simulations in the group
+        have ended their run.
+        """
+        self.triggered_callback_all_run_end.add_callback(callback)
+    def add_on_each_run_start(self, callback: Callable) -> None:
+        """
+        Adds a callback to each simulation in the group which runs
+        when that simulation's run starts. Equivalent to calling
+        sim.add_callback(Simulation.START_RUN, ...) on each simulation
+        in the group.
+        """
+        for sim in self.sims:
+            sim.add_callback(Simulation.START_RUN, callback)
+    def add_on_each_run_end(self, callback: Callable) -> None:
+        """
+        Adds a callback to each simulation in the group which runs
+        when that simulation's run ends. Equivalent to calling
+        sim.add_callback(Simulation.END_RUN, ...) on each simulation
+        in the group.
+        """
+        for sim in self.sims:
+            sim.add_callback(Simulation.END_RUN, callback)
+    
 
 class SimulationTracker:
 
@@ -397,8 +565,13 @@ class SimulationTracker:
         self._fullfilling_query:        bool = False
         self._fullfilling_post:         bool = False
 
-        loop = asyncio.get_event_loop()
-        loop.create_task(self.purge_loop())
+        self._access_mutex:             Lock = Lock()
+
+        self.callback_groups:           Dict[UUID, TriggeredCallback] = {}
+        
+
+        # loop = asyncio.get_event_loop()
+        # loop.create_task(self.purge_loop())
 
     def _to_key(self, key: Union[str, UUID]) -> UUID:
         # If UUID, we're good
@@ -424,33 +597,162 @@ class SimulationTracker:
             # for running simulations
             for id in self.running_sim_map.keys():
                 return id
-        
+            
+    def _set_sim_running(self, sim_key: UUID, sim: Simulation):
+        with self._access_mutex:
+            self.running_sim_map[sim_key] = sim
+    def _set_sim_done(self, sim_key: UUID, sim: Simulation):
+        with self._access_mutex:
+            self.done_sim_map[sim_key] = sim
+    def _get_sim_internal(self, sim_key: Union[str, UUID]) -> Union[Simulation, None]:
+        sim_key = self._to_key(sim_key)
+        with self._access_mutex:
+            if sim_key in self.running_sim_map:
+                return self.running_sim_map[sim_key]
+            elif sim_key in self.done_sim_map:
+                return self.done_sim_map[sim_key]
+            else:
+                return None
+    def try_get_sim(self, sim_key: Union[str, UUID]) -> Tuple[bool, Union[Simulation, None]]:
+        sim = self._get_sim_internal(sim_key)
+        if sim is None:
+            return (False, None)
+        else:
+            return (True, sim)
+    def get_sim(self, sim_key: Union[str, UUID]) -> Union[Simulation, None]:
+        return self._get_sim_internal(sim_key)
+    def get_sims(self, sim_keys: List[Union[str, UUID]]) -> List[Union[Simulation, None]]:
+        return [self.get_sim(key) for key in sim_keys]
     def is_valid(self, sim_key: Union[str, UUID]) -> bool:
         return self._to_key(sim_key) != SimulationTracker.no_id
     def is_invalid(self, sim_key: Union[str, UUID]) -> bool:
         return not self.is_valid(sim_key)
-    def is_running(self, sim_key: Union[str, UUID]) -> bool:
-        sim_key = self._to_key(sim_key)
-        return sim_key in self.running_sim_map
-    def is_done(self, sim_key: Union[str, UUID]) -> bool:
-        sim_key = self._to_key(sim_key)
-        return sim_key in self.done_sim_map
+    def _is_done_single(self, sim_key: Union[str, UUID]) -> bool:
+        sim = self.get_sim(sim_key)
+        if sim is None:
+            return True
+        else:
+            return sim.is_done
+    def _is_running_single(self, sim_key: Union[str, UUID]) -> bool:
+        return not self._is_done_single(sim_key)
+    def all_done(self, sim_keys: Union[Union[str, UUID], List[Union[str, UUID]]]) -> bool:
+        """
+        Checks whether all queried simulations are done.
+        Returns true if ALL simulations are done, false otherwise
+
+        Args:
+            sim_keys: Either a single or list of simulation keys.
+        Returns:
+            is_done: True if ALL simulations are done, False otherwise
+        """
+        if isinstance(sim_keys, list):
+            for key in sim_keys:
+                if not self._is_done_single(key):
+                    return False
+            return True
+        else:
+            return self._is_done_single(sim_keys)
+    def any_running(self, sim_keys: Union[Union[str, UUID], List[Union[str, UUID]]]) -> bool:
+        """
+        Checks whether any queried simulations are running.
+        Returns true if ANY simulations are running, false otherwise
+
+        Args:
+            sim_keys: Either a single or list of simulation keys.
+        Returns:
+            is_running: True if ANY simulations are running, False otherwise
+        """
+        return not self.all_done(sim_keys)
     
-    def start_sim(self, config: SimulationStartConfig) -> Tuple[UUID, Simulation]:
+    def add_on_all_done(self, callback_group_id: UUID, callback: Callable) -> bool:
+        if callback_group_id in self.callback_groups:
+            self.callback_groups[callback_group_id].add_callback(callback)
+            return True
+        else:
+            logger.warning(f"Cannot add callback to group ID '{str(callback_group_id)}'")
+            return False
+    def on_all_done(self, sim_keys: Union[Union[str, UUID], List[Union[str, UUID]]], callback: Callable):
+        group_id = uuid4()
+        if isinstance(sim_keys, list):
+            triggered_callback = TriggeredCallback(len(sim_keys))
+            triggered_callback.add_callback(callback)
+            # Each simulation should increment the TriggeredCallback counter
+            # when done, so when the last one finishes, the TriggeredCallback
+            # should finally trigger
+            for key in sim_keys:
+                sim = self.get_sim(key)
+                sim.add_callback(Simulation.END_RUN, triggered_callback.trigger)
+        else:
+            triggered_callback = TriggeredCallback(1)
+            triggered_callback.add_callback(callback)
+        self.callback_groups[group_id] = triggered_callback
+        return group_id
+    
+    def create_simulations(self, to_create: Union[SimulationGroup,List[Union[str, SimulationStartConfig, Simulation]]]) -> SimulationGroup:
+        # Return the existing group if passed in
+        if isinstance(to_create, SimulationGroup):
+            return to_create
+        # Otherwise, create new SimulationGroup
+        created = []
+        for potential in to_create:
+            created.append(self.create_simulation(potential))
+        group = SimulationGroup(created)
+        return group
+    
+    def create_simulation(self, to_create: Union[str, SimulationStartConfig, Simulation]) -> Tuple[UUID, Simulation]:
         new_id = uuid4()
-        logger.info(f"Attempting to start simulation (key='{new_id}', family='{config.sim_family}', type='{config.sim_type}')")
-        # Create a new simulation object
-        # Setup the simulation object
-        # Run the simulation object
-        simulation = SimulationRegistry.make(config.sim_type, config)
+        is_str = isinstance(to_create, str)
+        is_sim = isinstance(to_create, Simulation)
+        is_config = isinstance(to_create, SimulationStartConfig)
+        if not is_sim and not is_config and not is_str:
+            logger.warning(f"Could not create simulation because input was invalid")
+            return (SimulationTracker.no_id, None)
+        # Create a new simulation object or use the passed one
+        if is_str:
+            to_create: str = to_create
+            simulation = SimulationRegistry.make(to_create)
+            logger.info(f"Created simulation (key='{new_id}', type='{to_create}') with default registered config.")
+        elif is_config:
+            to_create: SimulationStartConfig = to_create
+            simulation = SimulationRegistry.make(to_create.sim_type, to_create)
+            logger.info(f"Created simulation object with config (key='{new_id}',  type='{to_create.sim_type}')")
+        else:
+            to_create: Simulation = to_create
+            simulation = to_create
+            logger.info(f"Creating existing simulation object (key='{new_id}')")
+        return (new_id, simulation)
+
+
+    def start_sims(self, to_start: Union[SimulationGroup, List[Union[str, SimulationStartConfig, Simulation]]]) -> SimulationGroup:
+        group = self.create_simulations(to_start)
+        for info in group.infos:
+            sim_id = info[0]
+            sim = info[1]
+            # Sim removes calls tracker to remove it from running
+            # sims when done
+            remove_when_done = functools.partial(self.remove_sims, to_remove=[sim_id])
+            sim.add_callback(Simulation.END_RUN, remove_when_done)
+            sim.start()
+            self.add_running_sim(sim_id, sim)
+            logger.info(f"Started simulation (key='{sim_id}') in group '{group.id}'")
+        return group
+    
+    def start_sim(self, to_start: Union[str, SimulationStartConfig, Simulation]) -> Tuple[UUID, Simulation]:
+        id, simulation = self.create_simulation(to_start)
         if simulation is not None:
+            # Upon simulation finishing,
+            # trigger its removal from running simulations
+            remove_when_done = functools.partial(self.remove_sims, to_remove=[id])
+            simulation.add_callback(Simulation.END_RUN, remove_when_done)
             simulation.start()
-            self.add_running_sim(new_id, simulation)
-            logger.info(f"Started simulation (key='{new_id}', family='{config.sim_family}', type='{config.sim_type}')")
-            return (new_id, simulation)
+            self.add_running_sim(id, simulation)
+            logger.info(f"Started simulation (key='{id}')")
+            return (id, simulation)
         
-        logger.info(f"Could not start simulation (key='{new_id}', family='{config.sim_family}', type='{config.sim_type}')")
+        logger.warning(f"Could not start simulation (key='{id}')")
         return (SimulationTracker.no_id, None)
+    
+    
 
     def add_running_sim(
         self,
@@ -460,44 +762,29 @@ class SimulationTracker:
         sim_key = self._to_key(sim_key)
         if sim_key in self.running_sim_map:
             raise ValueError(f"Already running simulation for key '{sim_key}'")
-        self.running_sim_map[sim_key] = sim
+        self._set_sim_running(sim_key, sim)
 
-    async def purge_loop(self):
-        while True:
-            await asyncio.sleep(0.1)
-            self.purge_finished_sims()
+    # async def purge_loop(self):
+    #     while True:
+    #         await asyncio.sleep(0.1)
+    #         self.purge_finished_sims()
 
-    def purge_finished_sims(self):
-        to_remove = []
-        for sim_key, sim in self.running_sim_map.items():
-            if sim.is_done:
-                to_remove.append(sim_key)
-        self.remove_sims(to_remove)
+    # def purge_finished_sims(self):
+    #     to_remove = []
+    #     for sim_key, sim in self.running_sim_map.items():
+    #         if sim.is_done:
+    #             to_remove.append(sim_key)
+    #     self.remove_sims(to_remove)
 
     def remove_sims(self, to_remove: Iterable[Union[str, UUID]]) -> None:
         for sim_key in to_remove:
+            # print(f"Removing sim {sim_key}")
             sim_key = self._to_key(sim_key)
             exists, sim = self.try_get_sim(sim_key)
             if exists:
                 sim.close()
                 self.running_sim_map.pop(sim_key)
                 self.done_sim_map[sim_key] = sim
-
-    def try_get_sim(self, sim_key: Union[str, UUID]) -> Tuple[bool, Union[Simulation, None]]:
-        sim_key = self._to_key(sim_key)
-        if sim_key in self.running_sim_map:
-            return (True, self.running_sim_map[sim_key])
-        elif sim_key in self.done_sim_map:
-            return (True, self.done_sim_map[sim_key])
-        else:
-            return (False, None)
-    def get_sim(self, sim_key: Union[str, UUID]) -> Union[Simulation, None]:
-        sim_key = self._to_key(sim_key)
-        if sim_key in self.running_sim_map:
-            return self.running_sim_map[sim_key]
-        elif sim_key in self.done_sim_map:
-            return self.done_sim_map[sim_key]
-        return None
     
     def _reset_free_outgoing_response_triggers(self, sim_key: Union[str, UUID], just_freed: Set[str]):
         """
@@ -510,7 +797,6 @@ class SimulationTracker:
             just_freed: Set of channel keys that was just freed after
                 a completed interaction.
         """
-        sim_key = self._to_key(sim_key)
         found, sim = self.try_get_sim(sim_key)
         if not found: return
         used = set() if len(self._current_needed_outgoing[sim_key]) < 1 else set.union(*self._current_needed_outgoing[sim_key].values())
@@ -531,7 +817,6 @@ class SimulationTracker:
             just_freed: Set of channel keys that was just freed after
                 a completed interaction.
         """
-        sim_key = self._to_key(sim_key)
         found, sim = self.try_get_sim(sim_key)
         if not found: return
         used = set() if len(self._current_needed_outgoing[sim_key]) < 1 else set.union(*self._current_needed_outgoing[sim_key].values())
