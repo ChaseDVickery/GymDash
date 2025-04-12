@@ -1,43 +1,33 @@
+import asyncio
+import importlib.util
+import logging
+import os
+import pickle
+import sys
+import traceback
+from contextlib import asynccontextmanager
+from random import randint
+from threading import Thread
+
+import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-from fastapi.responses import JSONResponse, Response, FileResponse, StreamingResponse
-from random import randint
-import numpy as np
-import asyncio
-
-from contextlib import asynccontextmanager
-
-import traceback
-import logging
-
-from threading import Thread
-import pickle
+from fastapi.responses import (FileResponse, JSONResponse, Response,
+                               StreamingResponse)
 
 from src.gymdash.backend.core.api.config.config import tags
-from src.gymdash.backend.core.utils.usage import *
+from src.gymdash.backend.core.api.models import (SimulationInteractionModel,
+                                                 SimulationStartConfig)
 from src.gymdash.backend.core.api.stream import StreamerRegistry
-from src.gymdash.backend.core.simulation import SimulationTracker, SimulationRegistry
-from src.gymdash.backend.core.api.models import SimulationStartConfig, SimulationInteractionModel
 from src.gymdash.backend.core.patch.patcher import apply_extension_patches
-from src.gymdash.backend.core.utils.zip import get_recent_media_generator_from_keys
-# from src.tests.stock.train import train, train_cartpole
-
-# from src.api.internals.logging.streamables.StreamerRegistry import StreamerRegistry
-# import src.api.internals.stat_tags as tags
-
-# from src.api.api_models import SimulationStartConfig, SimulationInteractionModel, InteractorChannelModel
-# from src.api.internals.extensions.patch import apply_extension_patches
-# import src.api.api_utils as api_utils
-# from src.api.api_utils_thread import SimulationTracker
-
-# from src.api.internals.usage import get_usage_simple, get_usage_detailed, get_usage_gpu
+from src.gymdash.backend.core.simulation.base import (SimulationRegistry,
+                                                      SimulationTracker)
+from src.gymdash.backend.core.utils.usage import *
+from src.gymdash.backend.core.utils.zip import \
+    get_recent_media_generator_from_keys
 
 
-# python how to use importlib
-import importlib.util
-import sys
-import os
 def import_from_path(module_name, file_path):
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     module = importlib.util.module_from_spec(spec)
@@ -66,10 +56,6 @@ if os.path.exists("registered_sim_info_test.pickle"):
         (key, simulation_type) = pickle.load(f)
         SimulationRegistry.register(key, simulation_type)
 
-# async def manage_simulation_loop():
-#     while True:
-#         simulation_tracker.purge_finished_sims()
-#         await asyncio.sleep(0.1)
 
 # App main
 @asynccontextmanager
@@ -114,13 +100,6 @@ app.add_middleware(
     # Compression level 1-9 (1 lowest compression, 9 highest compression)
     compresslevel=1
 )
-
-    
-
-# def start_test_simulation(config: SimulationStartConfig) -> Thread:
-#     sim_listener_thread = Thread(target=run_test_simulation, args=(config,))
-#     sim_listener_thread.start()
-#     return sim_listener_thread
 
 
 @app.get("/")
@@ -174,18 +153,12 @@ async def get_all_recent_images():
         ),
         media_type="application/zip"
     )
-    # return StreamingResponse(
-    #     content=api_utils.get_recent_media_generator_from_tag(
-    #         tags.TB_IMAGES,
-    #     ),
-    #     media_type="application/zip"
-    # )
     
 @app.post("/start-new-test")
 async def start_new_simulation_call(config: SimulationStartConfig):
     print(f"API called start-new-test with config: {config}")
     id, _ = simulation_tracker.start_sim(config)
-    if simulation_tracker.is_running(id):
+    if simulation_tracker.any_running(id):
         return { "id": str(id) }
     else:
         raise HTTPException(status_code=410, detail="Simulation not started")

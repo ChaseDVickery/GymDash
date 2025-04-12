@@ -8,7 +8,7 @@ import logging
 from typing import List
 
 from gymdash.backend.core.api.models import SimulationStartConfig
-from gymdash.backend.core.simulation import Simulation, SimulationTracker, SimulationRegistry
+from gymdash.backend.core.simulation.base import Simulation, SimulationTracker, SimulationRegistry
 from gymdash.start import add_gymdash_arguments
 
 
@@ -45,7 +45,7 @@ class DemoSimulation(Simulation):
 def create_demo_sim():
     return DemoSimulation(SimulationStartConfig(
         name="test",
-        sim_type="test",
+        sim_key="test",
         kwargs = {
             "sim_time": 2,
             "poll_time": 0.5
@@ -201,7 +201,7 @@ if __name__ == "__main__":
     print(f"Starting {num_sims} simulation with registered simulation")
     default_config = SimulationStartConfig(
         name="demo",
-        sim_type="demo",
+        sim_key="demo",
         kwargs = {
             "sim_time": 2,
             "poll_time": 0.1,

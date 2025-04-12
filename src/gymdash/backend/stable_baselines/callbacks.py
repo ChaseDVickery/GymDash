@@ -4,7 +4,7 @@ try:
 except ImportError:
     _has_sb = False
     
-from src.gymdash.backend.core.simulation import SimulationInteractor
+from src.gymdash.backend.core.simulation.base import SimulationInteractor
 from src.gymdash.backend.gymnasium.utils.wrapper_utils import WrapperUtils
 from src.gymdash.backend.gymnasium.wrappers import TensorboardStreamWrapper
 

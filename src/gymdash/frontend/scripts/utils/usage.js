@@ -129,7 +129,7 @@ const resourceUsageDisplayUtils = (
 
 
             // Internal Settings
-            let autoUpdateResourcePreview       = true;
+            let autoUpdateResourcePreview       = false;
             let autoUpdateResourcePreviewTime   = 1000;     // Auto-update time in ms;
             let autoUpdateResourcePreviewID;
             let showResourceValues              = true;

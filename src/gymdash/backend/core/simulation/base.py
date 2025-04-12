@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import types
 from abc import abstractmethod
 from collections import defaultdict
 from threading import Thread, Lock
@@ -320,11 +321,34 @@ class Simulation():
             Simulation.START_RUN:       [],
             Simulation.END_RUN:         [],
         }
+        self.kwarg_defaults = self.create_kwarg_defaults()
+
+    def create_kwarg_defaults(self):
+        return {}
 
     @property
     def is_done(self):
         return not self.thread.is_alive()
 
+    def _overwrite_new_kwargs(self, old_kwargs, *args) -> Dict[str, Any]:
+        """
+        Returns a unified dictionary of keyword arguments where each subsequent
+        keyword dictionary adds its own values to the old dictionary,
+        overwriting existing values at matching keys.
+
+        Args:
+            old_kwargs: Old dict of keyword arguments to override.
+            *args: Tuple of new keyword arguments to apply to the old.
+        Return:
+            new_kwargs: New dictionary containing unified kwargs
+        """
+        new_kwargs = {}
+        for k, v in old_kwargs.items():
+            new_kwargs[k] = v
+        for kwarg_dict in args:
+            for key, value in kwarg_dict.items():
+                new_kwargs[key] = value
+        return new_kwargs
     def _check_kwargs_required(self, req_args: List[str], method_name, **kwargs):
         for arg in req_args:
             if arg not in kwargs:
@@ -337,9 +361,9 @@ class Simulation():
 
     def start(self, **kwargs):
         self.start_kwargs = kwargs
-        self.setup()
+        self.setup(**kwargs)
         self.thread = Thread(target=self.run)
-        self.thread.start()
+        self.thread.start(**kwargs)
         return self.thread
 
     def reset_interactions(self):
@@ -388,23 +412,23 @@ class Simulation():
 
 
     @abstractmethod
-    def setup(self):
+    def setup(self, **kwargs):
         self.trigger_callbacks(Simulation.START_SETUP)
-        self._setup()
+        self._setup(**kwargs)
         self.trigger_callbacks(Simulation.END_SETUP)
 
     @abstractmethod
-    def run(self) -> None:
+    def run(self, **kwargs) -> None:
         self.trigger_callbacks(Simulation.START_RUN)
-        self._run()
+        self._run(**kwargs)
         self.trigger_callbacks(Simulation.END_RUN)
     
     @abstractmethod
-    def _setup(self):
+    def _setup(self, **kwargs):
         raise NotImplementedError
 
     @abstractmethod
-    def _run(self) -> None:
+    def _run(self, **kwargs) -> None:
         raise NotImplementedError
     
     def close(self) -> None:
@@ -422,7 +446,7 @@ class SimulationRegistry:
     def register(
         key: str,
         creator: Callable[[SimulationStartConfig], Simulation],
-        default_config: Union[SimulationStartConfig, None]
+        default_config: Union[SimulationStartConfig, None] = None
     ) -> None:
         """
         Adds the Simulation initializer and optional default configuration
@@ -714,8 +738,8 @@ class SimulationTracker:
             logger.info(f"Created simulation (key='{new_id}', type='{to_create}') with default registered config.")
         elif is_config:
             to_create: SimulationStartConfig = to_create
-            simulation = SimulationRegistry.make(to_create.sim_type, to_create)
-            logger.info(f"Created simulation object with config (key='{new_id}',  type='{to_create.sim_type}')")
+            simulation = SimulationRegistry.make(to_create.sim_key, to_create)
+            logger.info(f"Created simulation object with config (key='{new_id}',  type='{to_create.sim_key}')")
         else:
             to_create: Simulation = to_create
             simulation = to_create
@@ -723,7 +747,7 @@ class SimulationTracker:
         return (new_id, simulation)
 
 
-    def start_sims(self, to_start: Union[SimulationGroup, List[Union[str, SimulationStartConfig, Simulation]]]) -> SimulationGroup:
+    def start_sims(self, to_start: Union[SimulationGroup, List[Union[str, SimulationStartConfig, Simulation]]], **kwargs) -> SimulationGroup:
         group = self.create_simulations(to_start)
         for info in group.infos:
             sim_id = info[0]
@@ -732,19 +756,19 @@ class SimulationTracker:
             # sims when done
             remove_when_done = functools.partial(self.remove_sims, to_remove=[sim_id])
             sim.add_callback(Simulation.END_RUN, remove_when_done)
-            sim.start()
+            sim.start(**kwargs)
             self.add_running_sim(sim_id, sim)
             logger.info(f"Started simulation (key='{sim_id}') in group '{group.id}'")
         return group
     
-    def start_sim(self, to_start: Union[str, SimulationStartConfig, Simulation]) -> Tuple[UUID, Simulation]:
+    def start_sim(self, to_start: Union[str, SimulationStartConfig, Simulation], **kwargs) -> Tuple[UUID, Simulation]:
         id, simulation = self.create_simulation(to_start)
         if simulation is not None:
             # Upon simulation finishing,
             # trigger its removal from running simulations
             remove_when_done = functools.partial(self.remove_sims, to_remove=[id])
             simulation.add_callback(Simulation.END_RUN, remove_when_done)
-            simulation.start()
+            simulation.start(**kwargs)
             self.add_running_sim(id, simulation)
             logger.info(f"Started simulation (key='{id}')")
             return (id, simulation)

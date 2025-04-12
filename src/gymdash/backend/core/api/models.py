@@ -5,10 +5,11 @@ from pydantic import BaseModel
 
 
 class SimulationStartConfig(BaseModel):
-    name: str
-    sim_family: str = None
-    sim_type: str
-    kwargs: Dict[str, Any] = {}
+    name:       str
+    sim_key:    str
+    sim_family: str             = None
+    sim_type:   str             = None
+    kwargs:     Dict[str, Any]  = {}
 
 # class SimulationQuery(BaseModel):
 #     id: str     # Really should be a UUID

@@ -14,81 +14,82 @@ from stable_baselines3.ppo import PPO
 
 from src.gymdash.backend.core.api.models import SimulationStartConfig
 from src.gymdash.backend.core.api.stream import StreamerRegistry
-from src.gymdash.backend.core.simulation import Simulation, SimulationRegistry
+from src.gymdash.backend.core.simulation.base import Simulation, SimulationRegistry
 from src.gymdash.backend.gymnasium.wrappers.RecordVideoToTensorboard import \
     RecordVideoToTensorboard
 from src.gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import \
     TensorboardStreamWrapper
 from src.gymdash.backend.stable_baselines.callbacks import \
     SimulationInteractionCallback
+from src.gymdash.backend.core.simulation.examples import StableBaselinesSimulation
 
 logger = logging.getLogger("simulation")
 logger.setLevel(logging.DEBUG)
 
-class StableBaselinesSimulation(Simulation):
-    def __init__(self, config: SimulationStartConfig) -> None:
-        super().__init__(config)
+# class StableBaselinesSimulation(Simulation):
+#     def __init__(self, config: SimulationStartConfig) -> None:
+#         super().__init__(config)
 
-    def _setup(self):
-        logger.info(f"setup {type(self)}")
-        # self._check_kwargs_required(
-        #     ["model", "run_args"],
-        #     "setup",
-        #     **kwargs
-        # )
-        # self.model = kwargs.model
-        # self.run_args = kwargs.run_args
+#     def _setup(self):
+#         logger.info(f"setup {type(self)}")
+#         # self._check_kwargs_required(
+#         #     ["model", "run_args"],
+#         #     "setup",
+#         #     **kwargs
+#         # )
+#         # self.model = kwargs.model
+#         # self.run_args = kwargs.run_args
 
-    def _run(self):
-        logger.info(f"run {type(self)}")
-        # self._check_kwargs_required(
-        #     ["model"],
-        #     "run",
-        #     **kwargs
-        # )
+#     def _run(self):
+#         logger.info(f"run {type(self)}")
+#         # self._check_kwargs_required(
+#         #     ["model"],
+#         #     "run",
+#         #     **kwargs
+#         # )
 
-        config = self.config
+#         config = self.config
 
-        kwargs = config.kwargs
-
-
-
-        # env_name = config.sim_type
-        env_name = "CartPole-v1"
+#         kwargs = config.kwargs
 
 
 
-        # Check required kwargs
-        self._check_kwargs_optional(["num_steps"], "init", **(config.kwargs))
-        num_steps = kwargs.get("num_steps") if "num_steps" in kwargs else 5_000
-        tb_path = os.path.join("tb", "cartpole", "train")
+#         # env_name = config.sim_key
+#         env_name = "CartPole-v1"
 
-        try:
-            env = gym.make(env_name, render_mode="rgb_array")
-        except ValueError:
-            env = gym.make(env_name)
-        # Wrappers
-        env = StreamerRegistry.get_or_register(TensorboardStreamWrapper(
-                env,
-                tb_path,
-                ["rewards", "rollout/ep_rew_mean", "episode_video", "episode_video_thumbnail"]
-            ))
-        r_env = RecordVideoToTensorboard(env, tb_path, lambda x: x%100==0, video_length=0, fps=30)
-        env = r_env
-        # Callbacks
-        sim_interact_callback = SimulationInteractionCallback(self.interactor)
-        # Logger
-        backend_logger = configure(tb_path, ["tensorboard"])
 
-        # Setup Model
-        self.model = PPO("MlpPolicy", env, verbose=0, tensorboard_log=tb_path)
-        self.model.set_logger(backend_logger)
-        tb_loggers = [t for t in self.model.logger.output_formats if isinstance(t, TensorBoardOutputFormat)]
-        print(tb_loggers)
-        r_env.configure_recorder("episode_video", tb_loggers[0].writer)
 
-        self.model.learn(total_timesteps=num_steps, progress_bar=True, callback=sim_interact_callback)
-        self.model.save("ppo_aapl")
+#         # Check required kwargs
+#         self._check_kwargs_optional(["num_steps"], "init", **(config.kwargs))
+#         num_steps = kwargs.get("num_steps") if "num_steps" in kwargs else 5_000
+#         tb_path = os.path.join("tb", "cartpole", "train")
+
+#         try:
+#             env = gym.make(env_name, render_mode="rgb_array")
+#         except ValueError:
+#             env = gym.make(env_name)
+#         # Wrappers
+#         env = StreamerRegistry.get_or_register(TensorboardStreamWrapper(
+#                 env,
+#                 tb_path,
+#                 ["rewards", "rollout/ep_rew_mean", "episode_video", "episode_video_thumbnail"]
+#             ))
+#         r_env = RecordVideoToTensorboard(env, tb_path, lambda x: x%100==0, video_length=0, fps=30)
+#         env = r_env
+#         # Callbacks
+#         sim_interact_callback = SimulationInteractionCallback(self.interactor)
+#         # Logger
+#         backend_logger = configure(tb_path, ["tensorboard"])
+
+#         # Setup Model
+#         self.model = PPO("MlpPolicy", env, verbose=0, tensorboard_log=tb_path)
+#         self.model.set_logger(backend_logger)
+#         tb_loggers = [t for t in self.model.logger.output_formats if isinstance(t, TensorBoardOutputFormat)]
+#         print(tb_loggers)
+#         r_env.configure_recorder("episode_video", tb_loggers[0].writer)
+
+#         self.model.learn(total_timesteps=num_steps, progress_bar=True, callback=sim_interact_callback)
+#         self.model.save("ppo_aapl")
 
 
 
@@ -123,4 +124,4 @@ if __name__ == "__main__":
     print(module.StableBaselinesSimulation.__name__)
     print(module.StableBaselinesSimulation.__module__)
 
-    start(args, [("custom_sb_simulation", module.StableBaselinesSimulation)])
+    start(args, [("stable_baselines/ppo", module.StableBaselinesSimulation)])

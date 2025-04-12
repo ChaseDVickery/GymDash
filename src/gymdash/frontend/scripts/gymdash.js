@@ -145,10 +145,15 @@ function displayVideoTest() {
 function startSimTest() {
     const data = {
         name: "cartpole",
-        sim_family: "stable_baselines",
-        sim_type: "custom_sb_simulation",
+        sim_key: "stable_baselines/ppo",
+        sim_family: "",
+        sim_type: "",
         kwargs: {
             "num_steps": testSimTimesteps,
+            "episode_trigger": 50,
+            "policy": "MlpPolicy",
+            "env": "LunarLander-v3",
+            "algorithm": "ppo"
         }
     };
     fetch(apiURL("start-new-test"), {
