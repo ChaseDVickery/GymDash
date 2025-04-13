@@ -5,8 +5,14 @@ import http.server
 import multiprocessing
 import socket
 import pickle
+import logging
 from typing import Callable, Union, List, Tuple, Any
-from src.gymdash.backend.core.api.config.config import set_global_config
+from gymdash.backend.core.api.config.config import set_global_config
+
+logger = logging.getLogger("gymdash")
+# logger.setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG, 
+                    format='%(asctime)s - %(levelname)s - %(message)s')
 
 # https://stackoverflow.com/questions/2470971/fast-way-to-test-if-a-port-is-in-use-using-python
 def socket_used(port) -> bool:
@@ -42,11 +48,12 @@ def setup_frontend(args):
         s.close()
     elif args.apiserver == "custom_ip":
         final_host = args.apiserver_ip
-    print(f"Frontend will query final host at '{final_host}'")
+    logger.info(f"Frontend will query final host at '{final_host}'")
     if (not os.path.exists(js_main_path)):
-        print(f"Cannot start frontend because template JS file '{js_main_path}' does not exist")
+        logger.error(f"Cannot start frontend because template JS file '{js_main_path}' does not exist")
         return
     else:
+        logger.info(f"Modifying API address at {js_main_path} -> {js_new_path}")
         with open(js_main_path, "r") as f:
             new_content = f.read() \
                             .replace(r"<<api_addr>>", "http://" + str(final_host)) \
@@ -79,7 +86,7 @@ def run_frontend_server(args):
 # Starts a subprocess running the Uvicorn FastAPI server
 def run_backend_server(args):
     print("Starting API server")
-    subprocess.run(["uvicorn", "src.gymdash.backend.main:app", "--host", str(args.apiaddr), "--port", str(args.apiport), "--workers", str(args.apiworkers)])
+    subprocess.run(["uvicorn", "gymdash.backend.main:app", "--host", str(args.apiaddr), "--port", str(args.apiport), "--workers", str(args.apiworkers)])
 
 # Starts the frontend and backend servers
 def start(args, sim_registrations: Union[List[Tuple[str, Callable[[Any], Any]]],None] = None):

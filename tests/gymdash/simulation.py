@@ -2,8 +2,8 @@ import unittest
 import logging
 import asyncio
 import time
-from src.gymdash.backend.core.api.models import SimulationStartConfig
-from src.gymdash.backend.core.simulation.base import SimulationTracker, Simulation, SimulationRegistry
+from gymdash.backend.core.api.models import SimulationStartConfig
+from gymdash.backend.core.simulation.base import SimulationTracker, Simulation, SimulationRegistry
 
 logger = logging.getLogger("testing")
 

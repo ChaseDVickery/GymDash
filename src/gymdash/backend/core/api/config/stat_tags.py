@@ -4,8 +4,6 @@ try:
 except ImportError:
     _has_tensorboard = False
     
-
-print(_has_tensorboard)
 ANY_TAG = "any"
 if _has_tensorboard:
     TB_TENSORS                  = tag_types.TENSORS

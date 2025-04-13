@@ -1,7 +1,7 @@
 from typing import Any, Dict, Iterable, List, Set, SupportsFloat, Union
 
-from src.gymdash.backend.core.api.config.config import CONFIG
-from src.gymdash.backend.core.api.config.stat_tags import ANY_TAG
+from gymdash.backend.core.api.config.config import CONFIG
+from gymdash.backend.core.api.config.stat_tags import ANY_TAG
 
 try:
     import gymnasium as gym
@@ -18,7 +18,7 @@ except ImportError:
     _has_tensorboard = False
     
 
-from src.gymdash.backend.tensorboard.TensorboardStreamableStat import \
+from gymdash.backend.tensorboard.TensorboardStreamableStat import \
     TensorboardStreamableStat
 
 if not _has_gym:

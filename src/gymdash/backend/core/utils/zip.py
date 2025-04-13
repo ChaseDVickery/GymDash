@@ -15,11 +15,11 @@ except ImportError:
     
 
 
-import src.gymdash.backend.core.api.config.stat_tags as tags
-from src.gymdash.backend.core.api.stream import StreamerRegistry
-from src.gymdash.backend.core.utils.file_format import (FileFormat,
+import gymdash.backend.core.api.config.stat_tags as tags
+from gymdash.backend.core.api.stream import StreamerRegistry
+from gymdash.backend.core.utils.file_format import (FileFormat,
                                                     format_from_bytes)
-from src.gymdash.backend.core.utils.json import DataclassJSONEncoder
+from gymdash.backend.core.utils.json import DataclassJSONEncoder
 
 
 logger = logging.getLogger("utils")

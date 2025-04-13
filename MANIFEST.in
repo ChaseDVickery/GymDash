@@ -1,0 +1,5 @@
+recursive-include src/gymdash/frontend/ *.html *.css
+include src/gymdash/frontend/scripts/gymdash.js
+recursive-include src/gymdash/frontend/scripts/utils/ *.js
+recursive-include src/gymdash/frontend/scripts/libs/ *.min.js
+exclude src/gymdash/frontend/scripts/utils/api_link.js

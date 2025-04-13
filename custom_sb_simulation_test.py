@@ -6,22 +6,22 @@ import types
 import sys
 
 import argparse
-from src.gymdash.start import start
+from gymdash.start import start
 
 import gymnasium as gym
 from stable_baselines3.common.logger import TensorBoardOutputFormat, configure
 from stable_baselines3.ppo import PPO
 
-from src.gymdash.backend.core.api.models import SimulationStartConfig
-from src.gymdash.backend.core.api.stream import StreamerRegistry
-from src.gymdash.backend.core.simulation.base import Simulation, SimulationRegistry
-from src.gymdash.backend.gymnasium.wrappers.RecordVideoToTensorboard import \
+from gymdash.backend.core.api.models import SimulationStartConfig
+from gymdash.backend.core.api.stream import StreamerRegistry
+from gymdash.backend.core.simulation.base import Simulation, SimulationRegistry
+from gymdash.backend.gymnasium.wrappers.RecordVideoToTensorboard import \
     RecordVideoToTensorboard
-from src.gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import \
+from gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import \
     TensorboardStreamWrapper
-from src.gymdash.backend.stable_baselines.callbacks import \
+from gymdash.backend.stable_baselines.callbacks import \
     SimulationInteractionCallback
-from src.gymdash.backend.core.simulation.examples import StableBaselinesSimulation
+from gymdash.backend.core.simulation.examples import StableBaselinesSimulation
 
 logger = logging.getLogger("simulation")
 logger.setLevel(logging.DEBUG)

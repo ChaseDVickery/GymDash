@@ -16,15 +16,15 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (FileResponse, JSONResponse, Response,
                                StreamingResponse)
 
-from src.gymdash.backend.core.api.config.config import tags
-from src.gymdash.backend.core.api.models import (SimulationInteractionModel,
+from gymdash.backend.core.api.config.config import tags
+from gymdash.backend.core.api.models import (SimulationInteractionModel,
                                                  SimulationStartConfig)
-from src.gymdash.backend.core.api.stream import StreamerRegistry
-from src.gymdash.backend.core.patch.patcher import apply_extension_patches
-from src.gymdash.backend.core.simulation.base import (SimulationRegistry,
+from gymdash.backend.core.api.stream import StreamerRegistry
+from gymdash.backend.core.patch.patcher import apply_extension_patches
+from gymdash.backend.core.simulation.base import (SimulationRegistry,
                                                       SimulationTracker)
-from src.gymdash.backend.core.utils.usage import *
-from src.gymdash.backend.core.utils.zip import \
+from gymdash.backend.core.utils.usage import *
+from gymdash.backend.core.utils.zip import \
     get_recent_media_generator_from_keys
 
 

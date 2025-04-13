@@ -1,3 +1,9 @@
+[tool.setuptools]
+# Should be true by default, but still including.
+# https://setuptools.pypa.io/en/latest/userguide/datafiles.html
+# Needed to include frontend files (html, css, js) in MANIFEST.in
+include-package-data = true
+
 [project]
 name = "gymdash"
 version = "0.0.1"

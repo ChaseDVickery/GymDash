@@ -1,4 +1,4 @@
-import src.gymdash.backend.core.api.config.stat_tags as tags
+import gymdash.backend.core.api.config.stat_tags as tags
 
 try:
     from tensorboard.backend.event_processing.event_accumulator import (

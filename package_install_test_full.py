@@ -10,19 +10,19 @@ import types
 
 
 from gymdash.start import add_gymdash_arguments
-from src.gymdash.backend.core.api.models import SimulationStartConfig
-from src.gymdash.backend.core.api.stream import StreamerRegistry
-from src.gymdash.backend.core.simulation.base import (Simulation,
+from gymdash.backend.core.api.models import SimulationStartConfig
+from gymdash.backend.core.api.stream import StreamerRegistry
+from gymdash.backend.core.simulation.base import (Simulation,
                                                  SimulationRegistry,
                                                  SimulationTracker)
-from src.gymdash.backend.gymnasium.wrappers.RecordVideoToTensorboard import \
+from gymdash.backend.gymnasium.wrappers.RecordVideoToTensorboard import \
     RecordVideoToTensorboard
-from src.gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import \
+from gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import \
     TensorboardStreamWrapper
-from src.gymdash.backend.stable_baselines.callbacks import \
+from gymdash.backend.stable_baselines.callbacks import \
     SimulationInteractionCallback
-from src.gymdash.start import start
-from src.gymdash.backend.core.simulation.examples import StableBaselinesSimulation
+from gymdash.start import start
+from gymdash.backend.core.simulation.examples import StableBaselinesSimulation
 
 logger = logging.getLogger("gymdash-simulation")
 logger.setLevel(logging.DEBUG)

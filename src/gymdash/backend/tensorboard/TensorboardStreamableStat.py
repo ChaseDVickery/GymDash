@@ -1,6 +1,6 @@
-from src.gymdash.backend.core.api.stream import StreamableStat
+from gymdash.backend.core.api.stream import StreamableStat
 from typing import Set
-from src.gymdash.backend.core.api.config.stat_tags import ANY_TAG, TENSORBOARD_TAG_SET
+from gymdash.backend.core.api.config.stat_tags import ANY_TAG, TENSORBOARD_TAG_SET
 try:
     from tensorboard.backend.event_processing import event_accumulator, tag_types
     _has_tensorboard = True

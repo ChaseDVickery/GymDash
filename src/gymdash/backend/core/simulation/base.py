@@ -9,7 +9,7 @@ from typing_extensions import Self
 from uuid import UUID, uuid4
 import functools
 
-from src.gymdash.backend.core.api.models import (SimulationInteractionModel,
+from gymdash.backend.core.api.models import (SimulationInteractionModel,
                                                  SimulationStartConfig)
 
 logger = logging.getLogger("gymdash-simulation")

@@ -1,7 +1,7 @@
 import unittest
 import random
 import logging
-from src.gymdash.backend.core.utils.file_format import *
+from gymdash.backend.core.utils.file_format import *
 
 gif1 = b'\x47\x49\x46\x38\x37\x61'
 gif2 = b'\x47\x49\x46\x38\x39\x61'
