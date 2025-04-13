@@ -14,7 +14,9 @@ from stable_baselines3.ppo import PPO
 
 from gymdash.backend.core.api.models import SimulationStartConfig
 from gymdash.backend.core.api.stream import StreamerRegistry
+import gymdash.backend.core.simulation.base
 from gymdash.backend.core.simulation.base import Simulation, SimulationRegistry
+from gymdash.backend.core.simulation.export import SimulationExporter
 from gymdash.backend.gymnasium.wrappers.RecordVideoToTensorboard import \
     RecordVideoToTensorboard
 from gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import \
@@ -23,75 +25,7 @@ from gymdash.backend.stable_baselines.callbacks import \
     SimulationInteractionCallback
 from gymdash.backend.core.simulation.examples import StableBaselinesSimulation
 
-logger = logging.getLogger("simulation")
-logger.setLevel(logging.DEBUG)
-
-# class StableBaselinesSimulation(Simulation):
-#     def __init__(self, config: SimulationStartConfig) -> None:
-#         super().__init__(config)
-
-#     def _setup(self):
-#         logger.info(f"setup {type(self)}")
-#         # self._check_kwargs_required(
-#         #     ["model", "run_args"],
-#         #     "setup",
-#         #     **kwargs
-#         # )
-#         # self.model = kwargs.model
-#         # self.run_args = kwargs.run_args
-
-#     def _run(self):
-#         logger.info(f"run {type(self)}")
-#         # self._check_kwargs_required(
-#         #     ["model"],
-#         #     "run",
-#         #     **kwargs
-#         # )
-
-#         config = self.config
-
-#         kwargs = config.kwargs
-
-
-
-#         # env_name = config.sim_key
-#         env_name = "CartPole-v1"
-
-
-
-#         # Check required kwargs
-#         self._check_kwargs_optional(["num_steps"], "init", **(config.kwargs))
-#         num_steps = kwargs.get("num_steps") if "num_steps" in kwargs else 5_000
-#         tb_path = os.path.join("tb", "cartpole", "train")
-
-#         try:
-#             env = gym.make(env_name, render_mode="rgb_array")
-#         except ValueError:
-#             env = gym.make(env_name)
-#         # Wrappers
-#         env = StreamerRegistry.get_or_register(TensorboardStreamWrapper(
-#                 env,
-#                 tb_path,
-#                 ["rewards", "rollout/ep_rew_mean", "episode_video", "episode_video_thumbnail"]
-#             ))
-#         r_env = RecordVideoToTensorboard(env, tb_path, lambda x: x%100==0, video_length=0, fps=30)
-#         env = r_env
-#         # Callbacks
-#         sim_interact_callback = SimulationInteractionCallback(self.interactor)
-#         # Logger
-#         backend_logger = configure(tb_path, ["tensorboard"])
-
-#         # Setup Model
-#         self.model = PPO("MlpPolicy", env, verbose=0, tensorboard_log=tb_path)
-#         self.model.set_logger(backend_logger)
-#         tb_loggers = [t for t in self.model.logger.output_formats if isinstance(t, TensorBoardOutputFormat)]
-#         print(tb_loggers)
-#         r_env.configure_recorder("episode_video", tb_loggers[0].writer)
-
-#         self.model.learn(total_timesteps=num_steps, progress_bar=True, callback=sim_interact_callback)
-#         self.model.save("ppo_aapl")
-
-
+# logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
 
@@ -114,14 +48,19 @@ if __name__ == "__main__":
     # SimulationRegistry.register("custom_sb_simulation", StableBaselinesSimulation)
     # print(SimulationRegistry.list_simulations())
 
-    module_name = "custom_sb_simulation_test"
-    module = types.ModuleType("custom_sb_simulation_test")
-    module.StableBaselinesSimulation = StableBaselinesSimulation
-    sys.modules[module_name] = module
+    # module_name = "custom_sb_simulation_test"
+    # module = types.ModuleType("custom_sb_simulation_test")
+    # module.StableBaselinesSimulation = StableBaselinesSimulation
+    # sys.modules[module_name] = module
 
-    StableBaselinesSimulation.__module__ = module_name
+    # StableBaselinesSimulation.__module__ = module_name
 
-    print(module.StableBaselinesSimulation.__name__)
-    print(module.StableBaselinesSimulation.__module__)
+    # print(module.StableBaselinesSimulation.__name__)
+    # print(module.StableBaselinesSimulation.__module__)
 
-    start(args, [("stable_baselines/ppo", module.StableBaselinesSimulation)])
+    # SimulationExporter.prepare_for_export(StableBaselinesSimulation, StableBaselinesSimulation.__file__, module_name)
+    # SimulationExporter.export_sims()
+    SimulationExporter.prepare_for_export("my_custom_sim", StableBaselinesSimulation)
+    SimulationExporter.export_sims()
+
+    start(args, [("my_custom_sim", StableBaselinesSimulation)])

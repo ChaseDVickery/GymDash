@@ -9,10 +9,9 @@ import logging
 from typing import Callable, Union, List, Tuple, Any
 from gymdash.backend.core.api.config.config import set_global_config
 
-logger = logging.getLogger("gymdash")
-# logger.setLevel(logging.DEBUG)
-logging.basicConfig(level=logging.DEBUG, 
-                    format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+# logging.basicConfig(level=logging.DEBUG, 
+#                     format='%(asctime)s - %(levelname)s - %(message)s')
 
 # https://stackoverflow.com/questions/2470971/fast-way-to-test-if-a-port-is-in-use-using-python
 def socket_used(port) -> bool:
@@ -90,13 +89,6 @@ def run_backend_server(args):
 
 # Starts the frontend and backend servers
 def start(args, sim_registrations: Union[List[Tuple[str, Callable[[Any], Any]]],None] = None):
-    # Check if ports are open
-
-    if sim_registrations is not None:
-        to_register = sim_registrations[0]
-        with open("registered_sim_info_test.pickle", "wb") as f:
-            pickle.dump((to_register[0], to_register[1]), f)
-
     # Start the servers
     set_global_config(args)
     setup_frontend(args)

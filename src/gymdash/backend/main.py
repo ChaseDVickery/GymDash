@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from random import randint
 from threading import Thread
 
+import gymdash
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,6 +17,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (FileResponse, JSONResponse, Response,
                                StreamingResponse)
 
+from gymdash.backend.core.simulation.export import SimulationExporter
 from gymdash.backend.core.api.config.config import tags
 from gymdash.backend.core.api.models import (SimulationInteractionModel,
                                                  SimulationStartConfig)
@@ -27,35 +29,13 @@ from gymdash.backend.core.utils.usage import *
 from gymdash.backend.core.utils.zip import \
     get_recent_media_generator_from_keys
 
-
-def import_from_path(module_name, file_path):
-    spec = importlib.util.spec_from_file_location(module_name, file_path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[module_name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
-sim_logger = logging.getLogger("simulation")
+logger = logging.getLogger(__name__)
+logging.basicConfig(level = logging.INFO, format = '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s')
 
 simulation_tracker = SimulationTracker()
 apply_extension_patches()
 
-if os.path.exists("registered_sim_info_test.pickle"):
-
-    module = import_from_path(
-        "custom_sb_simulation_test",
-        "D:\\GymDash\\GymDash\\custom_sb_simulation_test.py"
-    )
-    importlib.invalidate_caches()
-    importlib.reload(module)
-    # simulation = module.StableBaselinesSimulation(None)
-
-    print("reading pickled registration file")
-    with open("registered_sim_info_test.pickle", "rb") as f:
-        (key, simulation_type) = pickle.load(f)
-        SimulationRegistry.register(key, simulation_type)
-
+SimulationExporter.import_and_register()
 
 # App main
 @asynccontextmanager
@@ -169,7 +149,7 @@ async def start_new_simulation_call(config: SimulationStartConfig):
 
 @app.post("/query-sim")
 async def get_sim_progress(sim_query: SimulationInteractionModel):
-    sim_logger.warning(f"Ignoring simulation query ID '{sim_query.id}' and replacing with a testing ID: {simulation_tracker.testing_first_id}")
+    logger.warning(f"Ignoring simulation query ID '{sim_query.id}' and replacing with a testing ID: {simulation_tracker.testing_first_id}")
     sim_query.id = simulation_tracker.testing_first_id
     query_response = await simulation_tracker.fulfill_query_interaction(sim_query)
     return query_response
