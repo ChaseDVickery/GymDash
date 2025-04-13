@@ -31,8 +31,7 @@ from gymdash.backend.stable_baselines.callbacks import \
 from gymdash.start import start
 
 
-logger = logging.getLogger("gymdash-simulation")
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 class StableBaselinesSimulation(Simulation):
     def __init__(self, config: SimulationStartConfig) -> None:

@@ -88,7 +88,7 @@ def run_backend_server(args):
     subprocess.run(["uvicorn", "gymdash.backend.main:app", "--host", str(args.apiaddr), "--port", str(args.apiport), "--workers", str(args.apiworkers)])
 
 # Starts the frontend and backend servers
-def start(args, sim_registrations: Union[List[Tuple[str, Callable[[Any], Any]]],None] = None):
+def start(args):
     # Start the servers
     set_global_config(args)
     setup_frontend(args)

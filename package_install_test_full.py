@@ -24,10 +24,7 @@ from gymdash.backend.stable_baselines.callbacks import \
 from gymdash.start import start
 from gymdash.backend.core.simulation.examples import StableBaselinesSimulation
 
-logger = logging.getLogger("gymdash-simulation")
-logger.setLevel(logging.DEBUG)
-
-
+logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

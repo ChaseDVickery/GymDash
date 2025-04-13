@@ -5,7 +5,7 @@ import time
 from gymdash.backend.core.api.models import SimulationStartConfig
 from gymdash.backend.core.simulation.base import SimulationTracker, Simulation, SimulationRegistry
 
-logger = logging.getLogger("testing")
+logger = logging.getLogger(__name__)
 
 SIM_KEY = "test"
 

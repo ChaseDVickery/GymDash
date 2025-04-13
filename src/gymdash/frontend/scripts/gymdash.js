@@ -145,7 +145,8 @@ function displayVideoTest() {
 function startSimTest() {
     const data = {
         name: "cartpole",
-        sim_key: "stable_baselines/ppo",
+        sim_key: "my_custom_sim",
+        // sim_key: "stable_baselines/ppo",
         sim_family: "",
         sim_type: "",
         kwargs: {

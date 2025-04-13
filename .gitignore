@@ -8,7 +8,7 @@ info.txt
 tb/
 quickstart.bat
 registered_sim_info_test.pickle
-# package_install_test*.py
+*exported_sims*
 dist/
 build/
 src/gymdash.egg-info/

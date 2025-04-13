@@ -1,4 +1,5 @@
 
+import logging
 from typing import Callable, Union
 
 import numpy as np
@@ -30,6 +31,7 @@ if not _has_tensorboard:
 if not _has_torch:
     raise ImportError("Install torch to use gymdash environment wrappers.")
 
+logger = logging.getLogger(__name__)
 
 class RecordVideoToTensorboard(RecordVideo):
     def __init__(self, env: Env, video_folder: str, episode_trigger: Union[Callable[[int], bool], None] = None, step_trigger: Union[Callable[[int], bool], None] = None, video_length: int = 0, name_prefix: str = "rl-video", fps: Union[int, None] = None, disable_logger: bool = True):
@@ -52,26 +54,15 @@ class RecordVideoToTensorboard(RecordVideo):
         if len(self.recorded_frames) == 0:
             logger.warn("Ignored saving a video as there were zero frames to save.")
         else:
-            # print(self.recorded_frames)
             # Rearrange recorded frames to format: (# vids, # frames, # channels, height, width)
             frame_stack = np.expand_dims(np.transpose(np.stack(self.recorded_frames, axis=0), axes=[0, 3, 1, 2]), axis=0)
             vid_tensor = th.from_numpy(frame_stack)
-            print(f"Adding video tensor: {vid_tensor.shape}")
-            # self.logger.add_video(self.tag, vid_tensor, self.episode_id, fps=30)
+            # Video
+            logger.info(f"Adding video tensor: {vid_tensor.shape}")
             self.logger.add_video(self.tag, vid_tensor, self.episode_id, fps=30)
+            # Thumbnail
+            logger.info(f"Adding video thumbnail tensor: {vid_tensor[0, 0, :, :, :].shape}")
             self.logger.add_image(self.tag+"_thumbnail", vid_tensor[0, 0, :, :, :], self.episode_id)
-                
-            # try:
-            #     from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
-            # except ImportError as e:
-            #     raise error.DependencyNotInstalled(
-            #         'MoviePy is not installed, run `pip install "gymnasium[other]"`'
-            #     ) from e
-
-            # clip = ImageSequenceClip(self.recorded_frames, fps=self.frames_per_sec)
-            # moviepy_logger = None if self.disable_logger else "bar"
-            # path = os.path.join(self.video_folder, f"{self._video_name}.mp4")
-            # clip.write_videofile(path, logger=moviepy_logger)
 
         self.recorded_frames = []
         self.recording = False

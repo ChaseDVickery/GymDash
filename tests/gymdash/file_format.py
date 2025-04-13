@@ -10,7 +10,7 @@ wav_, _wav = b'\x52\x49\x46\x46', b'\x57\x41\x56\x45'
 mp41 = b'\x66\x74\x79\x70\x4D\x53\x4E\x56'
 mp42 = b'\x66\x74\x79\x70\x69\x73\x6F\x6D'
 
-logger = logging.getLogger("testing")
+logger = logging.getLogger(__name__)
 
 class ByteSignatureBuilder:
     def __init__(self, offset, bytes1, any_bytes=0, bytes2=None) -> None:

@@ -22,8 +22,7 @@ from gymdash.backend.core.utils.file_format import (FileFormat,
 from gymdash.backend.core.utils.json import DataclassJSONEncoder
 
 
-logger = logging.getLogger("utils")
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)

@@ -12,14 +12,7 @@ import functools
 from gymdash.backend.core.api.models import (SimulationInteractionModel,
                                                  SimulationStartConfig)
 
-logger = logging.getLogger("gymdash-simulation")
-logging.basicConfig(
-    filename="gymdash-simulation.log",
-    filemode="w",
-    encoding='utf-8',
-    level=logging.DEBUG
-)
-logger.setLevel(logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 class InteractorFlag:
     def __init__(self, default_status: bool=False, default_value: Any=None) -> None:
@@ -63,7 +56,6 @@ class InteractorFlagChannel:
     def set_incoming(self, value: Any):
         self.incoming.trigger_with(value)
     def set_outgoing(self, value: Any):
-        print(f"InteractorFlagChannel set_outgoing value to new value: {value}")
         self.outgoing.trigger_with(value)
 
     # def consume_immediate_in(self) -> Any:
@@ -88,7 +80,6 @@ class InteractorFlagChannel:
             False if the outgoing value was not set.
         """
         if (self.has_incoming):
-            print(f"InteractorFlagChannel set_out_if_in: value={out_value}")
             self._consume_in_queued = True
             self.set_outgoing(out_value)
             return True
