@@ -36,34 +36,6 @@ class SimulationExporter:
             logger.error(f"Could not create simulation export folder")
         return path
 
-    # @staticmethod
-    # def prepare_for_export(sim_key, sim_type, sim_file_path, module_name=DEFAULT_MODULE_NAME):
-    #     # Find relevant module with the module name
-    #     # or create a new module type using module name
-    #     if module_name in SimulationExporter.simulation_packages:
-    #         module = SimulationExporter.simulation_packages[module_name]
-    #     else:
-    #         module = types.ModuleType(module_name)
-    #         SimulationExporter.simulation_packages[module_name] = module
-    #     # Try to find the class name in the current module.
-    #     # If it already exists in the current module, then we have a problem.
-    #     sim_type_name = sim_type.__name__            
-    #     try:
-    #         _ = module.__getattr__(sim_type_name)
-    #         class_already_in_module = True
-    #     except AttributeError:
-    #         class_already_in_module = False
-    #     if (class_already_in_module):
-    #         logger.warning(f"Could not add simulation '{sim_type}' to module '{module_name}' because it already exists in '{module_name}'")
-    #         return False
-    #     # Now, just try to add the class to the module
-    #     # and set the class's module to the module's name
-    #     module.__setattr__(sim_type_name, sim_type)
-    #     sim_type.__module__ = module_name
-    #     SimulationExporter.import_index.add(sim_file_path)
-    #     # Success!
-    #     return True
-
     @staticmethod
     def prepare_for_export(sim_key, sim_type):
         # Find relevant module with the module name
@@ -120,7 +92,7 @@ class SimulationExporter:
         return module
 
     @staticmethod
-    def import_and_register():
+    def import_and_register(delete_files: bool = True):
         export_folder = SimulationExporter._get_export_folder()
         index_filepath = os.path.join(export_folder, SimulationExporter.IMPORT_INDEX_FILENAME)
         exported_filepath = os.path.join(export_folder, SimulationExporter.EXPORTED_SIM_FILENAME)
@@ -149,4 +121,11 @@ class SimulationExporter:
         for sim_key, sim_type in SimulationExporter._simulations_imported.items():
             SimulationRegistry.register(sim_key, sim_type)
         logger.info(f"Successfully imported {len(SimulationExporter._simulations_imported)} simulation types and {len(SimulationExporter._import_index_imported)} import files.")
+        if delete_files:
+            try:
+                os.remove(index_filepath)
+                os.remove(exported_filepath)
+                logger.info(f"Successfully deleted index and exported simulation files.")
+            except:
+                logger.exception(f"Problem when deleting one of '{index_filepath}' or '{exported_filepath}'")
         return True
