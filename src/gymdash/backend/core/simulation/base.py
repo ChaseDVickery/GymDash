@@ -398,20 +398,44 @@ class Simulation():
         event: Literal["start_setup", "end_setup","start_run","end_run"]
     ) -> Self:
         callbacks = self.get_callbacks(event)
+        logger.debug(f"Simulation triggering {len(callbacks)} callbacks for '{event}'.")
         for callback in callbacks:
             callback()
 
 
     @abstractmethod
-    def setup(self, **kwargs):
-        self.trigger_callbacks(Simulation.START_SETUP)
-        self._setup(**kwargs)
-        self.trigger_callbacks(Simulation.END_SETUP)
+    def setup(self, **kwargs) -> None:
+        logger.debug(f"Simulation setup() kwargs: {kwargs}.")
+        # Start setup callbacks
+        try:
+            self.trigger_callbacks(Simulation.START_SETUP)
+        except Exception:
+            logger.exception(f"Exception when running Simulation '{Simulation.START_SETUP}' callbacks.")
+        # Setup
+        try:
+            self._setup(**kwargs)
+        except Exception:
+            logger.exception(f"Exception when calling Simulation _setup().")
+        # End setup callbacks
+        try:
+            self.trigger_callbacks(Simulation.END_SETUP)
+        except Exception:
+            logger.exception(f"Exception when running Simulation '{Simulation.END_SETUP}' callbacks.")
 
     @abstractmethod
     def run(self, **kwargs) -> None:
-        self.trigger_callbacks(Simulation.START_RUN)
-        self._run(**kwargs)
+        logger.debug(f"Simulation run() kwargs: {kwargs}.")
+        # Start run callbacks
+        try:
+            self.trigger_callbacks(Simulation.START_RUN)
+        except Exception:
+            logger.exception(f"Exception when running Simulation '{Simulation.START_SETUP}' callbacks.")
+        # Run
+        try:
+            self._run(**kwargs)
+        except Exception:
+            logger.exception(f"Exception when calling Simulation _run().")
+        # End run callbacks
         self.trigger_callbacks(Simulation.END_RUN)
     
     @abstractmethod
@@ -726,15 +750,15 @@ class SimulationTracker:
         if is_str:
             to_create: str = to_create
             simulation = SimulationRegistry.make(to_create)
-            logger.info(f"Created simulation (key='{new_id}', type='{to_create}') with default registered config.")
+            logger.info(f"Created simulation (type='{to_create}', id='{new_id}') with default registered config.")
         elif is_config:
             to_create: SimulationStartConfig = to_create
             simulation = SimulationRegistry.make(to_create.sim_key, to_create)
-            logger.info(f"Created simulation object with config (key='{new_id}',  type='{to_create.sim_key}')")
+            logger.info(f"Created simulation object with config (type='{to_create.sim_key}', id='{new_id}')")
         else:
             to_create: Simulation = to_create
             simulation = to_create
-            logger.info(f"Creating existing simulation object (key='{new_id}')")
+            logger.info(f"Creating existing simulation object (id='{new_id}')")
         return (new_id, simulation)
 
 
@@ -749,7 +773,7 @@ class SimulationTracker:
             sim.add_callback(Simulation.END_RUN, remove_when_done)
             sim.start(**kwargs)
             self.add_running_sim(sim_id, sim)
-            logger.info(f"Started simulation (key='{sim_id}') in group '{group.id}'")
+            logger.info(f"Started simulation (id='{sim_id}') in group '{group.id}'")
         return group
     
     def start_sim(self, to_start: Union[str, SimulationStartConfig, Simulation], **kwargs) -> Tuple[UUID, Simulation]:
@@ -761,7 +785,7 @@ class SimulationTracker:
             simulation.add_callback(Simulation.END_RUN, remove_when_done)
             simulation.start(**kwargs)
             self.add_running_sim(id, simulation)
-            logger.info(f"Started simulation (key='{id}')")
+            logger.info(f"Started simulation (id='{id}')")
             return (id, simulation)
         
         logger.warning(f"Could not start simulation (key='{id}')")
@@ -856,7 +880,8 @@ class SimulationTracker:
                 if the queried simulation could not be found.
         """
         interaction_id = uuid4()
-        logger.info(f"Attempting to fulfill query interaction (interaction: {str(interaction_id)}): {sim_query}")
+        logger.info(f"Attempting to fulfill query interaction (interaction: {str(interaction_id)}).")
+        logger.debug(f"Query interaction details (interaction: {str(interaction_id)}): {sim_query}")
         query       = sim_query
         id          = self._to_key(query.id)
         timeout     = query.timeout

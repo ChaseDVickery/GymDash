@@ -75,11 +75,9 @@ class StableBaselinesSimulation(Simulation):
     # https://stable-baselines3.readthedocs.io/en/sde/guide/custom_policy.html
 
     def _setup(self, **kwargs):
-        logger.info(f"setup {type(self)}")
         kwargs = self._overwrite_new_kwargs(self.kwarg_defaults, self.config.kwargs, kwargs)
 
     def _run(self, **kwargs):
-        logger.info(f"run {type(self)}")
         kwargs = self._overwrite_new_kwargs(self.kwarg_defaults, self.config.kwargs, kwargs)
         config = self.config
 
@@ -148,11 +146,14 @@ class StableBaselinesSimulation(Simulation):
         )
         self.model.set_logger(backend_logger)
         tb_loggers = [t for t in self.model.logger.output_formats if isinstance(t, TensorBoardOutputFormat)]
-        print(tb_loggers)
         # Change the video recorder wrapper to point to the same SummaryWriter
         # as used by the model for recording stats.
         r_env.configure_recorder("episode_video", tb_loggers[0].writer)
         # Train
-        self.model.learn(total_timesteps=num_steps, progress_bar=False, callback=sim_interact_callback)
-        self.model.save("ppo_aapl")
+        try:
+            # self.model.learn(total_timesteps=num_steps, progress_bar=False, callback=sim_interact_callback)
+            self.model.learn(total_timesteps=num_steps, progress_bar=True, callback=sim_interact_callback)
+            self.model.save("ppo_aapl")
+        except:
+            pass
         env.close()

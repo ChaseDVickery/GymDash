@@ -136,16 +136,21 @@ async def get_all_recent_images():
     
 @app.post("/start-new-test")
 async def start_new_simulation_call(config: SimulationStartConfig):
-    print(f"API called start-new-test with config: {config}")
+    logger.debug(f"API called start-new-test with config: {config}")
     id, _ = simulation_tracker.start_sim(config)
     if simulation_tracker.any_running(id):
         return { "id": str(id) }
     else:
-        raise HTTPException(status_code=410, detail="Simulation not started")
+        e = HTTPException(status_code=410, detail="Simulation not started")
+        logger.exception(f"API call could not start simulation with config: {config}")
+        raise e
 
-# @app.post("/stop-test")
+# @app.post("/stop-sim-test")
 # async def stop_simulation_call(sim_query: SimulationInteractionModel):
-#     success = await simulation_tracker.post_interaction()
+#     logger.warning(f"Ignoring simulation query ID '{sim_query.id}' and replacing with a testing ID: {simulation_tracker.testing_first_id}")
+#     sim_query.id = simulation_tracker.testing_first_id
+#     query_response = await simulation_tracker.fulfill_query_interaction(sim_query)
+#     return query_response
 
 @app.post("/query-sim")
 async def get_sim_progress(sim_query: SimulationInteractionModel):

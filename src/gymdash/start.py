@@ -7,11 +7,10 @@ import socket
 import pickle
 import logging
 from typing import Callable, Union, List, Tuple, Any
-from gymdash.backend.core.api.config.config import set_global_config
+from src.gymdash.backend.core.api.config.config import set_global_config
 
-logger = logging.getLogger(__name__)
-# logging.basicConfig(level=logging.DEBUG, 
-#                     format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger("gymdash")
+logger.setLevel(logging.DEBUG)
 
 # https://stackoverflow.com/questions/2470971/fast-way-to-test-if-a-port-is-in-use-using-python
 def socket_used(port) -> bool:
@@ -85,7 +84,7 @@ def run_frontend_server(args):
 # Starts a subprocess running the Uvicorn FastAPI server
 def run_backend_server(args):
     print("Starting API server")
-    subprocess.run(["uvicorn", "gymdash.backend.main:app", "--host", str(args.apiaddr), "--port", str(args.apiport), "--workers", str(args.apiworkers)])
+    subprocess.run(["uvicorn", "src.gymdash.backend.main:app", "--host", str(args.apiaddr), "--port", str(args.apiport), "--workers", str(args.apiworkers)])
 
 # Starts the frontend and backend servers
 def start(args):

@@ -22,6 +22,7 @@ const imageTestBtn    = document.querySelector("#image-test-btn");
 const startSimTestBtn    = document.querySelector("#start-test-sim-btn");
 const simTestTimestepsSlider = document.querySelector("#test-sim-steps-slider")
 const queryProgressTestBtn = document.querySelector("#query-test-btn");
+const stopSimTestBtn = document.querySelector("#stop-test-btn");
 
 const testImageOutputs = []
 
@@ -174,10 +175,36 @@ function startSimTest() {
     });
 }
 
-function testQueryProgress() {
+function stopSimTest() {
     const simulationQuery = {
         id: "dummy_id",
         timeout: 0.0,
+        stop_simulation: {
+            triggered: true,
+            value: "stop, please"
+        }
+    };
+    fetch(apiURL("query-sim"), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(simulationQuery),
+    })
+    .then((response) => {
+        const info = response.json();
+        console.log(info);
+        return info;
+    })
+    .catch((error) => {
+        console.error("Error: " + error);
+    })
+}
+
+function testQueryProgress() {
+    const simulationQuery = {
+        id: "dummy_id",
+        timeout: 1.0,
         stop_simulation: {}, // This would contain fields 'triggered' and 'value'
         progress: {
             triggered: true,
@@ -214,6 +241,7 @@ scalarDataTestBtn.addEventListener("click", displayScalarDataTest);
 imageTestBtn.addEventListener("click", displayVideoTest);
 startSimTestBtn.addEventListener("click", startSimTest);
 queryProgressTestBtn.addEventListener("click", testQueryProgress);
+stopSimTestBtn.addEventListener("click", stopSimTest);
 
 
 simTestTimestepsSlider.addEventListener("change", (e) => {

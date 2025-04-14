@@ -4,9 +4,9 @@ try:
 except ImportError:
     _has_sb = False
     
-from gymdash.backend.core.simulation.base import SimulationInteractor
-from gymdash.backend.gymnasium.utils.wrapper_utils import WrapperUtils
-from gymdash.backend.gymnasium.wrappers import TensorboardStreamWrapper
+from src.gymdash.backend.core.simulation.base import SimulationInteractor
+from src.gymdash.backend.gymnasium.utils.wrapper_utils import WrapperUtils
+from src.gymdash.backend.gymnasium.wrappers import TensorboardStreamWrapper
 
 if not _has_sb:
     raise ImportError("Install stable_baselines3 to use gymdash stable baselines callbacks.")
@@ -53,7 +53,7 @@ class SimulationInteractionCallback(BaseCallback):
         self.curr_timesteps += self.training_env.num_envs
         self.interactor.set_out_if_in("progress", (self.curr_timesteps, self.total_timesteps))
         # HANDLE INCOMING INFORMATION
-        if self.interactor.get_in("stop_simulation")[0]:
+        if self.interactor.set_out_if_in("stop_simulation", True):
             return False
         return True
 
