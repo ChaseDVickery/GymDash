@@ -1,11 +1,35 @@
+* {
+    margin: 0px;
+    padding: 0px;
+    box-sizing: border-box;
+}
 :root {
     font-family: monospace, sans-serif;
-    box-sizing: border-box;
-    margin: 0px;
+    --main-bg-color: #102030;
+    --main-contrast-color: #eed550;
+    --secondary-contrast-color: #ccc;
+    --secondary-bg-color: #402010;
+
+
+    /* --main-bg-color: #ddeeff;
+    --main-contrast-color: #223070;
+    --secondary-bg-color: #ffeedd;
+    --secondary-contrast-color: #703022; */
+
+
+    
+
+    --left-column-default: 200px;    
+
+    --panel-br: 8px;
+
+    --main-text-color: var(--main-contrast-color);
 }
 
 html, body {
     overscroll-behavior-y: contain;
+    background-color: var(--main-bg-color);
+    color: var(--main-text-color);
 }
 
 h1 {
@@ -16,8 +40,13 @@ h1 {
     display: none;
 }
 
+button:hover {
+    box-shadow: var(--main-contrast-color) 0 0 5px 1px inset;
+}
+
 .resource-preview {
-    background: linear-gradient(0deg, rgba(85,0,90,1) 0%, rgba(110,10,120,1) 35%, rgba(130,0,220,1) 100%);
+    /* background: linear-gradient(0deg, rgba(85,0,90,1) 0%, rgba(110,10,120,1) 35%, rgba(130,0,220,1) 100%); */
+    background: linear-gradient(0deg, var(--main-contrast-color) 0%, var(--main-contrast-color) 100%);
     /* display: grid;
     grid-template-rows: 1fr 1fr 1fr;
     grid-template-columns: 1fr;
@@ -26,7 +55,7 @@ h1 {
     max-width: 100%;
     resize: horizontal;
     overflow: hidden;
-    border-radius: 10px;
+    border-radius: var(--panel-br);
 
     .settings {
         color: white;
@@ -125,4 +154,18 @@ h1 {
         min-width: 2rem;
         width: 2rem;
     }
+}
+
+/* The main content (basically all that isn't header/footer) */
+.content {
+    display: flex;
+    border: solid 1px var(--main-contrast-color);
+    border-radius: var(--panel-br);
+}
+
+.main-content {
+    flex: 10 1 auto;
+    border: dashed 1px var(--main-contrast-color);
+    padding: 5px;
+    border-radius: var(--panel-br);
 }

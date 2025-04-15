@@ -303,7 +303,7 @@ function test() {
     // d3.select("body").append("svg", svg.node());
 }
 
-// test();
+test();
 
 
 function plotVideosTest() {

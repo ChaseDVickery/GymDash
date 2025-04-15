@@ -1,0 +1,42 @@
+
+/* Radial progress meter */
+/* #radial-meter-test2 {
+    width: 15px;
+    aspect-ratio: 1 / 1;
+} */
+.radial-meter {
+    height: 80%;
+    aspect-ratio: 1 / 1;
+    --bg-color: var(--main-contrast-color);
+    --bar-color: var(--main-bg-color);
+    --outline-thinness: 80%;
+    --thinness: 50%;
+    .outline {
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background-color: var(--main-contrast-color);
+    }
+    .outer {
+        width: var(--outline-thinness);
+        height: var(--outline-thinness);
+        position: relative;
+        left: calc(calc(100% - var(--outline-thinness))/2);
+        top: calc(calc(100% - var(--outline-thinness))/2);
+        background: conic-gradient(from 0deg, var(--bar-color) 0%, var(--bar-color) 0% var(--prog), var(--bg-color) var(--prog), var(--bg-color) 100%);
+        /* background-color: blue; */
+        border-radius: 50%;
+    }
+    .inner {
+        background-color: var(--bg-color);
+        width: var(--thinness);
+        height: var(--thinness);
+        position: relative;
+        left: calc(calc(100% - var(--thinness))/2);
+        top: calc(calc(100% - var(--thinness))/2);
+        border-radius: 50%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+    }
+}

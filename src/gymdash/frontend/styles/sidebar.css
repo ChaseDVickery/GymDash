@@ -1,0 +1,83 @@
+.sim-selection-sidebar {
+    flex: 1 1 var(--left-column-default);
+    display: grid;
+    gap: 2px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-auto-rows: 40px;
+    border: 1px dashed var(--main-contrast-color);
+    padding: 5px;
+    border-radius: var(--panel-br);
+
+    #sim-sidebar-header {
+        text-align: center;
+        vertical-align: center;
+    }
+}
+.sim-selection-box:hover {
+    box-shadow: var(--main-contrast-color) 0 0 5px 1px inset;
+}
+.sim-selection-box {
+    justify-content: space-between;
+    border: 1px var(--main-contrast-color) solid;
+    border-radius: var(--panel-br);
+    text-align: left;
+    display: flex;
+    align-items: center;
+    padding: 3px 10px;
+    label {
+        display: flex;
+        align-items: center;
+        height: 100%;
+        flex: 1 1 auto;
+    }
+    .interactives {
+        display: flex;
+        justify-content: space-between;
+        height: 100%;
+        align-items: center;
+        gap: 10px;
+    }
+}
+
+.cancel-sim-button:hover {
+    color: red;
+    background-color: rgba(0,0,0,0);
+    border: none;
+    box-shadow: none;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    padding: 0;
+    line-height: 0px;
+    font-size: calc(2em);
+    font-weight: 900;
+    transition: 0.15s;
+}
+.cancel-sim-button {
+    color: rgba(0,0,0,0);
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    background-color: rgba(0,0,0,0);
+    border: none;
+    line-height: 0px;
+    font-size: calc(0em);
+    font-weight: 900;
+    transition: 0.15s;
+}
+
+.sim-selection-checkbox {
+    accent-color: var(--main-contrast-color);
+    height: 80%;
+    aspect-ratio: 1 / 1;
+}
+/* .sim-selection-checkbox:after {
+    background-color: var(--main-contrast-color);
+    height: 80%;
+    aspect-ratio: 1 / 1;
+} */

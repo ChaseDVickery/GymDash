@@ -5,8 +5,37 @@
     justify-content: space-between;
     align-items: flex-start;
     overflow: visible;
-    height: 50px;
+    height: 60px;
+    padding: 0px 30px;
+    border-bottom: var(--main-contrast-color) 3px solid;
     /* vertical-align: center;
     text-align: center; */
-    
+
+    .left {
+        flex: 1 0 var(--left-column-default);
+    }
+    .right {
+        flex: 10 1 auto;
+        height: 100%;
+        display: flex;
+        /* gap: 30px; */
+        align-items: center;
+        justify-content: space-between;
+        .tab {
+            height: 100%;
+            display: flex;
+        }
+        button {
+            border-radius: 4px;
+            padding: 5px;
+            height: 100%;
+            /* background-color: rgba(0,0,0,0); */
+            background-color: var(--main-bg-color);
+            color: var(--main-contrast-color);
+            border-right: var(--main-contrast-color) solid 2px;
+            border-left: var(--main-contrast-color) solid 2px;
+            border-top: none;
+            border-bottom: none;
+        }
+    }
 }
