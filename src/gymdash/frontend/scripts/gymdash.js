@@ -24,9 +24,34 @@ const simTestTimestepsSlider = document.querySelector("#test-sim-steps-slider")
 const queryProgressTestBtn = document.querySelector("#query-test-btn");
 const stopSimTestBtn = document.querySelector("#stop-test-btn");
 
+// Constants
+const defaultSimProgressUpdateInterval = 2000;  // (ms)
+const defaultTimeout = 5.0; // (s)
+const noID = "00000000-0000-0000-0000-000000000000"; // (str(UUID))
+
+// Structures
+// sim_selections store information
+const sim_selections = {};
+
+// Elements
+const simSidebar = document.querySelector(".sim-selection-sidebar");
+// Control
+const startPanel                = document.querySelector("#start-panel");
+const controlPanel              = document.querySelector("#control-panel");
+const controlResponsePanel      = document.querySelector("#control-response-panel");
+const queryPanel                = document.querySelector("#query-panel");
+const queryResponsePanel        = document.querySelector("#query-response-panel");
+const configNameEntry           = startPanel.querySelector("#config-name1");
+const configKeyEntry            = startPanel.querySelector("#config-key1");
+const configFamilyEntry         = startPanel.querySelector("#config-family1");
+const configTypeEntry           = startPanel.querySelector("#config-type1");
+const startSimBtn               = startPanel.querySelector("#start-sim-btn");
+
+
 // Prefabs
 const prefabSimSelectBox    = document.querySelector(".prefab.sim-selection-box");
 const prefabKwarg        = document.querySelector(".prefab.kwarg");
+prefabSimSelectBox.parentElement.removeChild(prefabSimSelectBox);
 prefabKwarg.parentElement.removeChild(prefabKwarg);
 
 const testImageOutputs = []
@@ -233,9 +258,171 @@ function testQueryProgress() {
     })
 }
 
+function queryProgress(simID) {
+    if (!validID(simID)) { return Promise.resolve({id: noID}); }
+    return query({
+        id: simID,
+        timeout: defaultTimeout,
+        progress: {
+            triggered: true,
+            value: null,
+        }
+    });
+}
+// Returns a promise of the simulation query
+function query(queryBody) {
+    console.log(`Sending query: ${queryBody}`);
+    console.log(queryBody);
+    return fetch(apiURL("query-sim"), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(queryBody),
+    }).then((response) => { return response.json(); });
+}
 
 
+// Utils
+function convertKwargValue(valueString) {
+    // Return the input if it is not a string
+    if (typeof valueString !== "string") { return valueString; }
+    // Trim string
+    valueString = valueString.trim();
+    // Bool check
+    if (valueString.toLowerCase() === "true")   { return true; }
+    else if (valueString.toLowerCase() === "false")  { return false; }
+    // If starts with a quote, then there's really no other
+    // type it could be but string
+    else if (valueString.startsWith('\"') || valueString.startsWith('\'')) {
+        let startIdx = 0;
+        let endIdx = valueString.length-1;
+        // Find start index beyond quote marks
+        while (startIdx < valueString.length) {
+            if (valueString.charAt(startIdx) !== "\'" && valueString.charAt(startIdx) !== "\"") {
+                break;
+            }
+            startIdx += 1;
+        }
+        // Find index right before final sequence of quotes
+        while (endIdx >= 0) {
+            if (valueString.charAt(endIdx) !== "\'" && valueString.charAt(endIdx) !== "\"") {
+                endIdx += 1;
+                break;
+            }
+            endIdx -= 1;
+        }
+        return valueString.substring(startIdx, endIdx);
+    }
+    // Try to convert to number
+    else if (!Number.isNaN(Number(valueString))) {
+        return Number(valueString);
+    }
+    // Just return the trimmed value
+    else {
+        return valueString;
+    }
+}
+function getKwargs(elementWithKwargPanel) {
+    const kwargArea = elementWithKwargPanel.querySelector(".kwarg-area");
+    const allKwargEntries = kwargArea.querySelectorAll(".kwarg");
+    const kwargs = {};
+    for (const kwargEntry of allKwargEntries) {
+        let key = kwargEntry.querySelector(".key").value.trim();
+        let val = kwargEntry.querySelector(".value").value.trim();
+        if (key === "") { continue; }
+        if (val === "") { val = true; }
+        const splitKey = key.split(/\s+/);
+        key = splitKey.join("_");
+        val = convertKwargValue(val);
+        kwargs[key] = val;
+    }
+    return kwargs;
+}
 
+function updateAllSimSelectionProgress() {
+    // Iterates all incomplete sim selections and queries their progress
+    console.log("updateAllSimSelectionProgress: "+ sim_selections);
+    for (const [simID, simSelection] of Object.entries(sim_selections)) {
+        updateSimSelectionProgress(simID, simSelection);
+    }
+}
+function updateSimSelectionProgress(simID, simSelection) {
+    const meter = simSelection.querySelector(".radial-meter")
+    if (meter.classList.contains("complete")) { return; }
+    const outer = meter.querySelector(".outer")
+    queryProgress(simID)
+        .then((info) => {
+            console.log(info);
+            // if (!validID(info.id)) { return info; }
+            if (info.progress[1] === 0) { return info; }
+            // const meterStyle = getComputedStyle(meter);
+            outer.style.setProperty("--prog", `${100*info.progress[0]/info.progress[1]}%`);
+        })
+        .catch((error) => {
+            console.error(`Update sim selection progress error: ${error}`)
+        });
+}
+
+
+// Turns the entry into a SimulationStartConfig data layout
+function entryToConfig() {
+    const name = configNameEntry.value;
+    const key = configKeyEntry.value;
+    const family = configFamilyEntry.value;
+    const type = configTypeEntry.value;
+    const kwargs = getKwargs(startPanel.querySelector(".kwarg-panel"));
+    const config = {
+        name: name,
+        sim_key: key,
+        sim_family: family,
+        sim_type: type,
+        kwargs: kwargs
+    };
+    return config;
+}
+function createSimSelection(config, simID) {
+    const newSelection = prefabSimSelectBox.cloneNode(true);
+    // Set up new selection box
+    const selectionID = `${simID}`;
+    newSelection.classList.remove("prefab");
+    const label = newSelection.querySelector("label");
+    const input = newSelection.querySelector(".sim-selection-checkbox")
+    label.textContent   = config.name;
+    label.for           = selectionID;
+    input.id            = selectionID;
+    simSidebar.appendChild(newSelection);
+    // Set up progress meter
+
+    // Store
+    sim_selections[simID] = newSelection;
+}
+function validID(simID) { return noID !== simID; }
+function startSimulation() {
+    // Read relevant information and gather kwargs
+    const config = entryToConfig();
+    fetch(apiURL("start-new-test"), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(config),
+    })
+    .then((response) => response.json())
+    .then((info) => {
+        console.log(info);
+        const simID = info.id;
+        if (!validID(simID)) {
+            return info;
+        }
+        createSimSelection(config, simID);
+        console.log(info);
+        return info;
+    })
+    .catch((error) => {
+        console.error("Error: " + error);
+    });
+}
 
 
 function setupKwargBoxes() {
@@ -257,6 +444,7 @@ function addKwarg(kwargPanel) {
     }
     const kwargArea = kwargPanel.querySelector(".kwarg-area");
     const newKwarg = prefabKwarg.cloneNode(true);
+    newKwarg.classList.remove("prefab");
     // Setup listeners on new kwarg
     const removeBtn = newKwarg.querySelector(".remove-kwarg-btn");
     if (removeBtn !== null) {
@@ -292,6 +480,15 @@ stopSimTestBtn.addEventListener("click", stopSimTest);
 simTestTimestepsSlider.addEventListener("change", (e) => {
     testSimTimesteps = Number(e.target.value);
 });
+
+
+startSimBtn.addEventListener("click", startSimulation);
+
+
+
+// Setup intervals
+setInterval(updateAllSimSelectionProgress, defaultSimProgressUpdateInterval);
+
 
 
 function polyline(T, Y, tscale, yscale) {

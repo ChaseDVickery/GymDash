@@ -52,8 +52,8 @@
     <!-- Kwarg -->
     <div class="prefab kwarg">
         <button class="contrast-box-opp hoverable remove-kwarg-btn">-</button>
-        <input class="contrast-box hoverable config-key entry" type="text"></input>
-        <input class="contrast-box hoverable config-value entry" type="text"></input>
+        <input class="contrast-box hoverable key entry" type="text"></input>
+        <input class="contrast-box hoverable value entry" type="text"></input>
     </div>
 
 
@@ -128,42 +128,6 @@
     <div class="content">
         <div class="sim-selection-sidebar content-panel">
             <h2 id="sim-sidebar-header">Simulations</h2>
-            
-            
-            <div class="sim-selection-box contrast-box hoverable">
-                <label for="sim-selection-box-test2">sim name 2</label>
-                <div class="interactives">
-                    <div class="radial-meter" id="radial-meter-test3">
-                        <div class="outline">
-                            <div class="outer" style="--prog: 70%;">
-                                <div class="inner">
-                                    
-                                </div>
-                                <button class="cancel-sim-button">X</button>
-                            </div>
-                        </div>
-                    </div>
-                    <input type="checkbox" id="sim-selection-box-test2" class="sim-selection-checkbox">
-                </div>
-            </div>
-
-            <div class="sim-selection-box contrast-box hoverable">
-                <label for="sim-selection-box-test3">sim name 3</label>
-                <div class="interactives">
-                    <div class="radial-meter" id="radial-meter-test3">
-                        <div class="outline">
-                            <div class="outer" style="--prog: 70%;">
-                                <div class="inner">
-                                    
-                                </div>
-                                <button class="cancel-sim-button">X</button>
-                            </div>
-                        </div>
-                    </div>
-                    <input type="checkbox" id="sim-selection-box-test3" class="sim-selection-checkbox">
-                </div>
-            </div>
-
         </div>
     
         <div class="main-content content-panel">
@@ -176,20 +140,20 @@
                         <button class="send contrast-box-opp hoverable" id="start-sim-btn">START</button>
 
                         <div class="config-kwarg">
-                            <label for="config-name1" class="config-key">name: </label>
-                            <input id="config-name1" class="contrast-box hoverable config-value entry" type="text"></input>
+                            <label for="config-name1" class="key">name: </label>
+                            <input id="config-name1" class="contrast-box hoverable value entry" type="text"></input>
                         </div>
                         <div class="config-kwarg">
-                            <label for="config-key1" class="config-key">key: </label>
-                            <input id="config-key1" class="contrast-box hoverable config-value entry" type="text"></input>
+                            <label for="config-key1" class="key">key: </label>
+                            <input id="config-key1" class="contrast-box hoverable value entry" type="text"></input>
                         </div>
                         <div class="config-kwarg">
-                            <label for="config-family1" class="config-key">family: </label>
-                            <input id="config-family1" class="contrast-box hoverable config-value entry" type="text"></input>
+                            <label for="config-family1" class="key">family: </label>
+                            <input id="config-family1" class="contrast-box hoverable value entry" type="text"></input>
                         </div>
                         <div class="config-kwarg">
-                            <label for="config-type1" class="config-key">type: </label>
-                            <input id="config-type1" class="contrast-box hoverable config-value entry" type="text"></input>
+                            <label for="config-type1" class="key">type: </label>
+                            <input id="config-type1" class="contrast-box hoverable value entry" type="text"></input>
                         </div>
 
                         <div class="kwarg-panel content-panel">
@@ -202,37 +166,43 @@
                         </div>
                     </div>
                 </div>
-                <!-- Send Control queries. Do not need to wait for response. -->
-                <div class="control-panel content-panel" id="control-panel">
-                    <button class="send contrast-box-opp hoverable" id="start-sim-btn">SEND</button>
-                    <div class="kwarg-panel content-panel">
-                        <h4>kwargs</h4>
-                        <button class="add-kwarg contrast-box-opp hoverable">+</button>
-                        <div class="kwarg-area">
-                            
+                
+                <div class="control-column">
+                    <!-- Send Control queries. Do not need to wait for response. -->
+                    <div class="control-panel content-panel" id="control-panel">
+                        <button class="send contrast-box-opp hoverable" id="start-sim-btn">SEND</button>
+                        <div class="kwarg-panel content-panel">
+                            <h4>kwargs</h4>
+                            <button class="add-kwarg contrast-box-opp hoverable">+</button>
+                            <div class="kwarg-area">
+                                
+                            </div>
+                            <button class="add-kwarg contrast-box-opp hoverable">+</button>
                         </div>
-                        <button class="add-kwarg contrast-box-opp hoverable">+</button>
+                    </div>
+                    <!-- Recieve control requests and control responses. -->
+                    <div class="control-panel response-panel content-panel" id="control-response-panel">
+                        
                     </div>
                 </div>
-                <!-- Recieve control requests and control responses. -->
-                <div class="control-panel content-panel" id="control-response-panel">
-                    
-                </div>
-                <!-- Send information queries. We want to wait for a response or timeout. -->
-                <div class="control-panel content-panel" id="query-panel">
-                    <button class="send contrast-box-opp hoverable" id="start-sim-btn">SEND</button>
-                    <div class="kwarg-panel content-panel">
-                        <h4>kwargs</h4>
-                        <button class="add-kwarg contrast-box-opp hoverable">+</button>
-                        <div class="kwarg-area">
-                            
+                
+                <div class="query-column">
+                    <!-- Send information queries. We want to wait for a response or timeout. -->
+                    <div class="control-panel content-panel" id="query-panel">
+                        <button class="send contrast-box-opp hoverable" id="start-sim-btn">SEND</button>
+                        <div class="kwarg-panel content-panel">
+                            <h4>kwargs</h4>
+                            <button class="add-kwarg contrast-box-opp hoverable">+</button>
+                            <div class="kwarg-area">
+                                
+                            </div>
+                            <button class="add-kwarg contrast-box-opp hoverable">+</button>
                         </div>
-                        <button class="add-kwarg contrast-box-opp hoverable">+</button>
                     </div>
-                </div>
-                <!-- Recieve information responses. -->
-                <div class="control-panel content-panel" id="query-response-panel">
-                    
+                    <!-- Recieve information responses. -->
+                    <div class="control-panel response-panel content-panel" id="query-response-panel">
+                        
+                    </div>
                 </div>
             </div>
         

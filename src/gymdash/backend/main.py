@@ -17,6 +17,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (FileResponse, JSONResponse, Response,
                                StreamingResponse)
 
+from gymdash.backend.core.simulation.examples import register_example_simulations
 from gymdash.backend.core.simulation.export import SimulationExporter
 from gymdash.backend.core.api.config.config import tags
 from gymdash.backend.core.api.models import (SimulationInteractionModel,
@@ -35,6 +36,7 @@ logging.basicConfig(level = logging.INFO, format = '[%(asctime)s] %(levelname)s 
 simulation_tracker = SimulationTracker()
 apply_extension_patches()
 
+register_example_simulations()
 SimulationExporter.import_and_register()
 
 # App main
@@ -138,12 +140,13 @@ async def get_all_recent_images():
 async def start_new_simulation_call(config: SimulationStartConfig):
     logger.debug(f"API called start-new-test with config: {config}")
     id, _ = simulation_tracker.start_sim(config)
-    if simulation_tracker.any_running(id):
-        return { "id": str(id) }
-    else:
-        e = HTTPException(status_code=410, detail="Simulation not started")
-        logger.exception(f"API call could not start simulation with config: {config}")
-        raise e
+    return { "id": str(id) }
+    # if simulation_tracker.any_running(id):
+    #     return { "id": str(id) }
+    # else:
+    #     e = HTTPException(status_code=410, detail="Simulation not started")
+    #     logger.exception(f"API call could not start simulation with config: {config}")
+    #     raise e
 
 # @app.post("/stop-sim-test")
 # async def stop_simulation_call(sim_query: SimulationInteractionModel):

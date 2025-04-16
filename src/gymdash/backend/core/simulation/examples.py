@@ -157,3 +157,8 @@ class StableBaselinesSimulation(Simulation):
         except:
             pass
         env.close()
+
+
+
+def register_example_simulations():
+    SimulationRegistry.register("stable_baselines", StableBaselinesSimulation)
