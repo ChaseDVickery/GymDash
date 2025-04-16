@@ -5,20 +5,23 @@
 }
 :root {
     font-family: monospace, sans-serif;
-    --main-bg-color: #102030;
+    /* --main-bg-color: #102030;
     --main-contrast-color: #eed550;
     --secondary-contrast-color: #ccc;
-    --secondary-bg-color: #402010;
+    --secondary-bg-color: #402010; */
     --bad-color1: red;
 
 
-    /* --main-bg-color: #ddeeff;
+    --main-bg-color: #ddeeff;
     --main-contrast-color: #223070;
     --secondary-bg-color: #ffeedd;
-    --secondary-contrast-color: #703022; */
+    --secondary-contrast-color: #703022;
 
 
-    
+    --std-gap: 3px;
+    --extra-gap: 6px;
+    --panel-gap: 6px;
+    --panel-pad: 5px;
 
     --left-column-default: 200px;    
 
@@ -167,10 +170,15 @@ h1 {
 .content-panel {
     border: dashed 1px var(--main-contrast-color);
     border-radius: var(--panel-br);
+    padding: var(--panel-pad);
 }
 
 .main-content {
-    flex: 10 1 auto;
+    flex: 0 1 75vw;
     padding: 5px;
     border-radius: var(--panel-br);
+}
+
+.tabcontent {
+    display: none;
 }

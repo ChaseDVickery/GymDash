@@ -31,7 +31,7 @@
 
     <!-- Begin cloneable/dynamic nodes -->
     <!-- Simulation selection box -->
-    <!-- <div class="sim-selection-box contrast-box hoverable">
+    <div class="prefab sim-selection-box contrast-box hoverable">
         <label for="sim-selection-box-test">sim name 1</label>
         <div class="interactives">
             <div class="radial-meter incomplete">
@@ -48,19 +48,13 @@
             </div>
             <input type="checkbox" id="sim-selection-box-test" class="sim-selection-checkbox">
         </div>
-    </div> -->
-    <!-- Kwarg panel -->
-    <!-- <div class="kwarg-panel content-panel">
-        <h4>kwargs</h4>
-        <button class="add-kwarg contrast-box-opp hoverable">+</button>
-        <div class="kwarg-area">
-            <div class="config-kvp kwarg">
-                <input class="contrast-box hoverable config-key entry" type="text"></input>
-                <input class="contrast-box hoverable config-value entry" type="text"></input>
-            </div>
-        </div>
-        <button class="add-kwarg contrast-box-opp hoverable">+</button>
-    </div> -->
+    </div>
+    <!-- Kwarg -->
+    <div class="prefab kwarg">
+        <button class="contrast-box-opp hoverable remove-kwarg-btn">-</button>
+        <input class="contrast-box hoverable config-key entry" type="text"></input>
+        <input class="contrast-box hoverable config-value entry" type="text"></input>
+    </div>
 
 
 
@@ -174,21 +168,26 @@
     
         <div class="main-content content-panel">
             <div class="tabcontent" id="tab-control">
+                <h2 style="text-align: center;">Start</h2>
+                <h2 style="text-align: center;">Control</h2>
+                <h2 style="text-align: center;">Query</h2>
                 <div class="control-panel content-panel" id="start-panel">
                     <div class="config-details-panel">
-                        <div class="config-kvp">
+                        <button class="send contrast-box-opp hoverable" id="start-sim-btn">START</button>
+
+                        <div class="config-kwarg">
                             <label for="config-name1" class="config-key">name: </label>
                             <input id="config-name1" class="contrast-box hoverable config-value entry" type="text"></input>
                         </div>
-                        <div class="config-kvp">
+                        <div class="config-kwarg">
                             <label for="config-key1" class="config-key">key: </label>
                             <input id="config-key1" class="contrast-box hoverable config-value entry" type="text"></input>
                         </div>
-                        <div class="config-kvp">
+                        <div class="config-kwarg">
                             <label for="config-family1" class="config-key">family: </label>
                             <input id="config-family1" class="contrast-box hoverable config-value entry" type="text"></input>
                         </div>
-                        <div class="config-kvp">
+                        <div class="config-kwarg">
                             <label for="config-type1" class="config-key">type: </label>
                             <input id="config-type1" class="contrast-box hoverable config-value entry" type="text"></input>
                         </div>
@@ -197,18 +196,7 @@
                             <h4>kwargs</h4>
                             <button class="add-kwarg contrast-box-opp hoverable">+</button>
                             <div class="kwarg-area">
-                                <div class="config-kvp kwarg">
-                                    <input class="contrast-box hoverable config-key entry" type="text"></input>
-                                    <input class="contrast-box hoverable config-value entry" type="text"></input>
-                                </div>
-                                <div class="config-kvp kwarg">
-                                    <input class="contrast-box hoverable config-key entry" type="text"></input>
-                                    <input class="contrast-box hoverable config-value entry" type="text"></input>
-                                </div>
-                                <div class="config-kvp kwarg">
-                                    <input class="contrast-box hoverable config-key entry" type="text"></input>
-                                    <input class="contrast-box hoverable config-value entry" type="text"></input>
-                                </div>
+
                             </div>
                             <button class="add-kwarg contrast-box-opp hoverable">+</button>
                         </div>
@@ -216,65 +204,35 @@
                 </div>
                 <!-- Send Control queries. Do not need to wait for response. -->
                 <div class="control-panel content-panel" id="control-panel">
+                    <button class="send contrast-box-opp hoverable" id="start-sim-btn">SEND</button>
                     <div class="kwarg-panel content-panel">
                         <h4>kwargs</h4>
                         <button class="add-kwarg contrast-box-opp hoverable">+</button>
                         <div class="kwarg-area">
-                            <div class="config-kvp kwarg">
-                                <input class="contrast-box hoverable config-key entry" type="text"></input>
-                                <input class="contrast-box hoverable config-value entry" type="text"></input>
-                            </div>
+                            
                         </div>
                         <button class="add-kwarg contrast-box-opp hoverable">+</button>
                     </div>
                 </div>
                 <!-- Recieve control requests and control responses. -->
                 <div class="control-panel content-panel" id="control-response-panel">
-                    <div class="control-panel content-panel" id="control-panel">
-                        <div class="kwarg-panel content-panel">
-                            <h4>kwargs</h4>
-                            <button class="add-kwarg contrast-box-opp hoverable">+</button>
-                            <div class="kwarg-area">
-                                <div class="config-kvp kwarg">
-                                    <input class="contrast-box hoverable config-key entry" type="text"></input>
-                                    <input class="contrast-box hoverable config-value entry" type="text"></input>
-                                </div>
-                            </div>
-                            <button class="add-kwarg contrast-box-opp hoverable">+</button>
-                        </div>
-                    </div>
+                    
                 </div>
                 <!-- Send information queries. We want to wait for a response or timeout. -->
                 <div class="control-panel content-panel" id="query-panel">
-                    <div class="control-panel content-panel" id="control-panel">
-                        <div class="kwarg-panel content-panel">
-                            <h4>kwargs</h4>
-                            <button class="add-kwarg contrast-box-opp hoverable">+</button>
-                            <div class="kwarg-area">
-                                <div class="config-kvp kwarg">
-                                    <input class="contrast-box hoverable config-key entry" type="text"></input>
-                                    <input class="contrast-box hoverable config-value entry" type="text"></input>
-                                </div>
-                            </div>
-                            <button class="add-kwarg contrast-box-opp hoverable">+</button>
+                    <button class="send contrast-box-opp hoverable" id="start-sim-btn">SEND</button>
+                    <div class="kwarg-panel content-panel">
+                        <h4>kwargs</h4>
+                        <button class="add-kwarg contrast-box-opp hoverable">+</button>
+                        <div class="kwarg-area">
+                            
                         </div>
+                        <button class="add-kwarg contrast-box-opp hoverable">+</button>
                     </div>
                 </div>
                 <!-- Recieve information responses. -->
                 <div class="control-panel content-panel" id="query-response-panel">
-                    <div class="control-panel content-panel" id="control-panel">
-                        <div class="kwarg-panel content-panel">
-                            <h4>kwargs</h4>
-                            <button class="add-kwarg contrast-box-opp hoverable">+</button>
-                            <div class="kwarg-area">
-                                <div class="config-kvp kwarg">
-                                    <input class="contrast-box hoverable config-key entry" type="text"></input>
-                                    <input class="contrast-box hoverable config-value entry" type="text"></input>
-                                </div>
-                            </div>
-                            <button class="add-kwarg contrast-box-opp hoverable">+</button>
-                        </div>
-                    </div>
+                    
                 </div>
             </div>
         
@@ -291,13 +249,8 @@
     </div>
 
 
-    <div class="radial-meter" id="radial-meter-test">
-        <div class="outer">
-            <div class="inner">
-                
-            </div>
-        </div>
-    </div>
+
+
 
 
 

@@ -1,15 +1,19 @@
-/* button.contrast-box:hover {
-    box-shadow: var(--main-contrast-color) 0 0 5px 1px inset;
+button {
+    border-radius: var(--panel-br);
 }
-button.contrast-box-opp:hover {
-    box-shadow: var(--main-bg-color) 0 0 5px 1px inset;
+
+input[type="text"] {
+    font-family: monospace, sans-serif;
+    padding: 2px 5px;
+    border-radius: 4px;
+    filter: saturate(50%);
+    font-weight: 700;
+    font-size: 1em;
+
+    background-color: var(--main-bg-color);
+    border-color: var(--main-contrast-color);
 }
-input.contrast-box:hover {
-    box-shadow: var(--main-contrast-color) 0 0 5px 1px inset;
-}
-input.contrast-box-opp:hover {
-    box-shadow: var(--main-bg-color) 0 0 5px 1px inset;
-} */
+
 
 .contrast-box.hoverable:hover {
     box-shadow: var(--main-contrast-color) 0 0 5px 1px inset;
@@ -32,14 +36,25 @@ input.contrast-box-opp:hover {
 .kwarg-panel {
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: var(--std-gap);
     padding: 5px 10px;
 }
 .kwarg-area {
     margin: 5px 0px;
     display: flex;
     flex-direction: column;
-    gap: 3px;
+    gap: var(--std-gap);
+}
+.kwarg {
+    display: grid;
+    grid-template-rows: 1f;
+    grid-template-columns: 23px 2fr 3fr;
+}
+.remove-kwarg-btn {
+    border-radius: 50%;
+    filter: saturate(25%);
+    font-weight: 900;
+    font-size: 1.0em;
 }
 .add-kwarg {
     width: 100%;
@@ -47,16 +62,4 @@ input.contrast-box-opp:hover {
     font-size: 1em;
     text-align: center;
     border-radius: var(--panel-br);
-}
-
-input[type="text"] {
-    font-family: monospace, sans-serif;
-    padding: 2px 5px;
-    border-radius: 4px;
-    filter: saturate(50%);
-    font-weight: 700;
-    font-size: 1em;
-
-    background-color: var(--main-bg-color);
-    border-color: var(--main-contrast-color);
 }

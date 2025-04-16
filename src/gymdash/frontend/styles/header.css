@@ -6,36 +6,33 @@
     align-items: center;
     overflow: visible;
     height: 60px;
-    padding: 0px 30px;
+    padding: 0px 50px;
     border-bottom: var(--main-contrast-color) 3px solid;
     /* vertical-align: center;
     text-align: center; */
 
     .left {
-        flex: 1 0 var(--left-column-default);
+        flex: 1 1 var(--left-column-default);
+        min-width: 200px;
     }
     .right {
-        flex: 10 1 auto;
         height: 100%;
+        flex: 10 1 75vw;
         display: flex;
-        /* gap: 30px; */
-        align-items: center;
         justify-content: space-between;
         .tab {
-            height: 100%;
             display: flex;
-        }
-        button {
-            border-radius: 4px;
-            padding: 5px;
+            justify-content: center;
+            gap: 0px;
             height: 100%;
-            /* background-color: rgba(0,0,0,0); */
-            background-color: var(--main-bg-color);
-            color: var(--main-contrast-color);
-            border-right: var(--main-contrast-color) solid 2px;
-            border-left: var(--main-contrast-color) solid 2px;
+        }
+        button.tablinks {
+            height: 100%;
+            width: 70px;
             border-top: none;
             border-bottom: none;
         }
     }
+
+    
 }

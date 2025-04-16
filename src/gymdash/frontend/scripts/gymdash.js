@@ -24,6 +24,11 @@ const simTestTimestepsSlider = document.querySelector("#test-sim-steps-slider")
 const queryProgressTestBtn = document.querySelector("#query-test-btn");
 const stopSimTestBtn = document.querySelector("#stop-test-btn");
 
+// Prefabs
+const prefabSimSelectBox    = document.querySelector(".prefab.sim-selection-box");
+const prefabKwarg        = document.querySelector(".prefab.kwarg");
+prefabKwarg.parentElement.removeChild(prefabKwarg);
+
 const testImageOutputs = []
 
 let testSimTimesteps = Number(simTestTimestepsSlider.value)
@@ -227,6 +232,46 @@ function testQueryProgress() {
         console.error("Error: " + error);
     })
 }
+
+
+
+
+
+
+function setupKwargBoxes() {
+    // Get kwarg boxes
+    const kwargBoxes = document.querySelectorAll(".kwarg-panel");
+    // Add listener to kwarg box add button
+    for (const box of kwargBoxes) {
+        const addKwargBtn = box.querySelectorAll(".add-kwarg");
+        for (const btn of addKwargBtn) {
+            console.log(`Adding event listener to btn ${btn}`);
+            btn.addEventListener("click", addKwarg.bind(null, box));
+        }
+    }
+}
+function addKwarg(kwargPanel) {
+    if (!kwargPanel.classList.contains("kwarg-panel")) {
+        console.error(`Not adding kwarg because panel ${kwargPanel} is not a kwarg-panel.`);
+        return;
+    }
+    const kwargArea = kwargPanel.querySelector(".kwarg-area");
+    const newKwarg = prefabKwarg.cloneNode(true);
+    // Setup listeners on new kwarg
+    const removeBtn = newKwarg.querySelector(".remove-kwarg-btn");
+    if (removeBtn !== null) {
+        removeBtn.addEventListener("click", removeKwarg.bind(null, newKwarg));
+    }
+    kwargArea.appendChild(newKwarg);
+}
+function removeKwarg(kwargRow) {
+    kwargRow.parentElement.removeChild(kwargRow);
+}
+function clearKwargBox(kwargPanel, deleteRows=false) {
+
+}
+
+setupKwargBoxes();
 
 
 const fullResourcePreview = document.querySelector(".resource-preview.full-preview")
