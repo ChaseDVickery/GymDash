@@ -1,0 +1,62 @@
+/* button.contrast-box:hover {
+    box-shadow: var(--main-contrast-color) 0 0 5px 1px inset;
+}
+button.contrast-box-opp:hover {
+    box-shadow: var(--main-bg-color) 0 0 5px 1px inset;
+}
+input.contrast-box:hover {
+    box-shadow: var(--main-contrast-color) 0 0 5px 1px inset;
+}
+input.contrast-box-opp:hover {
+    box-shadow: var(--main-bg-color) 0 0 5px 1px inset;
+} */
+
+.contrast-box.hoverable:hover {
+    box-shadow: var(--main-contrast-color) 0 0 5px 1px inset;
+}
+.contrast-box-opp.hoverable:hover {
+    box-shadow: var(--main-bg-color) 0 0 5px 1px inset;
+}
+
+.contrast-box {
+    background-color: var(--main-bg-color);
+    border: 1px solid var(--main-contrast-color);
+    color: var(--main-contrast-color);
+}
+.contrast-box-opp {
+    background-color: var(--main-contrast-color);
+    border: 1px solid var(--main-bg-color);
+    color: var(--main-bg-color);
+}
+
+.kwarg-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    padding: 5px 10px;
+}
+.kwarg-area {
+    margin: 5px 0px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.add-kwarg {
+    width: 100%;
+    font-weight: 900;
+    font-size: 1em;
+    text-align: center;
+    border-radius: var(--panel-br);
+}
+
+input[type="text"] {
+    font-family: monospace, sans-serif;
+    padding: 2px 5px;
+    border-radius: 4px;
+    filter: saturate(50%);
+    font-weight: 700;
+    font-size: 1em;
+
+    background-color: var(--main-bg-color);
+    border-color: var(--main-contrast-color);
+}

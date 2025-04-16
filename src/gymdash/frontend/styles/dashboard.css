@@ -9,6 +9,7 @@
     --main-contrast-color: #eed550;
     --secondary-contrast-color: #ccc;
     --secondary-bg-color: #402010;
+    --bad-color1: red;
 
 
     /* --main-bg-color: #ddeeff;
@@ -40,11 +41,10 @@ h1 {
     display: none;
 }
 
-button:hover {
-    box-shadow: var(--main-contrast-color) 0 0 5px 1px inset;
-}
-
 .resource-preview {
+    position: relative;
+    z-index: 1;
+    align-self: flex-start;
     /* background: linear-gradient(0deg, rgba(85,0,90,1) 0%, rgba(110,10,120,1) 35%, rgba(130,0,220,1) 100%); */
     background: linear-gradient(0deg, var(--main-contrast-color) 0%, var(--main-contrast-color) 100%);
     /* display: grid;
@@ -161,11 +161,16 @@ button:hover {
     display: flex;
     border: solid 1px var(--main-contrast-color);
     border-radius: var(--panel-br);
+    padding: 20px 50px;
+}
+
+.content-panel {
+    border: dashed 1px var(--main-contrast-color);
+    border-radius: var(--panel-br);
 }
 
 .main-content {
     flex: 10 1 auto;
-    border: dashed 1px var(--main-contrast-color);
     padding: 5px;
     border-radius: var(--panel-br);
 }

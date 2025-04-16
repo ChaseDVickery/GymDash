@@ -1,0 +1,18 @@
+.config-details-panel {
+    display: flex;
+    flex-direction: column;
+    padding: 5px;
+    gap: 3px;
+    h4 {
+        text-align: center;
+    }
+}
+
+.config-kvp {
+    display: grid;
+    grid-template-rows: 1f;
+    grid-template-columns: 2fr 3fr;
+}
+.entry {
+    min-width: 30px;
+}

@@ -1,10 +1,14 @@
 
-/* Radial progress meter */
-/* #radial-meter-test2 {
-    width: 15px;
-    aspect-ratio: 1 / 1;
-} */
+.radial-meter.complete
+.outer {
+    display: none;
+}
+.radial-meter.incomplete
+.outer {
+    display: block;
+}
 .radial-meter {
+    position: relative;
     height: 80%;
     aspect-ratio: 1 / 1;
     --bg-color: var(--main-contrast-color);

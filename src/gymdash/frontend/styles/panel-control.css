@@ -1,0 +1,32 @@
+
+#tab-control {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    grid-template: 1fr 1fr / 1fr 1fr 1fr;
+    gap: 5px;
+
+    /* border-top-left-radius: var(--panel-br);
+    border-top-right-radius: var(--panel-br);
+    border-bottom-right-radius: var(--panel-br);
+    border-bottom-left-radius: var(--panel-br); */
+}
+.control-panel {
+    border: solid 1px;
+}
+
+#start-panel {
+    grid-area: 1 / 1 / 3 / 2;
+}
+#control-panel {
+    grid-area: 1 / 2 / 2 / 3;
+}
+#control-response-panel {
+    grid-area: 2 / 2 / 3 / 3;
+}
+#query-panel {
+    grid-area: 1 / 3 / 2 / 4;
+}
+#query-response-panel {
+    grid-area: 2 / 3 / 3 / 4;
+}

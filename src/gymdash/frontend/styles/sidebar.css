@@ -4,7 +4,6 @@
     gap: 2px;
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     grid-auto-rows: 40px;
-    border: 1px dashed var(--main-contrast-color);
     padding: 5px;
     border-radius: var(--panel-br);
 
@@ -13,9 +12,9 @@
         vertical-align: center;
     }
 }
-.sim-selection-box:hover {
+/* .sim-selection-box:hover {
     box-shadow: var(--main-contrast-color) 0 0 5px 1px inset;
-}
+} */
 .sim-selection-box {
     justify-content: space-between;
     border: 1px var(--main-contrast-color) solid;
@@ -39,8 +38,42 @@
     }
 }
 
+/* .incomplete */
+.radial-progress-completion {
+    display: none;
+}
+.complete.success
+.radial-progress-completion.success {
+    display: inline;
+}
+.complete.fail
+.radial-progress-completion.fail {
+    display: inline;
+}
+
+.radial-progress-completion {
+    background-color: rgba(0,0,0,0);
+    border: none;
+    position: absolute;
+    top: 0px;
+    left: 0px;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    padding: 0;
+    line-height: 100%;
+    font-size: calc(1.6em);
+    font-weight: 900;
+}
+.radial-progress-completion.success {
+    color: var(--main-bg-color);
+}
+.radial-progress-completion.fail {
+    color: var(--bad-color1);
+}
+
 .cancel-sim-button:hover {
-    color: red;
+    color: var(--bad-color1);
     background-color: rgba(0,0,0,0);
     border: none;
     box-shadow: none;
@@ -55,6 +88,12 @@
     font-size: calc(2em);
     font-weight: 900;
     transition: 0.15s;
+    text-shadow: var(--main-bg-color) 0px 0px 5px;
+}
+.cancel-sim-button:active {
+    font-size: calc(1.5em);
+    transition: 0.15s;
+    text-shadow: var(--main-bg-color) 0px 0px 5px;
 }
 .cancel-sim-button {
     color: rgba(0,0,0,0);
