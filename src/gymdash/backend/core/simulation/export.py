@@ -9,7 +9,7 @@ import logging
 import json
 from typing import Set, Dict, Tuple, Any, List
 from pathlib import Path
-from gymdash.backend.core.simulation.base import SimulationRegistry
+from gymdash.backend.core.simulation.manage import SimulationRegistry
 
 logger = logging.getLogger(__name__)
 

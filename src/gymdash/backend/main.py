@@ -9,7 +9,6 @@ from contextlib import asynccontextmanager
 from random import randint
 from threading import Thread
 
-import gymdash
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,18 +16,20 @@ from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (FileResponse, JSONResponse, Response,
                                StreamingResponse)
 
-from gymdash.backend.core.simulation.examples import register_example_simulations
-from gymdash.backend.core.simulation.export import SimulationExporter
+import gymdash
 from gymdash.backend.core.api.config.config import tags
 from gymdash.backend.core.api.models import (SimulationInteractionModel,
-                                                 SimulationStartConfig)
+                                             SimulationStartConfig)
 from gymdash.backend.core.api.stream import StreamerRegistry
 from gymdash.backend.core.patch.patcher import apply_extension_patches
-from gymdash.backend.core.simulation.base import (SimulationRegistry,
-                                                      SimulationTracker)
+from gymdash.backend.core.simulation.examples import \
+    register_example_simulations
+from gymdash.backend.core.simulation.export import SimulationExporter
+from gymdash.backend.core.simulation.manage import (SimulationRegistry,
+                                                    SimulationTracker)
 from gymdash.backend.core.utils.usage import *
-from gymdash.backend.core.utils.zip import \
-    get_recent_media_generator_from_keys
+from gymdash.backend.core.utils.zip import get_recent_media_generator_from_keys
+from gymdash.backend.project import ProjectManager
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level = logging.INFO, format = '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s')
@@ -38,6 +39,7 @@ apply_extension_patches()
 
 register_example_simulations()
 SimulationExporter.import_and_register()
+ProjectManager.import_args_from_file()
 
 # App main
 @asynccontextmanager

@@ -7,10 +7,11 @@ import socket
 import pickle
 import logging
 from typing import Callable, Union, List, Tuple, Any
-from src.gymdash.backend.core.api.config.config import set_global_config
+from gymdash.backend.core.api.config.config import set_global_config
+from gymdash.backend.project import ProjectManager
 
 logger = logging.getLogger("gymdash")
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 # https://stackoverflow.com/questions/2470971/fast-way-to-test-if-a-port-is-in-use-using-python
 def socket_used(port) -> bool:
@@ -88,6 +89,7 @@ def run_backend_server(args):
 
 # Starts the frontend and backend servers
 def start(args):
+    ProjectManager.export_args(args)
     # Start the servers
     set_global_config(args)
     setup_frontend(args)
@@ -99,7 +101,7 @@ def start(args):
         multiprocessing.Process(target=run_frontend_server, args=(args,)).start()
 
 def add_gymdash_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-    parser.add_argument("-d", "--project-dir",  default=".", type=str, help="Base relative path for the GymDash project")
+    parser.add_argument("-d", "--project-dir",  default="./.gymdash-projects", type=str, help="Base relative path for the GymDash project")
     parser.add_argument("-p", "--port",         default=8888, type=int, help="Port for frontend interface")
     parser.add_argument("-b", "--apiport",      default=8887, type=int, help="Port for backend API")
     parser.add_argument("-a", "--apiaddr",      default="127.0.0.1", type=str, help="Address for backend API")

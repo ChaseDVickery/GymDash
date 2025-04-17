@@ -9,6 +9,7 @@ tb/
 quickstart.bat
 registered_sim_info_test.pickle
 *exported_sims*
+*exported_args*
 dist/
 build/
 src/gymdash.egg-info/

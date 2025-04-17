@@ -20,8 +20,9 @@ except ImportError:
 
 from gymdash.backend.core.api.models import SimulationStartConfig
 from gymdash.backend.core.api.stream import StreamerRegistry
-from gymdash.backend.core.simulation.base import (Simulation,
-                                                      SimulationRegistry)
+from gymdash.backend.core.simulation.base import (Simulation)
+from gymdash.backend.core.simulation.manage import SimulationRegistry
+
 from gymdash.backend.gymnasium.wrappers.RecordVideoToTensorboard import \
     RecordVideoToTensorboard
 from gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import \
