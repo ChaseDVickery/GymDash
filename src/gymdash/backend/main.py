@@ -19,7 +19,8 @@ from fastapi.responses import (FileResponse, JSONResponse, Response,
 import gymdash
 from gymdash.backend.core.api.config.config import tags
 from gymdash.backend.core.api.models import (SimulationInteractionModel,
-                                             SimulationStartConfig)
+                                             SimulationStartConfig,
+                                             StoredSimulationInfo)
 from gymdash.backend.core.api.stream import StreamerRegistry
 from gymdash.backend.core.patch.patcher import apply_extension_patches
 from gymdash.backend.core.simulation.examples import \
@@ -143,26 +144,16 @@ async def start_new_simulation_call(config: SimulationStartConfig):
     logger.debug(f"API called start-new-test with config: {config}")
     id, _ = simulation_tracker.start_sim(config)
     return { "id": str(id) }
-    # if simulation_tracker.any_running(id):
-    #     return { "id": str(id) }
-    # else:
-    #     e = HTTPException(status_code=410, detail="Simulation not started")
-    #     logger.exception(f"API call could not start simulation with config: {config}")
-    #     raise e
-
-# @app.post("/stop-sim-test")
-# async def stop_simulation_call(sim_query: SimulationInteractionModel):
-#     logger.warning(f"Ignoring simulation query ID '{sim_query.id}' and replacing with a testing ID: {simulation_tracker.testing_first_id}")
-#     sim_query.id = simulation_tracker.testing_first_id
-#     query_response = await simulation_tracker.fulfill_query_interaction(sim_query)
-#     return query_response
 
 @app.post("/query-sim")
 async def get_sim_progress(sim_query: SimulationInteractionModel):
-    # logger.warning(f"Ignoring simulation query ID '{sim_query.id}' and replacing with a testing ID: {simulation_tracker.testing_first_id}")
-    # sim_query.id = simulation_tracker.testing_first_id
     query_response = await simulation_tracker.fulfill_query_interaction(sim_query)
     return query_response
+
+@app.get("/get_sims_history")
+async def get_stored_simulations():
+    sim_infos = ProjectManager.get_filtered_simulations()
+    return sim_infos
 
     
 @app.get("/all-recent-scalars")

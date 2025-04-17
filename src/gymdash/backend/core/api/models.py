@@ -1,5 +1,8 @@
-
+from collections.abc import Callable
+from datetime import datetime
+from uuid import UUID
 from typing import Any, Dict, Iterable, List, Tuple, Union
+import json
 
 from pydantic import BaseModel
 
@@ -11,8 +14,41 @@ class SimulationStartConfig(BaseModel):
     sim_type:   str             = None
     kwargs:     Dict[str, Any]  = {}
 
-# class SimulationQuery(BaseModel):
-#     id: str     # Really should be a UUID
+    class Encoder(json.JSONEncoder):
+        def default(self, o: Any) -> Any:
+            print("ENCODING SIMULATIONSTARTCONFIG")
+            print(o)
+            print(o.__dict__)
+            return o.__dict__
+    def custom_decoder(obj):
+        if "name" in obj and \
+        "sim_key" in obj and \
+        "sim_family" in obj and \
+        "sim_type" in obj and \
+        "kwargs" in obj:
+            family = obj["sim_family"] if "sim_family" in obj else None
+            sim_type = obj["sim_type"] if "sim_type" in obj else None
+            kwargs = obj["kwargs"] if "kwargs" in obj else {}
+            return SimulationStartConfig(
+                name=obj["name"],
+                sim_key=obj["sim_key"],
+                sim_family=family,
+                sim_type=sim_type,
+                kwargs=kwargs,
+            )
+        else:
+            return obj
+
+class StoredSimulationInfo(BaseModel):
+    name:       str             = None
+    sim_id:     UUID            = None
+    created:    datetime        = None
+    started:    datetime        = None
+    ended:      datetime        = None
+    is_done:    bool            = False
+    cancelled:  bool            = False
+    failed:     bool            = False
+    config:     SimulationStartConfig
 
 class InteractorChannelModel(BaseModel):
     triggered:  bool                = False

@@ -1,27 +1,43 @@
-import sqlite3
-import os
-import pickle
-import logging
 import argparse
 import asyncio
 import functools
-from threading import Lock
+import json
+import logging
+import os
+import pickle
+import sqlite3
 import uuid
-from typing import Tuple, List, Any
 from datetime import date, datetime
-from typing_extensions import Self
 from pathlib import Path
+from threading import Lock
+from typing import Any, List, Tuple
+
+from typing_extensions import Self
+
+from gymdash.backend.core.api.models import (SimulationStartConfig,
+                                             StoredSimulationInfo)
 from gymdash.backend.core.simulation.base import Simulation
 
 logger = logging.getLogger(__name__)
 
 
-def uuid2text(id):
+def uuid2text(id: uuid.UUID):
     return str(id)
+def config2text(config: SimulationStartConfig):
+    return json.dumps(config, cls=SimulationStartConfig.Encoder)
 sqlite3.register_adapter(uuid.UUID, uuid2text)
-def text2uuid(text):
+sqlite3.register_adapter(SimulationStartConfig, config2text)
+sqlite3.register_adapter(bool, int)
+# Converter objects are always passed a bytes object, so handle that
+def text2uuid(byte_text):
+    text = byte_text.decode("utf-8")
     return uuid.UUID(text)
+def text2config(byte_text):
+    text = byte_text.decode("utf-8")
+    return json.loads(text, object_hook=SimulationStartConfig.custom_decoder)
 sqlite3.register_converter("UUID", text2uuid)
+sqlite3.register_converter("SIMULATIONCONFIG", text2config)
+sqlite3.register_converter("BOOL", lambda i: bool(int(i)))
 
 class ProjectManager:
 
@@ -110,7 +126,7 @@ class ProjectManager:
         
     @staticmethod
     def _setup_database():
-        ProjectManager.dbcon = sqlite3.connect(ProjectManager.db_path())
+        ProjectManager.dbcon = sqlite3.connect(ProjectManager.db_path(), detect_types=sqlite3.PARSE_DECLTYPES)
         ProjectManager.dbcur = ProjectManager.dbcon.cursor()
         cur = ProjectManager.dbcur
         cur.execute("""CREATE TABLE IF NOT EXISTS simulations (
@@ -120,12 +136,12 @@ class ProjectManager:
                     created TIMESTAMP,
                     started TIMESTAMP,
                     ended TIMESTAMP,
-                    is_done INTEGER,
-                    cancelled INTEGER,
-                    failed INTEGER
+                    is_done BOOL,
+                    cancelled BOOL,
+                    failed BOOL,
+                    config SIMULATIONCONFIG
                     )""")
     
-        # cur.execute("INSERT INTO simulations(sim_id, created, started, ended, is_done, cancelled, failed) values (?, ?, ?, ?, ?, ?, ?)", (uuid.uuid4(),   datetime.now(),datetime.now(),datetime.now(),  False, False, False))
         ProjectManager.dbcon.commit()
 
         # retrieved = cur.execute("SELECT * from simulations").fetchone()
@@ -146,17 +162,16 @@ class ProjectManager:
     def run_cached_executions():
         con, cur = ProjectManager.get_con()
         with ProjectManager._execution_mutex:
-            print(f"ProjectManager running {len(ProjectManager._cached_executions)} cached executions")
+            if len(ProjectManager._cached_executions) > 0:
+                logger.info(f"ProjectManager running {len(ProjectManager._cached_executions)} cached executions")
             for exec_info in ProjectManager._cached_executions:
                 exec_info()
-                # if (len(exec_info) == 2):
-                #     cur.execute(exec_info[0], exec_info[1])
-                # else:
-                #     cur.execute(exec_info[0])
             ProjectManager._cached_executions.clear()
         con.commit()
-        retrieved = cur.execute("SELECT * from simulations").fetchall()
-        print(retrieved)
+
+        # ProjectManager.get_filtered_simulations()
+        # retrieved = cur.execute("SELECT * from simulations").fetchall()
+        # print(retrieved)
 
 
     @staticmethod
@@ -169,8 +184,8 @@ class ProjectManager:
         if (existing[0] < 1):
             sim_update_text = """
             INSERT INTO simulations
-            (sim_id, name, created, started, ended, is_done, cancelled, failed)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (sim_id, name, created, started, ended, is_done, cancelled, failed, config)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
             params = (
                 sim_id,
@@ -180,12 +195,13 @@ class ProjectManager:
                 sim._meta_end_time,
                 sim.is_done,
                 sim._meta_cancelled,
-                sim._meta_failed
+                sim._meta_failed,
+                sim.config,
             )
         else:
             sim_update_text = """
             UPDATE simulations
-            SET name=?, created=?, started=?, ended=?, is_done=?, cancelled=?, failed=?
+            SET name=?, created=?, started=?, ended=?, is_done=?, cancelled=?, failed=?, config=?
             WHERE sim_id=?
             """
             params = (
@@ -196,53 +212,50 @@ class ProjectManager:
                 sim.is_done,
                 sim._meta_cancelled,
                 sim._meta_failed,
+                sim.config,
                 sim_id
             )
 
         cur.execute(sim_update_text, params)
 
-
     @staticmethod
     def add_or_update_simulation(sim_id: uuid.UUID, sim: Simulation):
         ProjectManager._cached_executions.append(functools.partial(ProjectManager._add_or_update_simulation, sim_id=sim_id, sim=sim))
 
+    @staticmethod
+    def get_filtered_simulations(
+        started:datetime=None,
+        ended:datetime=None,
+        done:bool=None,
+        cancelled:bool=None,
+        failed:bool=None,
+    ) -> List[StoredSimulationInfo]:
+        con, cur = ProjectManager.get_con()
 
-        # sim_update_text = """
-        # UPDATE simulations
-        # SET created=?, started=?, ended=?, is_done=?, cancelled=?, failed=?
-        # WHERE sim_id=?
-        # """
+        query_text = """
+        SELECT
+            sim_id, name, created, started, ended, is_done, cancelled, failed, config
+        FROM
+            simulations
+        ORDER BY
+            created ASC
+        """
+        cur.execute(query_text)
 
-        # with ProjectManager._execution_mutex:
-        #     ProjectManager._cached_executions.append((
-        #         sim_update_text,
-        #         (
-        #             sim._meta_create_time,
-        #             sim._meta_start_time,
-        #             sim._meta_end_time,
-        #             sim.is_done,
-        #             sim._meta_cancelled,
-        #             sim._meta_failed, sim_id
-        #         )
-        #     ))
-
-
-
-        # con, cur = ProjectManager.get_con(())
-
-        # cur.execute("""
-        #             UPDATE simulations
-        #             SET created=?, started=?, ended=?, is_done=?, cancelled=?, failed=?
-        #             WHERE sim_id=?
-        #             """, (
-        #                 sim._meta_create_time,
-        #                 sim._meta_start_time,
-        #                 sim._meta_end_time,
-        #                 sim.is_done,
-        #                 sim._meta_cancelled,
-        #                 sim._meta_failed, sim_id
-        #             ))
-        # con.commit()
-
-        # retrieved = cur.execute("SELECT * from simulations").fetchall()
-        # print(retrieved)
+        res = cur.fetchall()
+        results = []
+        for info in res:
+            results.append(
+                StoredSimulationInfo(
+                    sim_id      = info[0],
+                    name        = info[1],
+                    created     = info[2],
+                    started     = info[3],
+                    ended       = info[4],
+                    is_done     = info[5],
+                    cancelled   = info[6],
+                    failed      = info[7],
+                    config      = info[8]
+                )
+            )
+        return results

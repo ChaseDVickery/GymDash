@@ -152,8 +152,8 @@ class StableBaselinesSimulation(Simulation):
         r_env.configure_recorder("episode_video", tb_loggers[0].writer)
         # Train
         try:
-            self.model.learn(total_timesteps=num_steps, progress_bar=False, callback=sim_interact_callback)
-            # self.model.learn(total_timesteps=num_steps, progress_bar=True, callback=sim_interact_callback)
+            # self.model.learn(total_timesteps=num_steps, progress_bar=False, callback=sim_interact_callback)
+            self.model.learn(total_timesteps=num_steps, progress_bar=True, callback=sim_interact_callback)
             self.model.save("ppo_aapl")
         except Exception as e:
             self._meta_failed = True

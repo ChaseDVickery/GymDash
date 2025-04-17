@@ -23,6 +23,7 @@ const startSimTestBtn    = document.querySelector("#start-test-sim-btn");
 const simTestTimestepsSlider = document.querySelector("#test-sim-steps-slider")
 const queryProgressTestBtn = document.querySelector("#query-test-btn");
 const stopSimTestBtn = document.querySelector("#stop-test-btn");
+const fillHistoryTestBtn = document.querySelector("#fill-sim-history-test-btn");
 
 // Constants
 const defaultSimProgressUpdateInterval = 2000;  // (ms)
@@ -378,6 +379,40 @@ function updateSimSelectionProgress(simID, simSelection) {
             console.error(`Update sim selection progress error: ${error}`)
         });
 }
+function fillSimulationHistory() {
+    fetch(apiURL("get_sims_history"))
+    .then((response) => response.json())
+    .then((infos) => {
+        // Should be list of StartedSimulationInfo
+        console.log(infos);
+        infos.forEach(info => {
+            const simID = info.sim_id;
+            const config = info.config;
+            if (!validID(simID)) {
+                return info;
+            }
+            const newSelection = createSimSelection(config, simID);
+            // Note: we do NOT store the simulation in sim_selections because
+            // we don't really want to associate it with any currently running
+            // simulations. It is purely here as history.
+            const meter = newSelection.querySelector(".radial-meter")
+            if (info.is_done) {
+                meter.classList.add("complete");
+                meter.classList.remove("incomplete");
+                if (info.cancelled || info.failed) {
+                    meter.classList.add("fail");
+                } else {
+                    meter.classList.add("success");
+                }
+            }
+            console.log(info);
+        });
+        return infos;
+    })
+    .catch((error) => {
+        console.error("Error: " + error);
+    });
+}
 
 
 // Turns the entry into a SimulationStartConfig data layout
@@ -408,9 +443,7 @@ function createSimSelection(config, simID) {
     label.textContent   = config.name;
     simSidebar.appendChild(newSelection);
     // Set up progress meter
-
-    // Store
-    sim_selections[simID] = newSelection;
+    return newSelection;
 }
 function validID(simID) { return noID !== simID; }
 function startSimulation() {
@@ -430,7 +463,9 @@ function startSimulation() {
         if (!validID(simID)) {
             return info;
         }
-        createSimSelection(config, simID);
+        const newSelection = createSimSelection(config, simID);
+        // Store new simulation in tracker
+        sim_selections[simID] = newSelection;
         console.log(info);
         return info;
     })
@@ -490,6 +525,7 @@ imageTestBtn.addEventListener("click", displayVideoTest);
 startSimTestBtn.addEventListener("click", startSimTest);
 queryProgressTestBtn.addEventListener("click", testQueryProgress);
 stopSimTestBtn.addEventListener("click", stopSimTest);
+fillHistoryTestBtn.addEventListener("click", fillSimulationHistory);
 
 
 simTestTimestepsSlider.addEventListener("change", (e) => {
@@ -503,6 +539,9 @@ startSimBtn.addEventListener("click", startSimulation);
 
 // Setup intervals
 setInterval(updateAllSimSelectionProgress, defaultSimProgressUpdateInterval);
+
+
+fillSimulationHistory();
 
 
 
