@@ -302,23 +302,35 @@ class Simulation():
     END_RUN     = "end_run"
 
     def __init__(self, config: SimulationStartConfig) -> None:
-        self.config = config
-        self.thread: Thread = None
-        self.start_kwargs = None
-        self.interactor = SimulationInteractor()
+        self.config: SimulationStartConfig      = config
+        self.thread: Thread                     = None
+        self.start_kwargs                       = None
+        self.interactor                         = SimulationInteractor()
+        self.kwarg_defaults                     = self.create_kwarg_defaults()
         self._callback_map: Dict[str, List[Callable[[Simulation], Simulation]]] = {
             Simulation.START_SETUP:     [],
             Simulation.END_SETUP:       [],
             Simulation.START_RUN:       [],
             Simulation.END_RUN:         [],
         }
-        self.kwarg_defaults = self.create_kwarg_defaults()
 
-    def create_kwarg_defaults(self):
+        self._meta_mutex: Lock                  = Lock()
+        self._meta_cancelled: bool              = False
+        self._meta_failed: bool                 = False
+        self._meta_error_details: List[str]     = []
+        
+    def set_cancelled(self) -> None:
+        with self._meta_mutex:
+            self._meta_cancelled = True
+    def add_error_details(self, new_error: str) -> None:
+        with self._meta_mutex:
+            self._meta_error_details.append(new_error)
+
+    def create_kwarg_defaults(self) -> Dict[str, Any]:
         return {}
 
     @property
-    def is_done(self):
+    def is_done(self) -> bool:
         return not self.thread.is_alive()
 
     def _overwrite_new_kwargs(self, old_kwargs, *args) -> Dict[str, Any]:
@@ -361,7 +373,13 @@ class Simulation():
         self.interactor.reset()
 
     def get_outgoing_values(self) -> Dict[str, Any]:
-        return self.interactor.get_all_outgoing_values()
+        channel_values = self.interactor.get_all_outgoing_values()
+        # Meta values that don't need interaction channels
+        channel_values["is_done"]       = self.is_done
+        channel_values["cancelled"]     = self._meta_cancelled
+        channel_values["failed"]        = self._meta_failed
+        channel_values["error_details"] = self._meta_error_details
+        return channel_values
 
     # def trigger_as_query(self, incoming_interactions: SimulationInteractionModel) -> Dict[str, Any]:
     #     for channel_key, value in incoming_interactions:

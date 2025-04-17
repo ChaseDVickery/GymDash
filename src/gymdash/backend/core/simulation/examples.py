@@ -132,7 +132,7 @@ class StableBaselinesSimulation(Simulation):
         # Hook into the running simulation.
         # This callback provides communication channels between the
         # simulation and the user as the simulation runs.
-        sim_interact_callback = SimulationInteractionCallback(self.interactor)
+        sim_interact_callback = SimulationInteractionCallback(self)
         # Logger
         backend_logger = configure(tb_path, ["tensorboard"])
 
@@ -151,10 +151,12 @@ class StableBaselinesSimulation(Simulation):
         r_env.configure_recorder("episode_video", tb_loggers[0].writer)
         # Train
         try:
-            # self.model.learn(total_timesteps=num_steps, progress_bar=False, callback=sim_interact_callback)
-            self.model.learn(total_timesteps=num_steps, progress_bar=True, callback=sim_interact_callback)
+            self.model.learn(total_timesteps=num_steps, progress_bar=False, callback=sim_interact_callback)
+            # self.model.learn(total_timesteps=num_steps, progress_bar=True, callback=sim_interact_callback)
             self.model.save("ppo_aapl")
-        except:
+        except Exception as e:
+            self._meta_failed = True
+            self.add_error_details(str(e))
             pass
         env.close()
 

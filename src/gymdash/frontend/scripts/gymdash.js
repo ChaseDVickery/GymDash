@@ -258,19 +258,23 @@ function testQueryProgress() {
     })
 }
 
-function queryProgress(simID) {
+function queryProgress(simID, onlyStatus=False) {
     if (!validID(simID)) { return Promise.resolve({id: noID}); }
-    return query({
+    const q = {
         id: simID,
         timeout: defaultTimeout,
-        progress: {
-            triggered: true,
-            value: null,
-        }
-    });
+        is_done:    { triggered: true, value: null, },
+        cancelled:  { triggered: true, value: null, },
+        failed:     { triggered: true, value: null, },
+    };
+    if (!onlyStatus) {
+        q.progress = { triggered: true, value: null, };
+    }
+    return query(q);
 }
 // Returns a promise of the simulation query
 function query(queryBody) {
+    queryBody.error_details = { triggered: true, value: null };
     console.log(`Sending query: ${queryBody}`);
     console.log(queryBody);
     return fetch(apiURL("query-sim"), {
@@ -349,15 +353,26 @@ function updateAllSimSelectionProgress() {
 }
 function updateSimSelectionProgress(simID, simSelection) {
     const meter = simSelection.querySelector(".radial-meter")
-    if (meter.classList.contains("complete")) { return; }
+    // if (meter.classList.contains("complete")) { return; }
+    const is_done = meter.classList.contains("complete");
+    if (is_done) { return; }
     const outer = meter.querySelector(".outer")
-    queryProgress(simID)
+    queryProgress(simID, is_done)
         .then((info) => {
             console.log(info);
-            // if (!validID(info.id)) { return info; }
-            if (info.progress[1] === 0) { return info; }
-            // const meterStyle = getComputedStyle(meter);
-            outer.style.setProperty("--prog", `${100*info.progress[0]/info.progress[1]}%`);
+            if (info.is_done) {
+                meter.classList.add("complete");
+                meter.classList.remove("incomplete");
+                if (info.cancelled || info.failed) {
+                    meter.classList.add("fail");
+                } else {
+                    meter.classList.add("success");
+                }
+            }
+            if (Object.hasOwn(info, "progress")) {
+                if (info.progress[1] === 0) { return info; }
+                outer.style.setProperty("--prog", `${100*info.progress[0]/info.progress[1]}%`);
+            }
         })
         .catch((error) => {
             console.error(`Update sim selection progress error: ${error}`)
@@ -388,9 +403,9 @@ function createSimSelection(config, simID) {
     newSelection.classList.remove("prefab");
     const label = newSelection.querySelector("label");
     const input = newSelection.querySelector(".sim-selection-checkbox")
-    label.textContent   = config.name;
-    label.for           = selectionID;
     input.id            = selectionID;
+    label.htmlFor           = selectionID;
+    label.textContent   = config.name;
     simSidebar.appendChild(newSelection);
     // Set up progress meter
 

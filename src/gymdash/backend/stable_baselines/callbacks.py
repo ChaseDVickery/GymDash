@@ -4,7 +4,7 @@ try:
 except ImportError:
     _has_sb = False
     
-from src.gymdash.backend.core.simulation.base import SimulationInteractor
+from src.gymdash.backend.core.simulation.base import Simulation, SimulationInteractor
 from src.gymdash.backend.gymnasium.utils.wrapper_utils import WrapperUtils
 from src.gymdash.backend.gymnasium.wrappers import TensorboardStreamWrapper
 
@@ -30,9 +30,10 @@ class TensorboardPathCorrectionCallback(BaseCallback):
 
 
 class SimulationInteractionCallback(BaseCallback):
-    def __init__(self, simulation_interactor: SimulationInteractor, verbose: int = 0):
+    def __init__(self, simulation: Simulation, verbose: int = 0):
         super().__init__(verbose)
-        self.interactor = simulation_interactor
+        self.simulation = simulation
+        self.interactor = simulation.interactor
         
         self.curr_timesteps = 0
         self.total_timesteps = 0
@@ -54,6 +55,7 @@ class SimulationInteractionCallback(BaseCallback):
         self.interactor.set_out_if_in("progress", (self.curr_timesteps, self.total_timesteps))
         # HANDLE INCOMING INFORMATION
         if self.interactor.set_out_if_in("stop_simulation", True):
+            self.simulation.set_cancelled()
             return False
         return True
 

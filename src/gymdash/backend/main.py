@@ -157,8 +157,8 @@ async def start_new_simulation_call(config: SimulationStartConfig):
 
 @app.post("/query-sim")
 async def get_sim_progress(sim_query: SimulationInteractionModel):
-    logger.warning(f"Ignoring simulation query ID '{sim_query.id}' and replacing with a testing ID: {simulation_tracker.testing_first_id}")
-    sim_query.id = simulation_tracker.testing_first_id
+    # logger.warning(f"Ignoring simulation query ID '{sim_query.id}' and replacing with a testing ID: {simulation_tracker.testing_first_id}")
+    # sim_query.id = simulation_tracker.testing_first_id
     query_response = await simulation_tracker.fulfill_query_interaction(sim_query)
     return query_response
 
