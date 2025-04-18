@@ -1,16 +1,17 @@
 import asyncio
-import logging
-from datetime import datetime
-from collections import defaultdict
-from threading import Lock
-from typing import Any, Dict, Iterable, List, Set, Tuple, Union, Callable
-from gymdash.backend.core.simulation.base import Simulation
-from uuid import UUID, uuid4
 import functools
-from gymdash.backend.project import ProjectManager
+import logging
+from collections import defaultdict
+from datetime import datetime
+from threading import Lock
+from typing import Any, Callable, Dict, Iterable, List, Set, Tuple, Union
+from uuid import UUID, uuid4
 
-from gymdash.backend.core.api.models import (SimulationInteractionModel,
-                                                 SimulationStartConfig)
+from gymdash.backend.core.api.models import (InteractorChannelModel,
+                                             SimulationInteractionModel,
+                                             SimulationStartConfig)
+from gymdash.backend.core.simulation.base import Simulation
+from gymdash.backend.project import ProjectManager
 
 logger = logging.getLogger(__name__)
 
@@ -165,16 +166,88 @@ class SimulationTracker:
         self.done_sim_map:              Dict[UUID, Simulation] = {}
         self._current_needed_outgoing:  Dict[UUID, Dict[UUID, Set[str]]] = defaultdict(dict)
         self._current_needed_incoming:  Dict[UUID, Dict[UUID, Set[str]]] = defaultdict(dict)
-        self._fullfilling_query:        bool = False
-        self._fullfilling_post:         bool = False
 
         self._access_mutex:             Lock = Lock()
+        
+        self._clear_poll_period:        float= 0.1
+        # This flag should be true while clear() is being called.
+        # We need to check this flag during fulfill_query_interaction because
+        # if we start trying to clear the tracker while the current query
+        # fulfillments are being processed, then they need to know to stop
+        # and return immediately.
+        self._is_clearing_internal:     bool = False
+        # Similarly, while processing clear(), we need to be sure not to
+        # finish clearing the maps if any query fulfillments are still in
+        # process.
+        self._current_queries:          set = set()
+
+        # This flag just for outside use
+        self._is_clearing:              bool = False
 
         self.callback_groups:           Dict[UUID, TriggeredCallback] = {}
+        
         
 
         # loop = asyncio.get_event_loop()
         # loop.create_task(self.purge_loop())
+
+    @property
+    def _fullfilling_query(self):
+        return len(self._current_queries) > 0
+    @property
+    def is_clearing(self):
+        return self._is_clearing
+
+    async def clear(self):
+        """
+        Sends stop simulation query to all running simulations.
+        Then clears all mappings.
+        """
+        self._is_clearing = True
+        stop_sim_tasks = []
+        stop_sim_ids = []
+        with self._access_mutex:
+            stop_sim_ids = [id for id in self.running_sim_map.keys()]
+            for sim_id in stop_sim_ids:
+                stop_sim_tasks.append(
+                    asyncio.create_task(
+                        self.fulfill_query_interaction(SimulationInteractionModel(
+                            id=str(sim_id),
+                            stop_simulation=InteractorChannelModel(triggered=True, value=None)
+                        ))
+                    )
+                )
+        # Must first GATHER the stop interactions to make sure that all
+        # relevant simulations have had stop called. After that, we can abort
+        # other interactions early if needed.
+        responses = await asyncio.gather(*stop_sim_tasks)
+        # Enable clearing flag after stop_simulation calls have been registered
+        # for each running simulation
+        self._is_clearing_internal = True
+        # Possibly wait here while other unrelated fulfillments finish up.
+        # Other interactions should be checking for the _is_clearing_internal flag
+        while (self._fullfilling_query):
+            print(f"Waiting on {self._current_queries} query fulfillment")
+            await asyncio.sleep(self._clear_poll_period)
+        # Wait still for individual Simulation threads to finish.
+        # We want to be sure that all simulation threads are done
+        # so that we prevent them from using resources (like tb directories)
+        # that may be cleared in other parts of the code after this
+        # (like from ProjectManager)
+        while self.any_running(stop_sim_ids):
+            print(f"Waiting on simulation thread shutdowns")
+            await asyncio.sleep(self._clear_poll_period)
+        # Now clear out all my maps and such
+        self.running_sim_map.clear()
+        self.done_sim_map.clear()
+        self._current_needed_outgoing.clear()
+        self._current_needed_incoming.clear()
+        self.callback_groups.clear()
+        self._is_clearing_internal = False
+        self._is_clearing = False
+        return responses
+        
+
 
     def _to_key(self, key: Union[str, UUID]) -> UUID:
         # If UUID, we're good
@@ -398,6 +471,11 @@ class SimulationTracker:
                 self.running_sim_map.pop(sim_key)
                 self.done_sim_map[sim_key] = sim
     
+    def _start_query(self, query_id: UUID):
+        self._current_queries.add(query_id)
+    def _end_query(self, query_id: UUID):
+        self._current_queries.remove(query_id)
+
     def _reset_free_outgoing_response_triggers(self, sim_key: Union[str, UUID], just_freed: Set[str]):
         """
         Resets all outgoing channels that were just freed from an interaction
@@ -452,7 +530,11 @@ class SimulationTracker:
                 if a timeout occurred, OR a response with a "no-id" simulation
                 if the queried simulation could not be found.
         """
+        if self._is_clearing_internal:
+            logger.info(f"Query interaction returning early because of clear flag")
+            return SimulationInteractionModel(id=str(SimulationTracker.no_id))
         interaction_id = uuid4()
+        self._start_query(interaction_id)
         logger.info(f"Attempting to fulfill query interaction (interaction: {str(interaction_id)}).")
         logger.debug(f"Query interaction details (interaction: {str(interaction_id)}): {sim_query}")
         query       = sim_query
@@ -461,7 +543,8 @@ class SimulationTracker:
         can_timeout = query.timeout > 0
         found, sim  = self.try_get_sim(id)
 
-        if not found:
+        if not found or self._is_clearing_internal:
+            self._end_query(interaction_id)
             return SimulationInteractionModel(id=str(SimulationTracker.no_id))
         
         # We want to assemble a list of attributes that be checked off
@@ -485,6 +568,9 @@ class SimulationTracker:
         done = False
         timer = 0
         while not done:
+            if self._is_clearing_internal:
+                self._end_query(interaction_id)
+                return response_data
             retrieved_values = sim.get_outgoing_values()
             logger.debug(f"Simulation tracker retrieved outgoing values: {retrieved_values}")
             for channel_key, outgoing_value in retrieved_values.items():
@@ -521,6 +607,7 @@ class SimulationTracker:
         self._reset_free_outgoing_response_triggers(id, needed_response_keys)
         self._reset_free_incoming_response_triggers(id, needed_response_keys)
 
+        self._end_query(interaction_id)
         return response_data
 
     # async def fulfill_post_interaction(self, sim_query: SimulationInteractionModel):

@@ -7,6 +7,7 @@ import os
 import pickle
 import sqlite3
 import uuid
+import shutil
 from datetime import date, datetime
 from pathlib import Path
 from threading import Lock
@@ -139,6 +140,11 @@ class ProjectManager:
     def _setup_database():
         ProjectManager.dbcon = sqlite3.connect(ProjectManager.db_path(), detect_types=sqlite3.PARSE_DECLTYPES)
         ProjectManager.dbcur = ProjectManager.dbcon.cursor()
+        ProjectManager._create_simulations_table()
+
+    @staticmethod
+    def _create_simulations_table():
+        con, cur = ProjectManager.get_con()
         cur = ProjectManager.dbcur
         cur.execute("""CREATE TABLE IF NOT EXISTS simulations (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -152,11 +158,7 @@ class ProjectManager:
                     failed BOOL,
                     config SIMULATIONCONFIG
                     )""")
-    
-        ProjectManager.dbcon.commit()
-
-        # retrieved = cur.execute("SELECT * from simulations").fetchone()
-        # print(retrieved)
+        con.commit()
 
     @staticmethod
     def _setup_loop():
@@ -236,7 +238,9 @@ class ProjectManager:
 
     @staticmethod
     def add_or_update_simulation(sim_id: uuid.UUID, sim: Simulation):
-        ProjectManager._cached_executions.append(functools.partial(ProjectManager._add_or_update_simulation, sim_id=sim_id, sim=sim))
+        ProjectManager._cached_executions.append(
+            functools.partial(ProjectManager._add_or_update_simulation, sim_id=sim_id, sim=sim)
+        )
 
     @staticmethod
     def get_filtered_simulations(
@@ -274,4 +278,30 @@ class ProjectManager:
                     config      = info[8]
                 )
             )
+        logger.error(f"Got {len(results)} db results")
         return results
+    
+    @staticmethod
+    def delete_all_simulations_immediate():
+        # Run cached executions early so we don't
+        # immediately repopulate with old stuff
+        ProjectManager.run_cached_executions()
+        with ProjectManager._execution_mutex:
+            ProjectManager._delete_all_simulations()
+    @staticmethod
+    def _delete_all_simulations():
+        # Clear simulation table
+        con, cur = ProjectManager.get_con()
+        cur.execute("DROP TABLE simulations")
+        ProjectManager._create_simulations_table()
+        con.commit()
+        logger.info("Cleared table 'simulations'")
+        # Delete all simulation subfolders if possible
+        shutil.rmtree(ProjectManager.sims_folder(), ignore_errors=True)
+        ProjectManager._setup_project_structure()
+        logger.info(f"Cleared simulation subfolder at '{ProjectManager.sims_folder()}'")
+    @staticmethod
+    def delete_all_simulations():
+        ProjectManager._cached_executions.append(
+            functools.partial(ProjectManager._delete_all_simulations)
+        )

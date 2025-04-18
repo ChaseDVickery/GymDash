@@ -24,6 +24,8 @@ const simTestTimestepsSlider = document.querySelector("#test-sim-steps-slider")
 const queryProgressTestBtn = document.querySelector("#query-test-btn");
 const stopSimTestBtn = document.querySelector("#stop-test-btn");
 const fillHistoryTestBtn = document.querySelector("#fill-sim-history-test-btn");
+const deleteAllSimsTestBtn = document.querySelector("#delete-all-sims-test-btn");
+
 
 // Constants
 const defaultSimProgressUpdateInterval = 2000;  // (ms)
@@ -498,7 +500,6 @@ function stopSimulationFromSelection(simSelection) {
     
     const input = simSelection.querySelector(".sim-selection-checkbox")
     const meter = simSelection.querySelector(".radial-meter")
-    const outer = meter.querySelector(".outer")
     const simID = input.id;
     // Set stopping visuals and remove from sim_selections
     delete sim_selections[simID];
@@ -521,6 +522,27 @@ function stopSimulationFromSelection(simSelection) {
 // Sends the request to actually stop the given simulation
 function stopSimulation(simID) {
     return controlStopSim(simID);
+}
+
+function showDeleteAllSimulationsOption() {
+    deleteAllSimulations();
+}
+function deleteAllSimulations() {
+    // Visually indicate all running sims as cancelling
+    for (const [key, simSelection] of Object.entries(sim_selections)) {
+        const meter = simSelection.querySelector(".radial-meter")
+        const simID = key;
+        // Set stopping visuals and remove from sim_selections
+        delete sim_selections[simID];
+        meter.classList.add("cancelling");
+    }
+    fetch(apiURL("delete-all-sims"))
+        .then((response) => { return response.json(); })
+        .then((info) => {
+            sim_selections = {};
+            refreshSimulationSidebar();
+        })
+        .catch((error) => { console.error(`Error while deleting all simulations: ${error}`)});
 }
 
 
@@ -575,6 +597,7 @@ startSimTestBtn.addEventListener("click", startSimTest);
 queryProgressTestBtn.addEventListener("click", testQueryProgress);
 stopSimTestBtn.addEventListener("click", stopSimTest);
 fillHistoryTestBtn.addEventListener("click", refreshSimulationSidebar);
+deleteAllSimsTestBtn.addEventListener("click", showDeleteAllSimulationsOption);
 
 
 simTestTimestepsSlider.addEventListener("change", (e) => {

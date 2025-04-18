@@ -142,11 +142,15 @@ async def get_all_recent_images():
 @app.post("/start-new-test")
 async def start_new_simulation_call(config: SimulationStartConfig):
     logger.debug(f"API called start-new-test with config: {config}")
+    if simulation_tracker.is_clearing:
+        return { "id": str(simulation_tracker.no_id) }
     id, _ = simulation_tracker.start_sim(config)
     return { "id": str(id) }
 
 @app.post("/query-sim")
 async def get_sim_progress(sim_query: SimulationInteractionModel):
+    if simulation_tracker.is_clearing:
+        return {}
     query_response = await simulation_tracker.fulfill_query_interaction(sim_query)
     return query_response
 
@@ -155,6 +159,17 @@ async def get_stored_simulations():
     sim_infos = ProjectManager.get_filtered_simulations()
     return sim_infos
 
+@app.get("/delete-all-sims")
+async def get_delete_all_simulations():
+    if simulation_tracker.is_clearing:
+        return {}
+    # Stop all current simulations and clear tracker
+    responses = await simulation_tracker.clear()
+    # Clear backend DB of simulations
+    ProjectManager.delete_all_simulations_immediate()
+    return responses
+
+    
     
 @app.get("/all-recent-scalars")
 async def get_all_recent_scalars():

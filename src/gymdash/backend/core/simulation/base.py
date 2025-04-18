@@ -488,6 +488,11 @@ class Simulation():
         # End run callbacks
         self._meta_end_time = datetime.now()
         self.trigger_callbacks(Simulation.END_RUN)
+        # If we are here and the stop_simulation flag has been raised
+        # and not dealt with, then we can deal with it now.
+        # Make sure it's after all the callbacks so we don't have any
+        # funny business.
+        self.interactor.set_out_if_in("stop_simulation", True)
     
     @abstractmethod
     def _setup(self, **kwargs):
