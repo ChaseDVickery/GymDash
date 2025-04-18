@@ -396,6 +396,9 @@ class SimulationTracker:
             to_create: Simulation = to_create
             simulation = to_create
             logger.info(f"Creating existing simulation object (id='{new_id}')")
+        if simulation is None:
+            logger.warning(f"Could not create valid simulation.")
+            return (SimulationTracker.no_id, None)
         simulation.set_project_info(ProjectManager.sims_folder(), new_id)
         ProjectManager.add_or_update_simulation(new_id, simulation)
         return (new_id, simulation)

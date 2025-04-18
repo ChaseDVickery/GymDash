@@ -1,0 +1,8 @@
+
+.tablinks.active {
+    transform: scale(0.90);
+    filter: saturate(30%);
+}
+.tabcontent.hidden {
+    display: none !important;
+}

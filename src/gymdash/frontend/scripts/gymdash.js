@@ -614,7 +614,7 @@ setInterval(updateAllSimSelectionProgress, defaultSimProgressUpdateInterval);
 
 
 refreshSimulationSidebar();
-
+openTab(null, "tab-control");
 
 
 function polyline(T, Y, tscale, yscale) {

@@ -4,19 +4,25 @@ function openTab(evt, tabID) {
     // Declare all variables
     var i, tabcontent, tablinks;
 
-    // Get all elements with class="tabcontent" and hide them
+    // Hide all tabs
     tabcontent = document.getElementsByClassName("tabcontent");
     for (i = 0; i < tabcontent.length; i++) {
-        tabcontent[i].style.display = "none";
+        tabcontent[i].classList.add("hidden");
     }
+    // Show the current tab
+    document.getElementById(tabID).classList.remove("hidden");
 
-    // Get all elements with class="tablinks" and remove the class "active"
+    // Remove "active" from all tablinks
     tablinks = document.getElementsByClassName("tablinks");
     for (i = 0; i < tablinks.length; i++) {
         tablinks[i].className = tablinks[i].className.replace(" active", "");
     }
-
-    // Show the current tab, and add an "active" class to the button that opened the tab
-    // document.getElementById(tabID).style.display = "block";
-    evt.currentTarget.className += " active";
+    // Add "active" to the correct tab link
+    for (const tablink of tablinks) {
+        console.log(tablink);
+        if (tablink.dataset.tab === tabID) {
+            tablink.classList.add("active");
+            break;
+        }
+    }
 }
