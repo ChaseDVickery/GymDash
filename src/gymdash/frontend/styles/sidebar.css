@@ -1,3 +1,8 @@
+@keyframes radialprogresscancelling {
+    100% {transform: rotate(-360deg);}
+}
+
+
 .sim-selection-sidebar {
     flex: 1 1 var(--left-column-default);
     display: grid;
@@ -42,6 +47,11 @@
 .radial-progress-completion {
     display: none;
 }
+/* .radial-meter.cancelling
+.outer {
+    animation: radialprogresscancelling 1s infinite;
+    background: conic-gradient(from 0deg, var(--bad-color) 0%, var(--bad-color) 0% var(--prog), var(--bad-color) var(--prog), var(--bad-color) 100%);
+} */
 .complete.success
 .radial-progress-completion.success {
     display: inline;
@@ -49,6 +59,11 @@
 .complete.fail
 .radial-progress-completion.fail {
     display: inline;
+}
+.cancelling
+.radial-progress-completion.fail {
+    display: inline;
+    animation: radialprogresscancelling 1s infinite;
 }
 
 .radial-progress-completion {

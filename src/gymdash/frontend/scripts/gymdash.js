@@ -273,6 +273,15 @@ function queryProgress(simID, onlyStatus=False) {
     }
     return query(q);
 }
+function controlStopSim(simID) {
+    if (!validID(simID)) { return Promise.resolve({id: noID}); }
+    const q = {
+        id: simID,
+        timeout: defaultTimeout,
+        stop_simulation: {triggered: true, value: null},
+    };
+    return query(q);
+}
 // Returns a promise of the simulation query
 function query(queryBody) {
     queryBody.error_details = { triggered: true, value: null };
@@ -356,9 +365,9 @@ function updateSimSelectionProgress(simID, simSelection) {
     const meter = simSelection.querySelector(".radial-meter")
     // if (meter.classList.contains("complete")) { return; }
     const is_done = meter.classList.contains("complete");
-    if (is_done) { return; }
+    if (is_done) { return Promise.resolve(); }
     const outer = meter.querySelector(".outer")
-    queryProgress(simID, is_done)
+    return queryProgress(simID, is_done)
         .then((info) => {
             console.log(info);
             if (info.is_done) {
@@ -451,7 +460,10 @@ function createSimSelection(config, simID) {
     label.htmlFor           = selectionID;
     label.textContent   = config.name;
     simSidebar.appendChild(newSelection);
-    // Set up progress meter
+    // Set up cancel button
+    const cancelButton = newSelection.querySelector(".cancel-sim-button");
+    cancelButton.addEventListener("click", stopSimulationFromSelection.bind(null, newSelection));
+    // Return selection box
     return newSelection;
 }
 function validID(simID) { return noID !== simID; }
@@ -481,6 +493,34 @@ function startSimulation() {
     .catch((error) => {
         console.error("Error: " + error);
     });
+}
+function stopSimulationFromSelection(simSelection) {
+    
+    const input = simSelection.querySelector(".sim-selection-checkbox")
+    const meter = simSelection.querySelector(".radial-meter")
+    const outer = meter.querySelector(".outer")
+    const simID = input.id;
+    // Set stopping visuals and remove from sim_selections
+    delete sim_selections[simID];
+    meter.classList.add("cancelling");
+    stopSimulation(simID)
+        .then((response) => {
+            console.log(`Done calling stop simulation on ${simID}`);
+            
+            updateSimSelectionProgress(simID, simSelection)
+                .then((response) => {
+                    // Put back in simSelection and stop cancellation visual
+                    sim_selections[simID] = simSelection;
+                    meter.classList.remove("cancelling");
+                })
+        })
+        .catch((error) => {
+            console.error(`Error while stopping simulation: ${error}`);
+        });
+}
+// Sends the request to actually stop the given simulation
+function stopSimulation(simID) {
+    return controlStopSim(simID);
 }
 
 
