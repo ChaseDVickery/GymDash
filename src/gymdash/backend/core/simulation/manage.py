@@ -323,6 +323,8 @@ class SimulationTracker:
             to_create: Simulation = to_create
             simulation = to_create
             logger.info(f"Creating existing simulation object (id='{new_id}')")
+        simulation.set_project_info(ProjectManager.sims_folder(), new_id)
+        ProjectManager.add_or_update_simulation(new_id, simulation)
         return (new_id, simulation)
 
 

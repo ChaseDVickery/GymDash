@@ -41,10 +41,11 @@ sqlite3.register_converter("BOOL", lambda i: bool(int(i)))
 
 class ProjectManager:
 
-    ARGS_FILENAME = "args.pickle"
-    TB_FOLDER = "tb"
-    DB_FOLDER = "db"
-    DB_NAME = "simulations.db"
+    ARGS_FILENAME   = "args.pickle"
+    TB_FOLDER       = "tb"
+    SIMS_FOLDER     = "sims"
+    DB_FOLDER       = "db"
+    DB_NAME         = "simulations.db"
 
     _execution_mutex = Lock()
     _cached_executions: List[Tuple[str, Any]] = []
@@ -105,21 +106,31 @@ class ProjectManager:
 
 
     @staticmethod
+    def project_folder():
+        return ProjectManager.args.project_dir
+    @staticmethod
     def tb_folder():
-        return os.path.join(ProjectManager.args.project_dir, ProjectManager.TB_FOLDER)
+        return os.path.join(ProjectManager.project_folder(), ProjectManager.TB_FOLDER)
+    @staticmethod
+    def sims_folder():
+        return os.path.join(ProjectManager.project_folder(), ProjectManager.SIMS_FOLDER)
+    @staticmethod
+    def db_folder():
+        return os.path.join(ProjectManager.project_folder(), ProjectManager.DB_FOLDER)
     @staticmethod
     def db_path():
-        return os.path.join(ProjectManager.args.project_dir, ProjectManager.DB_FOLDER, ProjectManager.DB_NAME)
+        return os.path.join(ProjectManager.db_folder(), ProjectManager.DB_NAME)
 
     @staticmethod
     def _setup_project_structure():
         try:
             # Base directory
-            path = Path(ProjectManager.args.project_dir)
+            path = Path(ProjectManager.project_folder())
             path.mkdir(parents=True, exist_ok=True)
             # Sub-dirs
-            os.makedirs(os.path.join(path, ProjectManager.TB_FOLDER), exist_ok=True)
-            os.makedirs(os.path.join(path, ProjectManager.DB_FOLDER), exist_ok=True)
+            os.makedirs(ProjectManager.tb_folder(),     exist_ok=True)
+            os.makedirs(ProjectManager.db_folder(),     exist_ok=True)
+            os.makedirs(ProjectManager.sims_folder(),   exist_ok=True)
         except Exception as e:
             logger.error(f"Problem setting up project structure at base directory '{ProjectManager.args.project_dir}'")
             raise e
@@ -157,16 +168,20 @@ class ProjectManager:
         while True:
             await asyncio.sleep(1)
             ProjectManager.run_cached_executions()
-
+            
     @staticmethod
     def run_cached_executions():
         con, cur = ProjectManager.get_con()
-        with ProjectManager._execution_mutex:
+        try:
+            ProjectManager._execution_mutex.acquire()
             if len(ProjectManager._cached_executions) > 0:
                 logger.info(f"ProjectManager running {len(ProjectManager._cached_executions)} cached executions")
             for exec_info in ProjectManager._cached_executions:
                 exec_info()
             ProjectManager._cached_executions.clear()
+            ProjectManager._execution_mutex.release()
+        except:
+            ProjectManager._execution_mutex.release()
         con.commit()
 
         # ProjectManager.get_filtered_simulations()
@@ -176,6 +191,7 @@ class ProjectManager:
 
     @staticmethod
     def _add_or_update_simulation(sim_id: uuid.UUID, sim: Simulation):
+        if sim is None: return
         con, cur = ProjectManager.get_con()
 
         check_text = "SELECT COUNT(id) FROM simulations WHERE sim_id=?"

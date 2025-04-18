@@ -30,6 +30,7 @@ from gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import \
 from gymdash.backend.stable_baselines.callbacks import \
     SimulationInteractionCallback
 from gymdash.start import start
+from gymdash.backend.project import ProjectManager
 
 
 logger = logging.getLogger(__name__)
@@ -95,6 +96,8 @@ class StableBaselinesSimulation(Simulation):
 
         experiment_name = f"{env_name}_{kwargs['algorithm']}"
         tb_path = os.path.join("tb", experiment_name, "train")
+        if self._project_info_set:
+            tb_path = os.path.join(self.sim_path, tb_path)
 
         try:
             env = gym.make(env_name, render_mode="rgb_array")
@@ -152,8 +155,8 @@ class StableBaselinesSimulation(Simulation):
         r_env.configure_recorder("episode_video", tb_loggers[0].writer)
         # Train
         try:
-            # self.model.learn(total_timesteps=num_steps, progress_bar=False, callback=sim_interact_callback)
-            self.model.learn(total_timesteps=num_steps, progress_bar=True, callback=sim_interact_callback)
+            self.model.learn(total_timesteps=num_steps, progress_bar=False, callback=sim_interact_callback)
+            # self.model.learn(total_timesteps=num_steps, progress_bar=True, callback=sim_interact_callback)
             self.model.save("ppo_aapl")
         except Exception as e:
             self._meta_failed = True

@@ -32,7 +32,7 @@ const noID = "00000000-0000-0000-0000-000000000000"; // (str(UUID))
 
 // Structures
 // sim_selections store information
-const sim_selections = {};
+let sim_selections = {};
 
 // Elements
 const simSidebar = document.querySelector(".sim-selection-sidebar");
@@ -379,7 +379,15 @@ function updateSimSelectionProgress(simID, simSelection) {
             console.error(`Update sim selection progress error: ${error}`)
         });
 }
-function fillSimulationHistory() {
+
+function refreshSimulationSidebar() {
+    // Clear all the current sim selections and remove from DOM
+    const selections = simSidebar.querySelectorAll(".sim-selection-box");
+    sim_selections = {};
+    selections.forEach(selection => {
+        selection.parentElement.removeChild(selection);
+    });
+    // Fetch sim history in backend DB
     fetch(apiURL("get_sims_history"))
     .then((response) => response.json())
     .then((infos) => {
@@ -392,9 +400,8 @@ function fillSimulationHistory() {
                 return info;
             }
             const newSelection = createSimSelection(config, simID);
-            // Note: we do NOT store the simulation in sim_selections because
-            // we don't really want to associate it with any currently running
-            // simulations. It is purely here as history.
+            // Note: Check to store the simulation in sim_selections because
+            // we only want running simulations in sim_selections.
             const meter = newSelection.querySelector(".radial-meter")
             if (info.is_done) {
                 meter.classList.add("complete");
@@ -404,6 +411,8 @@ function fillSimulationHistory() {
                 } else {
                     meter.classList.add("success");
                 }
+            } else {
+                sim_selections[simID] = newSelection;
             }
             console.log(info);
         });
@@ -525,7 +534,7 @@ imageTestBtn.addEventListener("click", displayVideoTest);
 startSimTestBtn.addEventListener("click", startSimTest);
 queryProgressTestBtn.addEventListener("click", testQueryProgress);
 stopSimTestBtn.addEventListener("click", stopSimTest);
-fillHistoryTestBtn.addEventListener("click", fillSimulationHistory);
+fillHistoryTestBtn.addEventListener("click", refreshSimulationSidebar);
 
 
 simTestTimestepsSlider.addEventListener("change", (e) => {
@@ -541,7 +550,7 @@ startSimBtn.addEventListener("click", startSimulation);
 setInterval(updateAllSimSelectionProgress, defaultSimProgressUpdateInterval);
 
 
-fillSimulationHistory();
+refreshSimulationSidebar();
 
 
 

@@ -40,14 +40,14 @@ class SimulationStartConfig(BaseModel):
             return obj
 
 class StoredSimulationInfo(BaseModel):
-    name:       str             = None
-    sim_id:     UUID            = None
-    created:    datetime        = None
-    started:    datetime        = None
-    ended:      datetime        = None
-    is_done:    bool            = False
-    cancelled:  bool            = False
-    failed:     bool            = False
+    name:       str                     = None
+    sim_id:     UUID                    = None
+    created:    Union[datetime, None]   = None
+    started:    Union[datetime, None]   = None
+    ended:      Union[datetime, None]   = None
+    is_done:    bool                    = False
+    cancelled:  bool                    = False
+    failed:     bool                    = False
     config:     SimulationStartConfig
 
 class InteractorChannelModel(BaseModel):

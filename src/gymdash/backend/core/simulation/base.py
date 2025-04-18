@@ -1,17 +1,15 @@
-import asyncio
 import logging
-import types
-from datetime import datetime
+import os
 from abc import abstractmethod
-from collections import defaultdict
-from threading import Thread, Lock
-from typing import Any, Dict, Iterable, List, Set, Tuple, Union, Callable, Literal, Protocol
-from typing_extensions import Self
+from datetime import datetime
+from threading import Lock, Thread
+from typing import (Any, Callable, Dict, Iterable, List, Literal, Set, Tuple,
+                    Union)
 from uuid import UUID, uuid4
-import functools
 
-from gymdash.backend.core.api.models import (SimulationInteractionModel,
-                                                 SimulationStartConfig)
+from typing_extensions import Self
+
+from gymdash.backend.core.api.models import SimulationStartConfig
 
 logger = logging.getLogger(__name__)
 
@@ -323,7 +321,32 @@ class Simulation():
         self._meta_create_time                  = datetime.now()
         self._meta_start_time                   = None
         self._meta_end_time                     = None
-        
+
+        self._project_info_set: bool            = False
+        self._project_sim_id: UUID              = None
+        self._project_sim_base_path: str             = None
+
+    @property
+    def sim_path(self) -> Union[str, None]:
+        if self._project_info_set:
+            return os.path.join(self._project_sim_base_path, str(self._project_sim_id))
+        else:
+            return None
+
+    def set_project_info(self, project_sim_base_path: str, sim_id: UUID):
+        """
+        Sets specific information that is only accessible from outside
+        a Simulation.
+
+        Args:
+            project_sim_base_path: Path to the folder where individual
+                simulation folders are stored.
+            sim_id: The ID of this Simulation as created elsewhere
+        """
+        self._project_info_set      = True
+        self._project_sim_id        = sim_id
+        self._project_sim_base_path = project_sim_base_path
+    
     def set_cancelled(self) -> None:
         with self._meta_mutex:
             self._meta_cancelled = True
