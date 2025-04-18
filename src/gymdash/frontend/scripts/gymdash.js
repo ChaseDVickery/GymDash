@@ -164,6 +164,7 @@ function setImageOutput(index, imgSrc) {
 function displayVideoTest() {
     dataUtils.getAllNewImages()
         .then((results) => {
+            console.log(results);
             for (let i = 0; i < results.length; i++) {
                 setImageOutput(i, results[i]);
             }

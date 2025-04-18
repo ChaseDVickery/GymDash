@@ -1,5 +1,5 @@
 
-// https://www.w3schools.com/howto/howto_js_tabs.asp
+// Modified from https://www.w3schools.com/howto/howto_js_tabs.asp
 function openTab(evt, tabID) {
     // Declare all variables
     var i, tabcontent, tablinks;
@@ -19,7 +19,6 @@ function openTab(evt, tabID) {
     }
     // Add "active" to the correct tab link
     for (const tablink of tablinks) {
-        console.log(tablink);
         if (tablink.dataset.tab === tabID) {
             tablink.classList.add("active");
             break;

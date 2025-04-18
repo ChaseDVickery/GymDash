@@ -4,7 +4,7 @@ import zipfile
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Union, Iterable
 
 try:
     from tensorboard.backend.event_processing.event_accumulator import (AudioEvent,
@@ -71,7 +71,9 @@ def event_to_media_format(event) -> Union[FileFormat, None]:
     if fformat is None:
         logger.warning(f"Cannot guess event media format for type '{type(event)}'. You may need to install tensorboard.")
     return fformat
-    
+
+# def zips_to_zip(zips: Iterable[io.BytesIO]):
+#     pass
 
 def pack_streamer_media_to_zip(streamer_key: str, key_event_map: Dict[str, List[Any]]):
     """ Packs media data from a single streamer into zipped bytes.
@@ -143,7 +145,7 @@ def get_recent_media_from_tag(media_tag: str):
 
     return zipped
 
-def get_recent_media_from_keys(keys: List[str]):
+def get_recent_media_from_keys(keys: List[str]) -> List[io.BytesIO]:
     # dictionary containing valid results from all streamers
     # with the key being each streamer's streamer_name/from
     # the StreamerRegistry key

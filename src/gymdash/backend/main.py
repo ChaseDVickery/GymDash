@@ -165,6 +165,8 @@ async def get_delete_all_simulations():
         return {}
     # Stop all current simulations and clear tracker
     responses = await simulation_tracker.clear()
+    # Clear streamer registry
+    StreamerRegistry.clear()
     # Clear backend DB of simulations
     ProjectManager.delete_all_simulations_immediate()
     return responses
