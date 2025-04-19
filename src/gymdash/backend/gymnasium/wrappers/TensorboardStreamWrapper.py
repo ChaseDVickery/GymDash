@@ -29,15 +29,19 @@ if not _has_tensorboard:
 
 class TensorboardStreamWrapper(gym.Wrapper):
 
-    def __init__(self, env: gym.Env, tb_log: str, keys: Union[List[str],None]=None, tag_key_map: Union[Dict[str,List[str]],None]=None):
+    def __init__(self, env: gym.Env, tb_log: str, tag_key_map: Union[Dict[str,List[str]],None]=None):
         super().__init__(env)
         self.tb_log_path: str                           = tb_log
         self._tb_exists: bool                           = False
         self._ea: event_accumulator.EventAccumulator    = None
-        self.keys: Set[str]                             = set(keys) if keys else []
+        # self.keys: Set[str]                             = set(keys) if keys else set()
+        if tag_key_map is None:
+            self.keys = set()
+        else:
+            self.keys = set([x for xs in tag_key_map.values() for x in xs])
 
         self.tag_key_map: Dict[str, Set[str]] = {
-            ANY_TAG: set(keys),
+            ANY_TAG: set(),
             tag_types.TENSORS:                  set(),
             tag_types.RUN_METADATA:             set(),
             tag_types.COMPRESSED_HISTOGRAMS:    set(),
@@ -47,7 +51,8 @@ class TensorboardStreamWrapper(gym.Wrapper):
             tag_types.SCALARS:                  set(),
         }
         self.key_tag_map: Dict[str, Set[str]] = {
-            key: set((ANY_TAG,)) for key in keys
+            # key: set((ANY_TAG,)) for key in self.keys
+            key: set() for key in self.keys
         }
         self.add_tag_keys(tag_key_map)
 
@@ -57,6 +62,12 @@ class TensorboardStreamWrapper(gym.Wrapper):
         # is only under a SINGLE tag in streamed_tag_exclusive even if that stat
         # has multiple associated_tags.
         self.streamed_tag_exclusive: Dict[str, Set[TensorboardStreamableStat]] = {}
+
+    def get_stat_keys(self):
+        # TODO: Don't be stupid. Please don't be stupied
+        # Every key should just have one, specific tag.
+        # You are overcomplicating this.
+        return [(key, list(self.key_tag_map[key])[0]) for key in self.keys]
         
     @property
     def streamer_name(self):
@@ -149,10 +160,11 @@ class TensorboardStreamWrapper(gym.Wrapper):
             return {stat.key: stat.get_recent() for stat in self._valid_stats(tag)}
         return {key: [] for key in self.streamed_tag_exclusive[tag]}
 
-    def get_recent_from_key(self, key:str):
+    def get_recent_from_key(self, key:str) -> List[Any]:
+        print(f"TensorboardStreamWrapper get_recent_from_key: '{key}'")
         if self.check_tb():
             self._ea.Reload()
             if key in self.streamed:
-                return {key: self.streamed[key].get_recent()}
+                return self.streamed[key].get_recent()
             else:
-                return {key: []}
+                return []

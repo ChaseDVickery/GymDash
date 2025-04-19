@@ -19,10 +19,9 @@ except ImportError:
     _has_sb = False
 
 from gymdash.backend.core.api.models import SimulationStartConfig
-from gymdash.backend.core.api.stream import StreamerRegistry
 from gymdash.backend.core.simulation.base import (Simulation)
 from gymdash.backend.core.simulation.manage import SimulationRegistry
-
+import gymdash.backend.core.api.config.stat_tags as stat_tags
 from gymdash.backend.gymnasium.wrappers.RecordVideoToTensorboard import \
     RecordVideoToTensorboard
 from gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import \
@@ -108,10 +107,13 @@ class StableBaselinesSimulation(Simulation):
         # the same streamer_name. In this case, the streamer_name checked is
         # just the tensorboard path (tb_path). This helps keep only one streamer
         # in charge of one tb folder.
-        env = StreamerRegistry.get_or_register(TensorboardStreamWrapper(
+        env = self.streamer.get_or_register(TensorboardStreamWrapper(
                 env,
                 tb_path,
-                ["rewards", "rollout/ep_rew_mean", "episode_video", "episode_video_thumbnail"]
+                {
+                    stat_tags.TB_SCALARS: ["rewards", "rollout/ep_rew_mean"],
+                    stat_tags.TB_IMAGES: ["episode_video", "episode_video_thumbnail"]
+                }
             ))
         # Record every X episodes to video.
         env = RecordVideo(

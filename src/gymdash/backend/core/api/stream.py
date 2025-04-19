@@ -1,5 +1,6 @@
 from abc import abstractmethod
-from typing import Dict, Any, List
+from uuid import UUID
+from typing import Dict, Any, List, Iterable
 
 class StreamableStat:
     """
@@ -58,6 +59,9 @@ class Streamer:
         self.source_reader = new_reader
         self._source_exists = False
         self.streamed.clear()
+
+    def get_stat_keys(self) -> Iterable[str]:
+        return self.keys
 
     # https://github.com/tensorflow/tensorboard/blob/master/tensorboard/backend/event_processing/event_accumulator.py#L940
     @abstractmethod

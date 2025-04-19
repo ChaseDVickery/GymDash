@@ -38,6 +38,9 @@ class SimulationStartConfig(BaseModel):
             )
         else:
             return obj
+        
+class SimulationIDModel(BaseModel):
+    id:         UUID
 
 class StoredSimulationInfo(BaseModel):
     name:       str                     = None

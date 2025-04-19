@@ -6,9 +6,8 @@ from threading import Lock, Thread
 from typing import (Any, Callable, Dict, Iterable, List, Literal, Set, Tuple,
                     Union)
 from uuid import UUID, uuid4
-
+from collections import defaultdict
 from typing_extensions import Self
-
 from gymdash.backend.core.api.models import SimulationStartConfig
 
 logger = logging.getLogger(__name__)
@@ -292,6 +291,90 @@ class SimulationInteractor:
         else:
             return False
         
+class SimulationStreamer:
+    def __init__(self) -> None:
+        self.log_map:       Dict[str, Any] = {}
+        self.key_log_map:   Dict[str, str] = {}
+        self._dirty_keys = True
+        self._dirty_tag_key_map = True
+        self._cached_keys = []
+        self._cached_tag_key_map = {}
+        
+
+    def get_all_keys(self) -> List[Tuple[str, str]]:
+        """
+        Return a list of all stat keys and their associated
+        media tags used across all streamers.
+        """
+        # Use cached version
+        if not self._dirty_keys:
+            return self._cached_keys
+        # Remake cached version
+        stat_keys = []
+        for streamer in self.streamers():
+            stat_keys.extend(streamer.get_stat_keys())
+        self._cached_keys = stat_keys
+        self._dirty_keys = False
+        return self._cached_keys
+    def get_tag_key_map(self) -> Dict[str, Set[str]]:
+        """
+        Return a dictionary mapping each used tag to a
+        set of stat keys that are under that tag.
+        """
+        # Use cacned version
+        if not self._dirty_tag_key_map:
+            return self._cached_tag_key_map
+        # Remake cached version
+        self._cached_tag_key_map = defaultdict(set)
+        keys = self.get_all_keys()
+        for key, tag in keys:
+            self._cached_tag_key_map[tag].add(key)
+        self._dirty_tag_key_map = False
+        return self._cached_tag_key_map
+    def get_streamer_for_key(self, key):
+        if key in self.key_log_map:
+            return self.get_streamer(self.key_log_map[key])
+        return None
+
+    def clear(self):
+        self.log_map.clear()
+        self.key_log_map.clear()
+        self._cached_tag_key_map.clear()
+        self._cached_keys.clear()
+
+    def get_streamer(self, log_key: str):
+        return self.log_map[log_key] if log_key in self.log_map else None
+
+    def _get_or_register(self, log_key: str, streamer: Any):
+        retrieved = self.get_streamer(log_key)
+        if retrieved:
+            print(f"Got existing streamer from '{log_key}'")
+            return retrieved
+        else:
+            if self.register(log_key, streamer):
+                print(f"Registered new streamer to '{log_key}'")
+                return streamer
+            else:
+                raise ValueError(f"No existing streamer with name '{log_key}' found, but unable to register")
+            
+    def get_or_register(self, streamer: Any):
+        return self._get_or_register(streamer.streamer_name, streamer)
+    
+    def register(self, log_key: str, streamer: Any):
+        if (log_key in self.log_map):
+            return False
+        self.log_map[log_key] = streamer
+        # Add stat keys from the streamer to my map
+        for stat_key, tag in streamer.get_stat_keys():
+            self.key_log_map[stat_key] = log_key
+        print(f"Register streamer '{log_key}'")
+        return True
+    
+    def items(self):
+        return self.log_map.items()
+    
+    def streamers(self):
+        return self.log_map.values()
 
 class Simulation():
 
@@ -305,6 +388,7 @@ class Simulation():
         self.thread: Thread                     = None
         self.start_kwargs                       = None
         self.interactor                         = SimulationInteractor()
+        self.streamer                           = SimulationStreamer()
         self.kwarg_defaults                     = self.create_kwarg_defaults()
         self._callback_map: Dict[str, List[Callable[[Simulation], Simulation]]] = {
             Simulation.START_SETUP:     [],

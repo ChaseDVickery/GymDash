@@ -162,15 +162,29 @@ function setImageOutput(index, imgSrc) {
     testImageOutputs[index].src = imgSrc;
 }
 function displayVideoTest() {
-    dataUtils.getAllNewImages()
-        .then((results) => {
-            console.log(results);
-            for (let i = 0; i < results.length; i++) {
-                setImageOutput(i, results[i]);
+    // dataUtils.getAllNewImages()
+    //     .then((mediaReport) => {
+    //         console.log(`mediaReport for ${mediaReport.simID}: ${mediaReport}`);
+    //         for (let i = 0; i < mediaReport.media["image/gif"].length; i++) {
+    //             setImageOutput(i, results[i]);
+    //         }
+    //     })
+    //     .catch((error) => {
+
+    //     });
+
+    const selectionOptions = document.querySelectorAll(".sim-selection-checkbox");
+    const randomSelection = selectionOptions[Math.floor(Math.random()*selectionOptions.length)];
+    const simID = randomSelection.id;
+    console.log(`Getting new media for random selection: ${simID}`);
+    dataUtils.getSimNewMedia(simID)
+        .then((mediaReport) => {
+            console.log(`mediaReport for ${mediaReport.simID}: ${mediaReport}`);
+            console.log(mediaReport.media["image/gif"]);
+            for (let i = 0; i < mediaReport.media["image/gif"].length; i++) {
+                console.log(mediaReport.media["image/gif"][i]);
+                setImageOutput(i, mediaReport.media["image/gif"][i].url);
             }
-            // console.log(results);
-            // const gif_src = mediaUtils.binaryToGIF(results);
-            // imageTestOut.src = gif_src;
         })
         .catch((error) => {
 

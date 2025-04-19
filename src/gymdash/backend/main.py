@@ -18,10 +18,10 @@ from fastapi.responses import (FileResponse, JSONResponse, Response,
 
 import gymdash
 from gymdash.backend.core.api.config.config import tags
-from gymdash.backend.core.api.models import (SimulationInteractionModel,
+from gymdash.backend.core.api.models import (SimulationIDModel,
+                                             SimulationInteractionModel,
                                              SimulationStartConfig,
                                              StoredSimulationInfo)
-from gymdash.backend.core.api.stream import StreamerRegistry
 from gymdash.backend.core.patch.patcher import apply_extension_patches
 from gymdash.backend.core.simulation.examples import \
     register_example_simulations
@@ -29,7 +29,9 @@ from gymdash.backend.core.simulation.export import SimulationExporter
 from gymdash.backend.core.simulation.manage import (SimulationRegistry,
                                                     SimulationTracker)
 from gymdash.backend.core.utils.usage import *
-from gymdash.backend.core.utils.zip import get_recent_media_generator_from_keys
+# from gymdash.backend.core.utils.zip import get_recent_media_generator_from_keys
+from gymdash.backend.core.utils.zip import \
+    get_recent_media_from_simulation_generator
 from gymdash.backend.project import ProjectManager
 
 logger = logging.getLogger(__name__)
@@ -132,9 +134,30 @@ async def get_resource_usage_gpu():
 
 @app.get("/all-recent-images")
 async def get_all_recent_images():
+    raise HTTPException(status_code=404, detail="all-recent-images endpoint is not implemented")
+    sim = list(simulation_tracker.done_sim_map.values())[0]
     return StreamingResponse(
-        content=get_recent_media_generator_from_keys(
-            ["episode_video", "episode_video_thumbnail"]
+        content=get_recent_media_from_simulation_generator(
+            sim,
+            media_tags=[],
+            stat_keys=["episode_video", "episode_video_thumbnail"]
+        ),
+        media_type="application/zip"
+    )
+
+@app.post("/sim-recent-media")
+async def get_sim_recent_media(sim_id: SimulationIDModel):
+    sim = simulation_tracker.get_sim(sim_id.id)
+    if sim is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"sim-recent-media endpoint found no simulation with id '{sim_id.id}'"
+        )
+    return StreamingResponse(
+        content=get_recent_media_from_simulation_generator(
+            sim,
+            media_tags=[],
+            stat_keys=["episode_video", "episode_video_thumbnail"]
         ),
         media_type="application/zip"
     )
@@ -165,8 +188,6 @@ async def get_delete_all_simulations():
         return {}
     # Stop all current simulations and clear tracker
     responses = await simulation_tracker.clear()
-    # Clear streamer registry
-    StreamerRegistry.clear()
     # Clear backend DB of simulations
     ProjectManager.delete_all_simulations_immediate()
     return responses
@@ -175,32 +196,33 @@ async def get_delete_all_simulations():
     
 @app.get("/all-recent-scalars")
 async def get_all_recent_scalars():
-    for streamer in StreamerRegistry.streamers():
-        recent = streamer.get_recent_from_tag(tags.TB_SCALARS)
-        return recent
+    raise HTTPException(status_code=404, detail="all-recent-scalars endpoint is not implemented")
+    # for streamer in StreamerRegistry.streamers():
+    #     recent = streamer.get_recent_from_tag(tags.TB_SCALARS)
+    #     return recent
 
-@app.get("/read-key/")
-async def get_read_test(exp_key: str, key: str, recent: bool = True):
-    """
-    Parameters:
-        exp_key:    The experiment key. Points towards the
-            internal tb file containing the stats.
-        key:        The scalar stat key to query.
-        recent:     If true, only queries and returns the
-            most recently acquired values from the key.
-            If false, returns the entire data sequence.
-    """
-    streamer = StreamerRegistry.get_streamer(exp_key)
-    print(f"Got streamer: '{streamer}'")
-    if not streamer:
-        print(f"No streamer '{exp_key}'")
-        return {}
-    else:
-        try:
-            recent = streamer.get_all_recent()
-            print(recent)
-            return recent
-        except Exception as e:
-            print(f"caught exception: {e}")
-            traceback.print_exc()
-        return {}
+# @app.get("/read-key/")
+# async def get_read_test(exp_key: str, key: str, recent: bool = True):
+#     """
+#     Parameters:
+#         exp_key:    The experiment key. Points towards the
+#             internal tb file containing the stats.
+#         key:        The scalar stat key to query.
+#         recent:     If true, only queries and returns the
+#             most recently acquired values from the key.
+#             If false, returns the entire data sequence.
+#     """
+#     streamer = StreamerRegistry.get_streamer(exp_key)
+#     print(f"Got streamer: '{streamer}'")
+#     if not streamer:
+#         print(f"No streamer '{exp_key}'")
+#         return {}
+#     else:
+#         try:
+#             recent = streamer.get_all_recent()
+#             print(recent)
+#             return recent
+#         except Exception as e:
+#             print(f"caught exception: {e}")
+#             traceback.print_exc()
+#         return {}
