@@ -42,6 +42,12 @@ class SimulationStartConfig(BaseModel):
 class SimulationIDModel(BaseModel):
     id:         UUID
 
+class StatQuery(BaseModel):
+    id:         UUID    # Simulation ID
+    tags:       List[str]   = [] # tag types to include
+    keys:       List[str]   = [] # keys to include
+    exclusion_mode: bool    = False # exclusion mode
+
 class StoredSimulationInfo(BaseModel):
     name:       str                     = None
     sim_id:     UUID                    = None

@@ -21,7 +21,7 @@ from gymdash.backend.core.api.config.config import tags
 from gymdash.backend.core.api.models import (SimulationIDModel,
                                              SimulationInteractionModel,
                                              SimulationStartConfig,
-                                             StoredSimulationInfo)
+                                             StoredSimulationInfo, StatQuery)
 from gymdash.backend.core.patch.patcher import apply_extension_patches
 from gymdash.backend.core.simulation.examples import \
     register_example_simulations
@@ -31,7 +31,7 @@ from gymdash.backend.core.simulation.manage import (SimulationRegistry,
 from gymdash.backend.core.utils.usage import *
 # from gymdash.backend.core.utils.zip import get_recent_media_generator_from_keys
 from gymdash.backend.core.utils.zip import \
-    get_recent_media_from_simulation_generator
+    get_recent_media_from_simulation_generator, get_recent_from_simulation_generator
 from gymdash.backend.project import ProjectManager
 
 logger = logging.getLogger(__name__)
@@ -200,6 +200,25 @@ async def get_all_recent_scalars():
     # for streamer in StreamerRegistry.streamers():
     #     recent = streamer.get_recent_from_tag(tags.TB_SCALARS)
     #     return recent
+
+@app.post("/all-recent")
+async def get_recent(query: StatQuery):
+    sim = simulation_tracker.get_sim(query.id)
+    if sim is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"all-recent endpoint found no simulation with id '{query.id}'"
+        )
+    return StreamingResponse(
+        content=get_recent_from_simulation_generator(
+            sim,
+            media_tags=query.tags,
+            stat_keys=query.keys,
+            exclusion_mode=query.exclusion_mode
+        ),
+        media_type="application/zip"
+    )
+    
 
 # @app.get("/read-key/")
 # async def get_read_test(exp_key: str, key: str, recent: bool = True):

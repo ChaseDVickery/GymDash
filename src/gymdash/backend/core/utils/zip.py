@@ -1,14 +1,15 @@
 import io
 import json
-import zipfile
 import logging
+import zipfile
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Any, Dict, List, Union, Iterable
+from typing import Any, Dict, Iterable, List, Union
 
 try:
-    from tensorboard.backend.event_processing.event_accumulator import (AudioEvent,
-                                                                    ImageEvent)
+    from tensorboard.backend.event_processing.event_accumulator import (
+        AudioEvent, CompressedHistogramEvent, HistogramEvent, ImageEvent,
+        ScalarEvent)
     _has_tensorboard = True
 except ImportError:
     _has_tensorboard = False
@@ -22,7 +23,6 @@ from gymdash.backend.core.utils.file_format import (FileFormat,
                                                     format_from_bytes)
 from gymdash.backend.core.utils.json import DataclassJSONEncoder
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -32,14 +32,34 @@ class MediaMetadata:
 
     Attributes:
       mimetype: MIME type of file.
+      step: The step at which the media was recorded
     """
+    key: str            # stat key
     mimetype: str       # MIME type of the media
     step:   int         # step of the logged media
+
+@dataclass(frozen=True)
+class JSONMetadata:
+    """Contains information for JSON-formatted data.
+    Usually for a sequence of values.
+
+    Attributes:
+      mimetype: MIME type of file. Should always be 'application/json'
+    """
+    key: str
+    mimetype: str  = "application/json"
 
 @dataclass(frozen=True)
 class ZippedMediaFile:
     streamer_key: str
     metadata: Dict[str, MediaMetadata]
+    sim_id: str         = ""
+
+@dataclass(frozen=True)
+class ZippedIndex:
+    streamer_key: str
+    # Map types to dict mapping filenames to metadata
+    metadata: Dict[str, Dict[str, Union[MediaMetadata, JSONMetadata]]]
     sim_id: str         = ""
 
 
@@ -223,10 +243,10 @@ def pack_simulation_streamer_media_to_zip(sim: Simulation, key_event_map: Dict[s
                 filename = file_prefix + str(i) + f".{ext}"
                 if isinstance(event, ImageEvent):
                     zip_file.writestr(filename, event.encoded_image_string)
-                    media_index[filename] = MediaMetadata(mimetype=mime_type, step=event.step)
+                    media_index[filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step)
                 elif isinstance(event, AudioEvent):
                     zip_file.writestr(filename, event.encoded_audio_string)
-                    media_index[filename] = MediaMetadata(mimetype=mime_type, step=event.step)
+                    media_index[filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step)
         # Add the index file to the zip
         index_data = ZippedMediaFile(streamer_key="", sim_id=str(sim._project_sim_id), metadata=media_index)
         zip_file.writestr("index.json", json.dumps(index_data, cls=DataclassJSONEncoder))
@@ -278,4 +298,145 @@ def get_recent_media_from_simulation(sim: Simulation, media_tags: List[str]=[], 
 
 def get_recent_media_from_simulation_generator(sim: Simulation, media_tags: List[str]=[], stat_keys: List[str]=[]):
     zip_buffer = get_recent_media_from_simulation(sim, media_tags, stat_keys)
+    yield zip_buffer.getvalue()
+
+
+
+
+
+
+
+
+
+
+def pack_simulation_events_to_zip(sim: Simulation, key_event_map: Dict[str, List[Any]]):
+    """ Packs media data from a single streamer into zipped bytes.
+
+    Zips up events from a streamer, creating a new file
+    from each media event and a new file for each scalar stat.
+    Includes an index file with information on each internal file.
+
+    Args:
+        sim: Simulation object to pack
+        key_event_map: Maps stat keys to a list of events containing
+            information that must be zipped.
+    Returns:
+        Bytes buffer of the zipped information.
+    """
+    zip_buffer = io.BytesIO()
+    streamer = sim.streamer
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        index = {
+            "scalars": {},
+            "images": {},
+            "audio": {},
+        }
+        # For each stat key, manage them appropriately
+        for key, events in key_event_map.items():
+            # Manage scalar key by stuffing into JSON file
+            if streamer.key_has_tag(key, tags.TB_SCALARS):
+                filename = f"{key}_scalars.json"
+                zip_file.writestr(filename, json.dumps(
+                    [{
+                        "wall_time": event.wall_time,
+                        "step": event.step,
+                        "value": event.value
+                    } for event in events]
+                ))
+                index["scalars"][filename] = JSONMetadata(key=key)
+                logger.info(f"packing scalars for key '{key}' to file '{filename}'")
+            # Manage media keys (images, audio)
+            elif    streamer.key_has_tag(key, tags.TB_IMAGES) or \
+                    streamer.key_has_tag(key, tags.TB_AUDIO):
+                file_prefix = f"{key}_"
+                for i, event in enumerate(events):
+                    # Get true file format from event point data
+                    media_format = event_to_media_format(event)
+                    if media_format is None:
+                        raise RuntimeError(f"No valid media format found for event '{event}' for key '{key}'")
+                    mime_type = media_format.mime if media_format.has_mimetype else ""
+                    ext = media_format.ext if media_format.has_extension else ""
+                    filename = file_prefix + str(i) + f".{ext}"
+                    if isinstance(event, ImageEvent):
+                        zip_file.writestr(filename, event.encoded_image_string)
+                        index["images"][filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step)
+                        logger.info(f"packing image for key '{key}' at step '{event.step}' to file '{filename}'")
+                    elif isinstance(event, AudioEvent):
+                        zip_file.writestr(filename, event.encoded_audio_string)
+                        index["audio"][filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step)
+                        logger.info(f"packing audio for key '{key}' at step '{event.step}' to file '{filename}'")
+        # Add the index file to the zip
+        index_data = ZippedIndex(streamer_key="", sim_id=str(sim._project_sim_id), metadata=index)
+        zip_file.writestr("index.json", json.dumps(index_data, cls=DataclassJSONEncoder))
+        logger.info(f"packing index.json")
+    zip_buffer.seek(0)
+    return zip_buffer
+
+def get_recent_from_simulation(
+        sim: Simulation,
+        media_tags: List[str]=[],
+        stat_keys: List[str]=[],
+        exclusion_mode: bool = False
+    ) -> io.BytesIO:
+    """
+    Returns a zip file of all data generated by the Simulation.
+
+    Args:
+        sim: Simulation from which we retrieve data.
+        media_tags: List of stat types to retrieve. When exclusion_mode is False
+            all keys from all tags in media_tags will be retrieved. When True,
+            we exclude all keys from all tags in media_tags.
+        stat_keys: List of keys to explicitly include. When exclusion_mode is
+            True, stat_keys indicates specific keys that should be excluded
+            from the final data.
+        exclusion_mode: When false, media_tags and stat_keys act inclusively
+            from an empty default. i.e. we only return those keys included by
+            media_tags or stat_keys. When true, we include all keys by default
+            and media_tags and stat_keys indicate which keys and tag types to
+            exclude from the final result.
+    """
+    logger.info(f"get_recent_from_simulation: {sim._project_sim_id}, tags={media_tags}, keys={stat_keys}, exclusion_mode={exclusion_mode}")
+    tag_key_map = sim.streamer.get_tag_key_map()
+    tag_key_set = set()
+    for tag in media_tags:
+        if tag in tag_key_map:
+            tag_key_set.update([key for key_list in tag_key_map[tag] for key in key_list])
+    specific_key_set = set(stat_keys)
+    # In exclusion_mode, we include all keys by default
+    if exclusion_mode:
+        final_keys = set([key for key, tag in sim.streamer.get_all_keys()])
+        # Now exclude all keys from tags or specific
+        final_keys.difference_update(tag_key_set.union(specific_key_set))
+    else:
+        # When not exclusionary, set the final keys to the
+        # union of tag keys and specific keys
+        final_keys = tag_key_set.union(specific_key_set)
+    logger.info(f"get_recent_from_simulation final keys: {final_keys}")
+    
+    # dictionary containing valid results from all streamers
+    # with the key being each stat key and the values being
+    # a list of the key's new events
+    # Maps [stat key -> List[tb event value]]
+    streamer_responses: Dict[str, List[Any]] = {}
+    for key in final_keys:
+        streamer = sim.streamer.get_streamer_for_key(key)
+        streamer_responses[key] = streamer.get_recent_from_key(key)
+        logger.info(f"Got {len(streamer_responses[key])} recent from key '{key}'")
+    
+    zip_buffer = pack_simulation_events_to_zip(sim, streamer_responses)
+    with zipfile.ZipFile(zip_buffer, "r") as zip:
+        print(f"zip file for sim '{sim._project_sim_id}': {zip.filelist}")
+        print("index: ", zip.open("index.json").read())
+
+    zip_buffer.seek(0)
+    return zip_buffer
+
+def get_recent_from_simulation_generator(
+    sim: Simulation,
+    media_tags: List[str]=[],
+    stat_keys: List[str]=[],
+    exclusion_mode: bool = False
+):
+    logger.info(f"get_recent_from_simulation_generator: {sim._project_sim_id}, tags={media_tags}, keys={stat_keys}, exclusion_mode={exclusion_mode}")
+    zip_buffer = get_recent_from_simulation(sim, media_tags, stat_keys, exclusion_mode)
     yield zip_buffer.getvalue()

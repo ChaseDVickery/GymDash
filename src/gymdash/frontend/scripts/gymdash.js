@@ -173,18 +173,34 @@ function displayVideoTest() {
 
     //     });
 
+
+
+    // const selectionOptions = document.querySelectorAll(".sim-selection-checkbox");
+    // const randomSelection = selectionOptions[Math.floor(Math.random()*selectionOptions.length)];
+    // const simID = randomSelection.id;
+    // console.log(`Getting new media for random selection: ${simID}`);
+    // dataUtils.getSimNewMedia(simID)
+    //     .then((mediaReport) => {
+    //         console.log(`mediaReport for ${mediaReport.simID}: ${mediaReport}`);
+    //         console.log(mediaReport.media["image/gif"]);
+    //         for (let i = 0; i < mediaReport.media["image/gif"].length; i++) {
+    //             console.log(mediaReport.media["image/gif"][i]);
+    //             setImageOutput(i, mediaReport.media["image/gif"][i].url);
+    //         }
+    //     })
+    //     .catch((error) => {
+
+    //     });
+
+
     const selectionOptions = document.querySelectorAll(".sim-selection-checkbox");
     const randomSelection = selectionOptions[Math.floor(Math.random()*selectionOptions.length)];
     const simID = randomSelection.id;
     console.log(`Getting new media for random selection: ${simID}`);
-    dataUtils.getSimNewMedia(simID)
+    dataUtils.getRecent(simID, [], [], true)
         .then((mediaReport) => {
-            console.log(`mediaReport for ${mediaReport.simID}: ${mediaReport}`);
-            console.log(mediaReport.media["image/gif"]);
-            for (let i = 0; i < mediaReport.media["image/gif"].length; i++) {
-                console.log(mediaReport.media["image/gif"][i]);
-                setImageOutput(i, mediaReport.media["image/gif"][i].url);
-            }
+            console.log("Got media report.");
+            console.log(mediaReport);
         })
         .catch((error) => {
 

@@ -297,10 +297,16 @@ class SimulationStreamer:
         self.key_log_map:   Dict[str, str] = {}
         self._dirty_keys = True
         self._dirty_tag_key_map = True
+        self._dirty_key_tag_map = True
         self._cached_keys = []
         self._cached_tag_key_map = {}
+        self._cached_key_tag_map = {}
         
 
+    def key_has_tag(self, key: str, tag: str) -> bool:
+        return key in self.get_key_tag_map() and tag in self.get_key_tag_map()[key]
+    def tag_has_key(self, tag: str, key: str) -> bool:
+        return tag in self.get_tag_key_map() and key in self.get_tag_key_map()[tag]
     def get_all_keys(self) -> List[Tuple[str, str]]:
         """
         Return a list of all stat keys and their associated
@@ -321,7 +327,7 @@ class SimulationStreamer:
         Return a dictionary mapping each used tag to a
         set of stat keys that are under that tag.
         """
-        # Use cacned version
+        # Use cached version
         if not self._dirty_tag_key_map:
             return self._cached_tag_key_map
         # Remake cached version
@@ -331,6 +337,22 @@ class SimulationStreamer:
             self._cached_tag_key_map[tag].add(key)
         self._dirty_tag_key_map = False
         return self._cached_tag_key_map
+    def get_key_tag_map(self) -> Dict[str, Set[str]]:
+        """
+        Return a dictionary mapping each used key to a
+        set of tags that are associated with that key.
+        """
+        # Use cached version
+        if not self._dirty_key_tag_map:
+            return self._cached_key_tag_map
+        # Remake cached version
+        self._cached_key_tag_map = defaultdict(set)
+        keys = self.get_all_keys()
+        for key, tag in keys:
+            self._cached_key_tag_map[key].add(tag)
+        self._dirty_key_tag_map = False
+        return self._cached_key_tag_map
+    
     def get_streamer_for_key(self, key):
         if key in self.key_log_map:
             return self.get_streamer(self.key_log_map[key])
