@@ -2,8 +2,6 @@ import { resourceUsageUtils, resourceUsageDisplayUtils } from "./utils/usage.js"
 import { dataUtils } from "./utils/data.js";
 import { mediaUtils } from "./utils/media_utils.js";
 import { apiURL } from "./utils/api_link.js";
-// import * as d3 from "./libraries/d3.js";
-// import { range } from "./libraries/d3.js";
 
 console.log(d3);
 console.log(JSZip);
@@ -35,6 +33,14 @@ const noID = "00000000-0000-0000-0000-000000000000"; // (str(UUID))
 // Structures
 // sim_selections store information
 let sim_selections = {};
+// allData stores all the data retrieved from the backend
+// Maps in the following way:
+//      simID -> {
+//          "scalars" -> {stat_key1_s -> [], ...},
+//          "images" -> {stat_key1_i -> [], ...},
+//          "audio" -> {stat_key1_a -> [], ...}
+//      }
+let allData = {};
 
 // Elements
 const simSidebar = document.querySelector(".sim-selection-sidebar");
@@ -52,10 +58,16 @@ const startSimBtn               = startPanel.querySelector("#start-sim-btn");
 
 
 // Prefabs
-const prefabSimSelectBox    = document.querySelector(".prefab.sim-selection-box");
-const prefabKwarg        = document.querySelector(".prefab.kwarg");
+const prefabSimSelectBox        = document.querySelector(".prefab.sim-selection-box");
+const prefabKwarg               = document.querySelector(".prefab.kwarg");
+const prefabImageMedia          = document.querySelector(".prefab.multimedia-instance-panel.image-instance-panel");
+const prefabAudioMedia          = document.querySelector(".prefab.multimedia-instance-panel.audio-instance-panel");
+const prefabVideoMedia          = document.querySelector(".prefab.multimedia-instance-panel.video-instance-panel");
 prefabSimSelectBox.parentElement.removeChild(prefabSimSelectBox);
 prefabKwarg.parentElement.removeChild(prefabKwarg);
+prefabImageMedia.parentElement.removeChild(prefabImageMedia);
+prefabAudioMedia.parentElement.removeChild(prefabAudioMedia);
+prefabVideoMedia.parentElement.removeChild(prefabVideoMedia);
 
 const testImageOutputs = []
 
@@ -193,17 +205,63 @@ function displayVideoTest() {
     //     });
 
 
+    // const selectionOptions = document.querySelectorAll(".sim-selection-checkbox");
+    // const randomSelection = selectionOptions[Math.floor(Math.random()*selectionOptions.length)];
+    // const simID = randomSelection.id;
+    // console.log(`Getting new media for random selection: ${simID}`);
+    // dataUtils.getRecent(simID, [], [], true)
+    //     .then((mediaReport) => {
+    //         console.log("Got media report.");
+    //         console.log(mediaReport);
+    //     })
+    //     .catch((error) => {
+
+    //     });
+
+
+    updateData();
+}
+
+
+function updateData() {
+    // const selectionOptions = document.querySelectorAll(".sim-selection-checkbox");
+    // const randomSelection = selectionOptions[Math.floor(Math.random()*selectionOptions.length)];
+    // const simID = randomSelection.id;
+    const dataRetrievalPromises = [];
+    const allDataReports = [];
     const selectionOptions = document.querySelectorAll(".sim-selection-checkbox");
-    const randomSelection = selectionOptions[Math.floor(Math.random()*selectionOptions.length)];
-    const simID = randomSelection.id;
-    console.log(`Getting new media for random selection: ${simID}`);
-    dataUtils.getRecent(simID, [], [], true)
-        .then((mediaReport) => {
-            console.log("Got media report.");
-            console.log(mediaReport);
+    for (let i = 0; i < selectionOptions.length; i++) {
+        const simID = selectionOptions[i].id;
+        console.log(`Getting new data for sim: ${simID}`);
+        dataRetrievalPromises.push(
+            dataUtils.getRecent(simID, [], [], true)
+                .then((dataReport) => {
+                    console.log("Got data report.");
+                    console.log(dataReport);
+                    allDataReports.push(dataReport);
+                    return Promise.resolve(dataReport);
+                })
+                .catch((error) => {
+
+                })
+        );
+    }
+    Promise.all(dataRetrievalPromises)
+        .then((allDataReports) => {
+            // Add the data from each new report to the current
+            // allData report
+            for (let j = 0; j < allDataReports.length; j++) {
+                const simID = allDataReports[j].simID;
+                if (!Object.hasOwn(allData, simID)) {
+                    allData[simID] = dataUtils.createEmptyDataReport(simID);
+                }
+                dataUtils.dataReportUnion(allData[simID], allDataReports[j]);
+            }
+            console.log("ALL DATA");
+            console.log(allData);
         })
         .catch((error) => {
-
+            console.error(`Error processing all data reports: ${error}`)
         });
 }
 
@@ -645,7 +703,7 @@ setInterval(updateAllSimSelectionProgress, defaultSimProgressUpdateInterval);
 
 
 refreshSimulationSidebar();
-openTab(null, "tab-control");
+openTab(null, "tab-analyze");
 
 
 function polyline(T, Y, tscale, yscale) {

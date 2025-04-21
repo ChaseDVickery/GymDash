@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="styles/sidebar.css">
     <link rel="stylesheet" href="styles/config.css">
     <link rel="stylesheet" href="styles/panel-control.css">
+    <link rel="stylesheet" href="styles/panel-analyze.css">
 
     
     <!-- ALL OF THE SCRIPTS NEED type="module", APPARENTLY... -->
@@ -54,6 +55,39 @@
         <button class="contrast-box-opp hoverable remove-kwarg-btn">-</button>
         <input class="contrast-box hoverable key entry" type="text"></input>
         <input class="contrast-box hoverable value entry" type="text"></input>
+    </div>
+    <!-- Image media instance -->
+    <div class="prefab multimedia-instance-panel image-instance-panel">
+        <!-- Actual media (image, gif, audio player) goes here -->
+        <div class="media-area">
+            <img src="resources/imgs/placeholder.png" alt="">
+        </div>
+        <!-- Basically where captions go (key, step #, sim ID or name) -->
+        <p class="media-info">
+            This is a picture.
+        </p>
+    </div>
+    <!-- Audio media instance -->
+    <div class="prefab multimedia-instance-panel audio-instance-panel">
+        <!-- Actual media (image, gif, audio player) goes here -->
+        <div class="media-area">
+            <audio controls src="resources/audio/placeholder.wav"></audio>
+        </div>
+        <!-- Basically where captions go (key, step #, sim ID or name) -->
+        <p class="media-info">
+            This is some audio.
+        </p>
+    </div>
+    <!-- Video media instance -->
+    <div class="prefab multimedia-instance-panel video-instance-panel">
+        <!-- Actual media (image, gif, audio player) goes here -->
+        <div class="media-area">
+            <video src="" type=""></video>
+        </div>
+        <!-- Basically where captions go (key, step #, sim ID or name) -->
+        <p class="media-info">
+            This is some video.
+        </p>
     </div>
 
 
@@ -211,7 +245,76 @@
         
         
             <div class="tabcontent" id="tab-analyze">
-                <h3>ANALYZE</h3>
+                <div class="plots-panel analyze-panel content-panel">
+                    <p>Plots panel</p>
+                </div>
+                <div class="media-panel analyze-panel content-panel">
+                    <h3>Multimedia</h3>
+
+                    <div class="submedia-panel" id="video-panel">
+                        <h4>Videos</h4>
+                        <div class="media-instance-area">
+
+                        </div>
+                    </div>
+
+                    <div class="submedia-panel" id="image-panel">
+                        <h4>Images</h4>
+                        <div class="media-instance-area">
+                            <div class="multimedia-instance-panel image-instance-panel">
+                                <!-- Actual media (image, gif, audio player) goes here -->
+                                <div class="media-area">
+                                    <img src="resources/imgs/placeholder.png" alt="">
+                                </div>
+                                <!-- Basically where captions go (key, step #, sim ID or name) -->
+                                <p class="media-info">
+                                    This is a picture.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="submedia-panel" id="audio-panel">
+                        <h4>Audio</h4>
+                        <div class="media-instance-area" id="audio-media-area">
+                            <div class="prefab multimedia-instance-panel">
+                                <div class="media-area">
+                                    <audio controls src="resources/audio/placeholder.wav"></audio>
+                                </div>
+                                <p class="media-info">
+                                    This is some audio.
+                                </p>
+                            </div>
+        
+                            <div class="prefab multimedia-instance-panel">
+                                <div class="media-area">
+                                    <audio controls src="resources/audio/placeholder.wav"></audio>
+                                </div>
+                                <p class="media-info">
+                                    This is more audio.
+                                </p>
+                            </div>
+    
+                            <div class="prefab multimedia-instance-panel">
+                                <div class="media-area">
+                                    <audio controls src="resources/audio/placeholder.wav"></audio>
+                                </div>
+                                <p class="media-info">
+                                    This is more audio.
+                                </p>
+                            </div>
+    
+                            <div class="prefab multimedia-instance-panel">
+                                <div class="media-area">
+                                    <audio controls src="resources/audio/placeholder.wav"></audio>
+                                </div>
+                                <p class="media-info">
+                                    This is more audio.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         
         
