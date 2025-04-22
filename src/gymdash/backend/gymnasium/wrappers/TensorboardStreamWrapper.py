@@ -28,9 +28,53 @@ if not _has_tensorboard:
 
 
 class TensorboardStreamWrapper(gym.Wrapper):
-
     def __init__(self, env: gym.Env, tb_log: str, tag_key_map: Union[Dict[str,List[str]],None]=None):
         super().__init__(env)
+        self.streamer = TensorboardStreamer(tb_log, tag_key_map)
+
+    def reset(self, **kwargs) -> tuple[Any, dict[str, Any]]:
+        return self.env.reset(**kwargs)
+    
+    def render(self):
+        return self.env.render()
+    
+    def close(self):
+        return self.env.close()
+    
+    def step(self, action: Any) -> tuple[Any, SupportsFloat, bool, bool, dict[str, Any]]:
+        return self.env.step(action)
+    
+
+
+    def get_stat_keys(self):
+        return self.streamer.get_stat_keys()
+        
+    @property
+    def streamer_name(self):
+        return self.streamer.streamer_name
+        
+    def add_tag_keys(self, tag_key_map:Dict[str, Iterable[str]]):
+        self.streamer.add_tag_keys(tag_key_map)
+    
+    def set_log_path(self, new_path):
+        self.streamer.set_log_path(new_path)
+    
+    def get_all_from_tag(self, tag: str):
+        return self.streamer.get_all_from_tag(tag)
+    
+    def get_all_recent(self):
+        return self.streamer.get_all_recent()
+    
+    def get_recent_from_tag(self, tag: str):
+        return self.streamer.get_recent_from_tag(tag)
+
+    def get_recent_from_key(self, key:str) -> List[Any]:
+        return self.streamer.get_recent_from_key(key)
+    
+        
+
+class TensorboardStreamer:
+    def __init__(self, tb_log: str, tag_key_map: Union[Dict[str,List[str]],None]=None):
         self.tb_log_path: str                           = tb_log
         self._tb_exists: bool                           = False
         self._ea: event_accumulator.EventAccumulator    = None
@@ -96,18 +140,6 @@ class TensorboardStreamWrapper(gym.Wrapper):
                         self.key_tag_map[key] = set(tag)
         print(f"TensorboardStreamWrapper New tag_key_map: {self.tag_key_map}")
         print(f"TensorboardStreamWrapper New key_tag_map: {self.key_tag_map}")
-        
-    def reset(self, **kwargs) -> tuple[Any, dict[str, Any]]:
-        return self.env.reset(**kwargs)
-    
-    def render(self):
-        return self.env.render()
-    
-    def close(self):
-        return self.env.close()
-    
-    def step(self, action: Any) -> tuple[Any, SupportsFloat, bool, bool, dict[str, Any]]:
-        return self.env.step(action)
     
     def set_log_path(self, new_path):
         self.tb_log_path = new_path

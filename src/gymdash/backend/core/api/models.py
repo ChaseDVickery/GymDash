@@ -57,7 +57,11 @@ class StoredSimulationInfo(BaseModel):
     is_done:    bool                    = False
     cancelled:  bool                    = False
     failed:     bool                    = False
+    force_stopped: bool                 = False
     config:     SimulationStartConfig
+    start_kwargs: Dict[str, Any]        = {}
+    sim_type_name: str                  = None
+    sim_module_name: str                = None
 
 class InteractorChannelModel(BaseModel):
     triggered:  bool                = False

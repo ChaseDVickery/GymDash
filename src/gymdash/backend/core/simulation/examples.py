@@ -1,5 +1,6 @@
 import logging
 import os
+
 try:
     import gymnasium as gym
     from gymnasium.wrappers import RecordVideo
@@ -8,7 +9,8 @@ except ImportError:
     _has_gym = False
 try:
     from stable_baselines3.a2c import A2C
-    from stable_baselines3.common.logger import TensorBoardOutputFormat, configure
+    from stable_baselines3.common.logger import (TensorBoardOutputFormat,
+                                                 configure)
     from stable_baselines3.ddpg import DDPG
     from stable_baselines3.dqn import DQN
     from stable_baselines3.ppo import PPO
@@ -17,20 +19,21 @@ try:
     _has_sb = True
 except ImportError:
     _has_sb = False
+from typing import Any, Dict
 
-from gymdash.backend.core.api.models import SimulationStartConfig
-from gymdash.backend.core.simulation.base import (Simulation)
-from gymdash.backend.core.simulation.manage import SimulationRegistry
 import gymdash.backend.core.api.config.stat_tags as stat_tags
+from gymdash.backend.core.api.models import SimulationStartConfig
+from gymdash.backend.core.simulation.base import Simulation
+from gymdash.backend.core.simulation.manage import SimulationRegistry
+from gymdash.backend.core.utils.kwarg_utils import overwrite_new_kwargs
 from gymdash.backend.gymnasium.wrappers.RecordVideoToTensorboard import \
     RecordVideoToTensorboard
-from gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import \
-    TensorboardStreamWrapper
+from gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import (
+    TensorboardStreamer, TensorboardStreamWrapper)
+from gymdash.backend.project import ProjectManager
 from gymdash.backend.stable_baselines.callbacks import \
     SimulationInteractionCallback
 from gymdash.start import start
-from gymdash.backend.project import ProjectManager
-
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +62,21 @@ class StableBaselinesSimulation(Simulation):
             return lambda x: x%value==0
         else:
             return value
+        
+    
+        
+    def _create_streamers(self, kwargs: Dict[str, Any]):
+        experiment_name = f"{kwargs['env']}_{kwargs['algorithm']}"
+        tb_path = os.path.join("tb", experiment_name, "train")
+        if self._project_info_set:
+            tb_path = os.path.join(self.sim_path, tb_path)
+        self.streamer.get_or_register(TensorboardStreamer(
+            tb_path,
+            {
+                stat_tags.TB_SCALARS: ["rewards", "rollout/ep_rew_mean"],
+                stat_tags.TB_IMAGES: ["episode_video", "episode_video_thumbnail"]
+            }
+        ))
 
     def create_kwarg_defaults(self):
         return {

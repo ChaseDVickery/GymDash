@@ -712,7 +712,7 @@ function polyline(T, Y, tscale, yscale) {
     );
 }
 
-function test() {
+function test(nodeThing="body") {
     const margin = {top: 30, right: 30, bottom: 30, left: 60};
     const n = 10;
     const x = d3.range(0, n);
@@ -723,10 +723,12 @@ function test() {
     const width = 500;
     const height = 500;
     const svg = d3
-        .select("body")
+        .select(nodeThing)
         .append("svg")
-        .attr("width", width)
-        .attr("height", height)
+        .attr("viewBox", "0 0 700 500")
+        // .attr("preserveAspectRatio", "xMinYMin meet")
+        // .attr("width", width)
+        // .attr("height", height)
         .style("border", "1px solid black");
 
     const xScale = d3
@@ -760,7 +762,7 @@ function test() {
     // d3.select("body").append("svg", svg.node());
 }
 
-test();
+test("#plots-area");
 
 
 function plotVideosTest() {

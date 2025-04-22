@@ -1,14 +1,18 @@
 import logging
 import os
 from abc import abstractmethod
+from collections import defaultdict
 from datetime import datetime
 from threading import Lock, Thread
 from typing import (Any, Callable, Dict, Iterable, List, Literal, Set, Tuple,
                     Union)
 from uuid import UUID, uuid4
-from collections import defaultdict
+
 from typing_extensions import Self
-from gymdash.backend.core.api.models import SimulationStartConfig
+
+from gymdash.backend.core.api.models import (SimulationStartConfig,
+                                             StoredSimulationInfo)
+from gymdash.backend.core.utils.kwarg_utils import overwrite_new_kwargs
 
 logger = logging.getLogger(__name__)
 
@@ -418,6 +422,8 @@ class Simulation():
             Simulation.START_RUN:       [],
             Simulation.END_RUN:         [],
         }
+        self.force_stopped: bool                = False
+        self.from_disk: bool                    = False
 
         self._meta_mutex: Lock                  = Lock()
         self._meta_cancelled: bool              = False
@@ -438,6 +444,35 @@ class Simulation():
             return os.path.join(self._project_sim_base_path, str(self._project_sim_id))
         else:
             return None
+        
+    def fill_from_stored_info(self, info: StoredSimulationInfo):
+        self.from_disk = True
+        self._project_sim_id = info.sim_id
+        self.start_kwargs = info.start_kwargs
+        self._meta_cancelled = info.cancelled
+        self._meta_failed = info.failed
+        self._meta_create_time = info.created
+        self._meta_start_time = info.started
+        self._meta_end_time = info.ended
+        self.config = info.config
+        self.force_stopped = info.force_stopped
+        self.create_streamers()
+        
+    # Maybe something like you call this when you get or register streamer
+    # (new callback wrapper around streamer.get_or_register?)
+    def create_streamers(self, config: SimulationStartConfig = None, kwargs: Dict[str, Any] = None):
+        if config is None or config.kwargs is None:
+            config_kwargs = {}
+        else:
+            config_kwargs = config.kwargs
+        if kwargs is None:
+            kwargs = {}
+        self._create_streamers(
+            overwrite_new_kwargs(self.kwarg_defaults, config_kwargs, kwargs)
+        )
+    @abstractmethod
+    def _create_streamers(self, kwargs: Dict[str, Any]):
+        pass
 
     def set_project_info(self, project_sim_base_path: str, sim_id: UUID):
         """
@@ -468,7 +503,7 @@ class Simulation():
         return self.config.name
     @property
     def is_done(self) -> bool:
-        return not self.thread.is_alive()
+        return self.from_disk or self.force_stopped or not self.thread.is_alive() 
 
     def _overwrite_new_kwargs(self, old_kwargs, *args) -> Dict[str, Any]:
         """
@@ -482,13 +517,8 @@ class Simulation():
         Return:
             new_kwargs: New dictionary containing unified kwargs
         """
-        new_kwargs = {}
-        for k, v in old_kwargs.items():
-            new_kwargs[k] = v
-        for kwarg_dict in args:
-            for key, value in kwarg_dict.items():
-                new_kwargs[key] = value
-        return new_kwargs
+        return overwrite_new_kwargs(old_kwargs, *args)
+    
     def _check_kwargs_required(self, req_args: List[str], method_name, **kwargs):
         for arg in req_args:
             if arg not in kwargs:
@@ -498,8 +528,20 @@ class Simulation():
         for arg in req_args:
             if arg not in kwargs:
                 logger.warning(f"Argument '{arg}' not provided for method '{method_name}' of {type(self)}")
+    
+    def false_start(self, **kwargs):
+        """
+        Same as start, but sets from_disk flag to true so actual simulation
+        logic does NOT run during call to run()
+        """
+        self.from_disk = True
+        self.start(**kwargs)
 
     def start(self, **kwargs):
+        """
+        Begins the simulation. Invokes setup() on this thread, then run()
+        on a worker thread.
+        """
         self.start_kwargs = kwargs
         self.setup(**kwargs)
         self.thread = Thread(target=self.run)
@@ -557,8 +599,6 @@ class Simulation():
         for callback in callbacks:
             callback()
 
-
-    @abstractmethod
     def setup(self, **kwargs) -> None:
         logger.debug(f"Simulation setup() kwargs: {kwargs}.")
         # Start setup callbacks
@@ -577,7 +617,6 @@ class Simulation():
         except Exception:
             logger.exception(f"Exception when running Simulation '{Simulation.END_SETUP}' callbacks.")
 
-    @abstractmethod
     def run(self, **kwargs) -> None:
         logger.debug(f"Simulation run() kwargs: {kwargs}.")
         # Start run callbacks
@@ -587,8 +626,10 @@ class Simulation():
             logger.exception(f"Exception when running Simulation '{Simulation.START_SETUP}' callbacks.")
         # Run
         try:
-            self._meta_start_time = datetime.now()
-            self._run(**kwargs)
+            # ONLY RUN IF YOU WERE NOT LOADED FROM DISK
+            if not self.from_disk:
+                self._meta_start_time = datetime.now()
+                self._run(**kwargs)
         except Exception:
             logger.exception(f"Exception when calling Simulation _run().")
         # End run callbacks

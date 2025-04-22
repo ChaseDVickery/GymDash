@@ -11,7 +11,7 @@ import shutil
 from datetime import date, datetime
 from pathlib import Path
 from threading import Lock
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Dict, Union, Literal
 
 from typing_extensions import Self
 
@@ -21,13 +21,19 @@ from gymdash.backend.core.simulation.base import Simulation
 
 logger = logging.getLogger(__name__)
 
+class KwargWrapper:
+    def __init__(self, kwargs):
+        self._kwargs = kwargs if kwargs is not None else {}
 
 def uuid2text(id: uuid.UUID):
     return str(id)
 def config2text(config: SimulationStartConfig):
     return json.dumps(config, cls=SimulationStartConfig.Encoder)
+def kwargs2text(kwargs: KwargWrapper):
+    return json.dumps(kwargs._kwargs)
 sqlite3.register_adapter(uuid.UUID, uuid2text)
 sqlite3.register_adapter(SimulationStartConfig, config2text)
+sqlite3.register_adapter(KwargWrapper, kwargs2text)
 sqlite3.register_adapter(bool, int)
 # Converter objects are always passed a bytes object, so handle that
 def text2uuid(byte_text):
@@ -36,8 +42,12 @@ def text2uuid(byte_text):
 def text2config(byte_text):
     text = byte_text.decode("utf-8")
     return json.loads(text, object_hook=SimulationStartConfig.custom_decoder)
+def text2kwargs(byte_text):
+    text = byte_text.decode("utf-8")
+    return json.loads(text)
 sqlite3.register_converter("UUID", text2uuid)
 sqlite3.register_converter("SIMULATIONCONFIG", text2config)
+sqlite3.register_converter("KWARGS", text2kwargs)
 sqlite3.register_converter("BOOL", lambda i: bool(int(i)))
 
 class ProjectManager:
@@ -156,7 +166,11 @@ class ProjectManager:
                     is_done BOOL,
                     cancelled BOOL,
                     failed BOOL,
-                    config SIMULATIONCONFIG
+                    force_stopped BOOL,
+                    config SIMULATIONCONFIG,
+                    start_kwargs KWARGS,
+                    sim_type_name TEXT,
+                    sim_module_name TEXT
                     )""")
         con.commit()
 
@@ -182,13 +196,11 @@ class ProjectManager:
                 exec_info()
             ProjectManager._cached_executions.clear()
             ProjectManager._execution_mutex.release()
-        except:
+        except Exception as e:
+            logger.error(f"Error running cached executions: {ProjectManager._cached_executions}")
             ProjectManager._execution_mutex.release()
+            raise e
         con.commit()
-
-        # ProjectManager.get_filtered_simulations()
-        # retrieved = cur.execute("SELECT * from simulations").fetchall()
-        # print(retrieved)
 
 
     @staticmethod
@@ -198,12 +210,26 @@ class ProjectManager:
 
         check_text = "SELECT COUNT(id) FROM simulations WHERE sim_id=?"
         existing = cur.execute(check_text, (sim_id,)).fetchone()
-        print(existing)
+        
         if (existing[0] < 1):
             sim_update_text = """
             INSERT INTO simulations
-            (sim_id, name, created, started, ended, is_done, cancelled, failed, config)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (
+                sim_id,
+                name,
+                created,
+                started,
+                ended,
+                is_done,
+                cancelled,
+                failed,
+                force_stopped,
+                config,
+                start_kwargs,
+                sim_type_name,
+                sim_module_name
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """
             params = (
                 sim_id,
@@ -214,12 +240,28 @@ class ProjectManager:
                 sim.is_done,
                 sim._meta_cancelled,
                 sim._meta_failed,
+                sim.force_stopped,
                 sim.config,
+                KwargWrapper(sim.start_kwargs),
+                type(sim).__name__,
+                type(sim).__module__
             )
         else:
             sim_update_text = """
             UPDATE simulations
-            SET name=?, created=?, started=?, ended=?, is_done=?, cancelled=?, failed=?, config=?
+            SET
+                name=?,
+                created=?,
+                started=?,
+                ended=?,
+                is_done=?,
+                cancelled=?,
+                failed=?,
+                force_stopped=?,
+                config=?,
+                start_kwargs=?,
+                sim_type_name=?,
+                sim_module_name=?
             WHERE sim_id=?
             """
             params = (
@@ -230,7 +272,11 @@ class ProjectManager:
                 sim.is_done,
                 sim._meta_cancelled,
                 sim._meta_failed,
+                sim.force_stopped,
                 sim.config,
+                KwargWrapper(sim.start_kwargs),
+                type(sim).__name__,
+                type(sim).__module__,
                 sim_id
             )
 
@@ -243,40 +289,103 @@ class ProjectManager:
         )
 
     @staticmethod
-    def get_filtered_simulations(
-        started:datetime=None,
-        ended:datetime=None,
-        done:bool=None,
-        cancelled:bool=None,
-        failed:bool=None,
-    ) -> List[StoredSimulationInfo]:
+    def retrieval_to_stored_info(info):
+        return StoredSimulationInfo(
+            sim_id      = info[0],
+            name        = info[1],
+            created     = info[2],
+            started     = info[3],
+            ended       = info[4],
+            is_done     = info[5],
+            cancelled   = info[6],
+            failed      = info[7],
+            force_stopped = info[8],
+            config      = info[9],
+            start_kwargs = info[10],    # should be a KwargWrapper after conversion. Fetch just the dict
+            sim_type_name = info[11],
+            sim_module_name = info[12],
+        )
+
+    @staticmethod
+    def get_filtered_simulations_where(where_query: str, exec_args):
         con, cur = ProjectManager.get_con()
 
-        query_text = """
+        query_text = f"""
         SELECT
-            sim_id, name, created, started, ended, is_done, cancelled, failed, config
+            sim_id, name, created, started, ended, is_done, cancelled, failed, force_stopped, config, start_kwargs, sim_type_name, sim_module_name
         FROM
             simulations
+        WHERE
+            {where_query}
         ORDER BY
             created ASC
         """
-        cur.execute(query_text)
+        cur.execute(query_text, exec_args)
 
         res = cur.fetchall()
         results = []
         for info in res:
             results.append(
-                StoredSimulationInfo(
-                    sim_id      = info[0],
-                    name        = info[1],
-                    created     = info[2],
-                    started     = info[3],
-                    ended       = info[4],
-                    is_done     = info[5],
-                    cancelled   = info[6],
-                    failed      = info[7],
-                    config      = info[8]
-                )
+                ProjectManager.retrieval_to_stored_info(info)
+            )
+        logger.error(f"Got {len(results)} db results")
+        return results
+
+    @staticmethod
+    def get_filtered_simulations(
+        sim_id:Union[str,uuid.UUID]=None,
+        # started:datetime=None,
+        # ended:datetime=None,
+        is_done:bool=None,
+        cancelled:bool=None,
+        failed:bool=None,
+        force_stopped:bool=None,
+        set_mode:Literal["OR", "AND"]="OR"
+    ) -> List[StoredSimulationInfo]:
+        con, cur = ProjectManager.get_con()
+
+        exec_args = []
+        filters = []
+        if sim_id is not None:
+            filters.append("sim_id=?")
+            exec_args.append(sim_id)
+        # if started is not None:
+        #     filters.append("started=?")
+        # if ended is not None:
+        #     filters.append("ended=?")
+        if is_done is not None:
+            filters.append("is_done=?")
+            exec_args.append(int(is_done))
+        if cancelled is not None:
+            filters.append("cancelled=?")
+            exec_args.append(int(cancelled))
+        if failed is not None:
+            filters.append("failed=?")
+            exec_args.append(int(failed))
+        if force_stopped is not None:
+            filters.append("force_stopped=?")
+            exec_args.append(int(force_stopped))
+        
+        has_filter = len(filters) > 0
+
+        filter_string = (" " + set_mode + " ").join(filters)
+        query_text = f"""
+        SELECT
+            sim_id, name, created, started, ended, is_done, cancelled, failed, force_stopped, config, start_kwargs, sim_type_name, sim_module_name
+        FROM
+            simulations
+        {'WHERE' if has_filter else ''}
+            {filter_string}
+        ORDER BY
+            created ASC;
+        """
+        cur.execute(query_text, exec_args)
+
+        res = cur.fetchall()
+        results = []
+        for info in res:
+            results.append(
+                ProjectManager.retrieval_to_stored_info(info)
             )
         logger.error(f"Got {len(results)} db results")
         return results

@@ -38,11 +38,22 @@ logger = logging.getLogger(__name__)
 logging.basicConfig(level = logging.INFO, format = '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s')
 
 simulation_tracker = SimulationTracker()
+# Apply patching methods to other packages
 apply_extension_patches()
-
+# Register default simulations
 register_example_simulations()
+# Register custom simulations
 SimulationExporter.import_and_register()
+# Set up project structure and database
 ProjectManager.import_args_from_file()
+# Load old streamers from disk
+# ProjectManager.get_filtered_simulations_where("is_done=? OR force_stopped=?", (int(True), int(True)))
+finished_sim_info = ProjectManager.get_filtered_simulations(
+    is_done=int(True),
+    force_stopped=int(True),
+    set_mode="OR"
+)
+simulation_tracker.load_old_simulations_from_info(finished_sim_info)
 
 # App main
 @asynccontextmanager
@@ -51,7 +62,17 @@ async def lifespan(app: FastAPI):
     # asyncio.create_task(manage_simulation_loop())
     yield
     # Executed right before app shutdown
-    pass
+    # Clearing the simulation tracker also
+    # tells all running simulations to shutdown
+    try:
+        await simulation_tracker.clear()
+    except KeyboardInterrupt:
+        print(f"Force shutdown may cause unfinishable simulations.")
+    finally:
+        for id, sim in simulation_tracker.running_sim_map.items():
+            sim.force_stopped = True
+            sim._meta_cancelled = True
+            ProjectManager._add_or_update_simulation(id, sim)
 
 # Setup our API
 app = FastAPI(

@@ -9,9 +9,11 @@ from uuid import UUID, uuid4
 
 from gymdash.backend.core.api.models import (InteractorChannelModel,
                                              SimulationInteractionModel,
-                                             SimulationStartConfig)
+                                             SimulationStartConfig,
+                                             StoredSimulationInfo)
 from gymdash.backend.core.simulation.base import Simulation
 from gymdash.backend.project import ProjectManager
+from gymdash.backend.core.utils.type_utils import get_type
 
 logger = logging.getLogger(__name__)
 
@@ -197,6 +199,12 @@ class SimulationTracker:
     @property
     def is_clearing(self):
         return self._is_clearing
+    
+    async def stop_simulation(self, sim_id):
+        await self.fulfill_query_interaction(SimulationInteractionModel(
+            id=str(sim_id),
+            stop_simulation=InteractorChannelModel(triggered=True, value=None)
+        ))
 
     async def clear(self):
         """
@@ -211,10 +219,11 @@ class SimulationTracker:
             for sim_id in stop_sim_ids:
                 stop_sim_tasks.append(
                     asyncio.create_task(
-                        self.fulfill_query_interaction(SimulationInteractionModel(
-                            id=str(sim_id),
-                            stop_simulation=InteractorChannelModel(triggered=True, value=None)
-                        ))
+                        self.stop_simulation(sim_id)
+                        # self.fulfill_query_interaction(SimulationInteractionModel(
+                        #     id=str(sim_id),
+                        #     stop_simulation=InteractorChannelModel(triggered=True, value=None)
+                        # ))
                     )
                 )
         # Must first GATHER the stop interactions to make sure that all
@@ -247,6 +256,51 @@ class SimulationTracker:
         self._is_clearing = False
         return responses
         
+    def load_old_simulations_from_info(self, stored_infos: List[StoredSimulationInfo]):
+        """
+        Creates and stores old simulations using information stored and
+        retrieved from disk. Such simulations should not already exist
+        in the maps, and all such simulations should be done or forcibly
+        stopped, otherwise they will not be loaded into the tracker. This
+        is here so that interfacing with old data streams from other places
+        will be easier because the revived simulations should automatically
+        provide information necessary to reconstruct log file paths upon
+        their re-instantiation.
+
+        Args:
+            stored_infos: List of simulation informations retrieved from disk.
+        """
+        if self.is_clearing:
+            return
+        with self._access_mutex:
+            for sim_info in stored_infos:
+                sim_id = self._to_key(sim_info.sim_id)
+                sim_type = get_type(sim_info.sim_type_name, sim_info.sim_module_name)
+                sim_done = sim_info.is_done
+                sim_stopped = sim_info.force_stopped
+                sim_start_kwargs = sim_info.start_kwargs
+                # Check for simulation type
+                if sim_type is None:
+                    logger.error(f"Cannot load old simulation ({sim_info.sim_id}) because type ({sim_info.sim_type_name}) cannot be found.")
+                    continue
+                # Check for simulation ID existence
+                if sim_id in self.done_sim_map:
+                    logger.error(f"Cannot load old simulation ({sim_info.sim_id}) because ID is already found in the tracker's done_sim_map.")
+                    continue
+                if sim_id in self.running_sim_map:
+                    logger.error(f"Cannot load old simulation ({sim_info.sim_id}) because ID is already found in the tracker's running_sim_map.")
+                    continue
+                # Check simulation doneness
+                if not sim_done and not sim_stopped:
+                    logger.error(f"Cannot load old simulation ({sim_info.sim_id}) because it is not marked as either done nor forcibly stopped. Simulations loaded from disk cannot still be running.")
+                    continue
+                # Create new sim instance from stored config.
+                # Also set from_disk so we cannot accidentally run it again.
+                revived_sim: Simulation = sim_type(sim_info.config)
+                revived_sim.fill_from_stored_info(sim_info)
+                print(f"SimulationTracker adding old simulation at: {sim_id}")
+                self.done_sim_map[sim_id] = revived_sim
+                print(f"SimulationTracker done_sim_map: {self.done_sim_map}")
 
 
     def _to_key(self, key: Union[str, UUID]) -> UUID:
@@ -296,6 +350,7 @@ class SimulationTracker:
         else:
             return (True, sim)
     def get_sim(self, sim_key: Union[str, UUID]) -> Union[Simulation, None]:
+        print(f"SimulationTracker done_sim_map: {self.done_sim_map}")
         return self._get_sim_internal(sim_key)
     def get_sims(self, sim_keys: List[Union[str, UUID]]) -> List[Union[Simulation, None]]:
         return [self.get_sim(key) for key in sim_keys]
@@ -404,27 +459,59 @@ class SimulationTracker:
         return (new_id, simulation)
 
 
-    def start_sims(self, to_start: Union[SimulationGroup, List[Union[str, SimulationStartConfig, Simulation]]], **kwargs) -> SimulationGroup:
+    def start_sims(
+        self, 
+        to_start: Union[SimulationGroup, List[Union[str, SimulationStartConfig, Simulation]]],
+        **kwargs
+    ) -> SimulationGroup:
+        """
+        Begins multiple simulations using a set of input kwargs.
+
+        Args:
+            to_start: List of simulations, configs, or simulation names to start.
+            kwargs: Custom start kwarg overrides for all simulations.
+        Returns:
+            group: SimulationGroup of all started simulations.
+        """
         group = self.create_simulations(to_start)
         for info in group.infos:
             sim_id = info[0]
             sim = info[1]
-            # Sim removes calls tracker to remove it from running
-            # sims when done
+            # Add callbacks. Mostly to update sim db at certain points
             on_done = functools.partial(self.on_sim_done, sim_ids=[sim_id])
+            on_start_setup = functools.partial(self.update_sim_dbs, sim_ids=[sim_id])
             sim.add_callback(Simulation.END_RUN, on_done)
+            sim.add_callback(Simulation.START_SETUP, on_start_setup)
+            # Begin simulation
             sim.start(**kwargs)
             self.add_running_sim(sim_id, sim)
             logger.info(f"Started simulation (id='{sim_id}') in group '{group.id}'")
         return group
     
-    def start_sim(self, to_start: Union[str, SimulationStartConfig, Simulation], **kwargs) -> Tuple[UUID, Simulation]:
+    def start_sim(
+        self,
+        to_start: Union[str, SimulationStartConfig, Simulation],
+        **kwargs
+    ) -> Tuple[UUID, Simulation]:
+        """
+        Begins a single simulation given a simulation, config, or sim name.
+
+        Args:
+            to_start: Simulation, config, or simulation name to start.
+            kwargs: Custom start kwarg overrides for the simulation.
+        Returns:
+            info: The started simulation ID and the simulation.
+        """
         id, simulation = self.create_simulation(to_start)
         if simulation is not None:
             # Upon simulation finishing,
             # trigger its removal from running simulations
+            # Add other callbacks. Mostly to update sim db at certain points/
             on_done = functools.partial(self.on_sim_done, sim_ids=[id])
+            on_start_setup = functools.partial(self.update_sim_dbs, sim_ids=[id])
             simulation.add_callback(Simulation.END_RUN, on_done)
+            simulation.add_callback(Simulation.START_SETUP, on_start_setup)
+            # Begin simulation/
             simulation.start(**kwargs)
             self.add_running_sim(id, simulation)
             logger.info(f"Started simulation (id='{id}')")
@@ -459,6 +546,8 @@ class SimulationTracker:
         
     def on_sim_done(self, sim_ids: Iterable[Union[str, UUID]]) -> None:
         self.remove_sims(sim_ids)
+        self.update_sim_dbs(sim_ids)
+    def update_sim_dbs(self, sim_ids: Iterable[Union[str, UUID]]) -> None:
         for sim_key in sim_ids:
             key = self._to_key(sim_key)
             exists, sim = self.try_get_sim(key)
