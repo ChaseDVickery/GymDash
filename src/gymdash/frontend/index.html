@@ -31,6 +31,7 @@
 <body>
 
     <!-- Begin cloneable/dynamic nodes -->
+    <!-- SIMULATION SIDEBAR -->
     <!-- Simulation selection box -->
     <div class="prefab sim-selection-box contrast-box hoverable">
         <label for="sim-selection-box-test">sim name 1</label>
@@ -50,12 +51,29 @@
             <input type="checkbox" id="sim-selection-box-test" class="sim-selection-checkbox">
         </div>
     </div>
+    <!-- KWARGS AND KWARG PANELS -->
+    <!-- Removable/Nestable Kwarg Panel -->
+    <div class="prefab kwarg-panel content-panel">
+        <h4>kwargs</h4>
+        <button class="add-kwarg contrast-box-opp hoverable">+</button>
+        <div class="kwarg-area">
+            
+        </div>
+        <button class="add-kwarg contrast-box-opp hoverable">+</button>
+    </div>
     <!-- Kwarg -->
     <div class="prefab kwarg">
-        <button class="contrast-box-opp hoverable remove-kwarg-btn">-</button>
-        <input class="contrast-box hoverable key entry" type="text"></input>
-        <input class="contrast-box hoverable value entry" type="text"></input>
+        <div class="kwarg-kvp">
+            <button class="contrast-box-opp hoverable remove-kwarg-btn">-</button>
+            <input class="contrast-box hoverable key entry" type="text">
+            <input class="contrast-box hoverable value entry" type="text">
+            <button class="contrast-box-opp hoverable add-subkwarg-btn">+</button>
+        </div>
+        <div class="kwarg-subkwargs">
+
+        </div>
     </div>
+    <!-- MEDIA DISPLAY -->
     <!-- Image media instance -->
     <div class="prefab multimedia-instance-panel image-instance-panel">
         <!-- Actual media (image, gif, audio player) goes here -->
@@ -160,6 +178,7 @@
 
     <button class="contrast-box-opp hoverable" id="fill-sim-history-test-btn">Fill History</button>
     <button class="contrast-box-opp hoverable" id="delete-all-sims-test-btn">DELETE ALL SIMS</button>
+    <button class="contrast-box-opp hoverable" id="delete-selected-sims-test-btn">DELETE SELECTED</button>
 
 
     <div class="content">
@@ -178,19 +197,19 @@
 
                         <div class="config-kwarg">
                             <label for="config-name1" class="key">name: </label>
-                            <input id="config-name1" class="contrast-box hoverable value entry" type="text"></input>
+                            <input id="config-name1" class="contrast-box hoverable value entry" type="text">
                         </div>
                         <div class="config-kwarg">
                             <label for="config-key1" class="key">key: </label>
-                            <input id="config-key1" class="contrast-box hoverable value entry" type="text"></input>
+                            <input id="config-key1" class="contrast-box hoverable value entry" type="text">
                         </div>
                         <div class="config-kwarg">
                             <label for="config-family1" class="key">family: </label>
-                            <input id="config-family1" class="contrast-box hoverable value entry" type="text"></input>
+                            <input id="config-family1" class="contrast-box hoverable value entry" type="text">
                         </div>
                         <div class="config-kwarg">
                             <label for="config-type1" class="key">type: </label>
-                            <input id="config-type1" class="contrast-box hoverable value entry" type="text"></input>
+                            <input id="config-type1" class="contrast-box hoverable value entry" type="text">
                         </div>
 
                         <div class="kwarg-panel content-panel">

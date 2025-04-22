@@ -23,6 +23,8 @@ const queryProgressTestBtn = document.querySelector("#query-test-btn");
 const stopSimTestBtn = document.querySelector("#stop-test-btn");
 const fillHistoryTestBtn = document.querySelector("#fill-sim-history-test-btn");
 const deleteAllSimsTestBtn = document.querySelector("#delete-all-sims-test-btn");
+const deleteSelectedSimsTestBtn = document.querySelector("#delete-selected-sims-test-btn");
+
 
 
 // Constants
@@ -59,11 +61,13 @@ const startSimBtn               = startPanel.querySelector("#start-sim-btn");
 
 // Prefabs
 const prefabSimSelectBox        = document.querySelector(".prefab.sim-selection-box");
+const prefabKwargPanel          = document.querySelector(".prefab.kwarg-panel");
 const prefabKwarg               = document.querySelector(".prefab.kwarg");
 const prefabImageMedia          = document.querySelector(".prefab.multimedia-instance-panel.image-instance-panel");
 const prefabAudioMedia          = document.querySelector(".prefab.multimedia-instance-panel.audio-instance-panel");
 const prefabVideoMedia          = document.querySelector(".prefab.multimedia-instance-panel.video-instance-panel");
 prefabSimSelectBox.parentElement.removeChild(prefabSimSelectBox);
+prefabKwargPanel.parentElement.removeChild(prefabKwargPanel);
 prefabKwarg.parentElement.removeChild(prefabKwarg);
 prefabImageMedia.parentElement.removeChild(prefabImageMedia);
 prefabAudioMedia.parentElement.removeChild(prefabAudioMedia);
@@ -80,6 +84,26 @@ function call_random() {
     // return fetch(apiURL("big-data1000000");
 }
 
+function getActiveSelections() {
+
+}
+/**
+ * Return a mapping from all simulation selection IDs to the simulation
+ * selection nodes.
+ * 
+ * @returns Object mapping each simulation ID to the selection object
+ */
+function getAllSelections() {
+    const mapping = Array.from(document.querySelectorAll(".sim-selection-checkbox")).reduce(
+        (curr_map, curr_chkbox) => {
+            curr_map[curr_chkbox.id] = curr_chkbox.parentElement.parentElement;
+            return curr_map;
+        },
+        {}
+    )
+    console.log(mapping);
+    return mapping;
+}
 
 function displayNumberOutput(num) {
     tryBtnOut.textContent = num;
@@ -433,20 +457,35 @@ function convertKwargValue(valueString) {
         return valueString;
     }
 }
+/**
+ * Gathers all keyword arguments from input kwarg panel into a single
+ * kwarg object.
+ */
 function getKwargs(elementWithKwargPanel) {
     const kwargArea = elementWithKwargPanel.querySelector(".kwarg-area");
     const allKwargEntries = kwargArea.querySelectorAll(".kwarg");
     const kwargs = {};
     for (const kwargEntry of allKwargEntries) {
+        // Only include if kwarg is a DIRECT DESCENDENT of this kwarg panel
+        if (kwargEntry.parentElement !== kwargArea) { continue; }
+        // Get key and value for kwarg
         let key = kwargEntry.querySelector(".key").value.trim();
         let val = kwargEntry.querySelector(".value").value.trim();
+        let subkwargsPanel = kwargEntry.querySelector(".kwarg-subkwargs").querySelector(".kwarg-panel");
         if (key === "") { continue; }
         if (val === "") { val = true; }
         const splitKey = key.split(/\s+/);
         key = splitKey.join("_");
-        val = convertKwargValue(val);
+        // If we have subkwargs, use those instead of value
+        if (subkwargsPanel !== null) {
+            val = getKwargs(subkwargsPanel);
+        } else {
+            val = convertKwargValue(val);
+        }
         kwargs[key] = val;
     }
+    console.log("KWARGS");
+    console.log(kwargs);
     return kwargs;
 }
 
@@ -638,18 +677,56 @@ function deleteAllSimulations() {
         })
         .catch((error) => { console.error(`Error while deleting all simulations: ${error}`)});
 }
+function deleteSelectedSimulations() {
+    console.log("deleteSelectedSimulations");
+    // Visually indicate all running sims as cancelling
+    const simIDs = [];
+    for (const [key, simSelection] of Object.entries(getAllSelections())) {
+        const checkbox = simSelection.querySelector(".sim-selection-checkbox");
+        const meter = simSelection.querySelector(".radial-meter")
+        const simID = key;
+        if (checkbox.checked) {
+            simIDs.push(simID);
+            // Set stopping visuals and remove from sim_selections
+            delete sim_selections[simID];
+            meter.classList.add("cancelling");
+            console.log("deleting " + simID);
+        }
+    }
+    deleteSimulations(simIDs);
+}
+function deleteSimulations(simIDs) {
+    console.log("SIM IDS");
+    console.log(simIDs);
+    fetch(apiURL("delete-sims"), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ids: simIDs}),
+    })
+    .then((response) => { return response.json(); })
+    .then((info) => {
+        sim_selections = {};
+        refreshSimulationSidebar();
+    })
+    .catch((error) => { console.error(`Error while deleting all simulations: ${error}`)});
+}
 
 
+function setupKwargBox(kwargPanel) {
+    const addKwargBtn = kwargPanel.querySelectorAll(".add-kwarg");
+    for (const btn of addKwargBtn) {
+        console.log(`Adding event listener to btn ${btn}`);
+        btn.addEventListener("click", addKwarg.bind(null, kwargPanel));
+    }
+}
 function setupKwargBoxes() {
     // Get kwarg boxes
     const kwargBoxes = document.querySelectorAll(".kwarg-panel");
     // Add listener to kwarg box add button
     for (const box of kwargBoxes) {
-        const addKwargBtn = box.querySelectorAll(".add-kwarg");
-        for (const btn of addKwargBtn) {
-            console.log(`Adding event listener to btn ${btn}`);
-            btn.addEventListener("click", addKwarg.bind(null, box));
-        }
+        setupKwargBox(box);
     }
 }
 function addKwarg(kwargPanel) {
@@ -665,10 +742,20 @@ function addKwarg(kwargPanel) {
     if (removeBtn !== null) {
         removeBtn.addEventListener("click", removeKwarg.bind(null, newKwarg));
     }
+    const addSubkwargBtn = newKwarg.querySelector(".add-subkwarg-btn");
+    if (addSubkwargBtn !== null) {
+        addSubkwargBtn.addEventListener("click", addSubkwargs.bind(null, newKwarg));
+    }
     kwargArea.appendChild(newKwarg);
 }
 function removeKwarg(kwargRow) {
     kwargRow.parentElement.removeChild(kwargRow);
+}
+function addSubkwargs(kwargRow) {
+    const subkwargArea = kwargRow.querySelector(".kwarg-subkwargs");
+    const newSubkwargs = prefabKwargPanel.cloneNode(true);
+    setupKwargBox(newSubkwargs);
+    subkwargArea.appendChild(newSubkwargs);
 }
 function clearKwargBox(kwargPanel, deleteRows=false) {
 
@@ -692,6 +779,7 @@ queryProgressTestBtn.addEventListener("click", testQueryProgress);
 stopSimTestBtn.addEventListener("click", stopSimTest);
 fillHistoryTestBtn.addEventListener("click", refreshSimulationSidebar);
 deleteAllSimsTestBtn.addEventListener("click", showDeleteAllSimulationsOption);
+deleteSelectedSimsTestBtn.addEventListener("click", deleteSelectedSimulations);
 
 
 simTestTimestepsSlider.addEventListener("change", (e) => {
@@ -719,45 +807,47 @@ function createPlots() {
     // const key = "train/learning_rate";
 
     const margin = {top: 30, right: 30, bottom: 30, left: 60};
+    const tempID = Object.keys(allData)[0]
+    const dataTemp = allData[tempID].media["scalars"][key];
+    const x = dataTemp.map(p => p.step);
+
+    // const extentY = d3.extent(y);
+    const extentY = [0, 500];
+
+    const width = 500;
+    const height = 500;
+    const svg = d3
+        .select("#plots-area")
+        .append("svg")
+        .attr("viewBox", "0 0 700 500")
+        // .attr("preserveAspectRatio", "xMinYMin meet")
+        // .attr("width", width)
+        // .attr("height", height)
+        .style("border", "1px solid black");
+
+    const xScale = d3
+        .scaleLinear()
+        .domain([x[0], x[x.length - 1]])
+        .range([margin.left, width - margin.right]);
+    const yScale = d3
+        .scaleLinear()
+        .domain(extentY)
+        .nice()
+        .range([height - margin.bottom, margin.top]);
+
+    const xAxis = svg
+        .append("g")
+        .attr("transform", `translate(0,${margin.top})`)
+        .call(d3.axisTop(xScale));
+    const yAxis = svg
+        .append("g")
+        .attr("transform", `translate(${margin.left - 1}, 0)`)
+        .call(d3.axisLeft(yScale));
 
     for (const simID in allData) {
         console.log(allData[simID].media["scalars"][key]);
         const data = allData[simID].media["scalars"][key];
-        const x = data.map(p => p.step);
         const y = data.map(p => p.value);
-
-        const extentY = d3.extent(y);
-
-        const width = 500;
-        const height = 500;
-        const svg = d3
-            .select("#plots-area")
-            .append("svg")
-            .attr("viewBox", "0 0 700 500")
-            // .attr("preserveAspectRatio", "xMinYMin meet")
-            // .attr("width", width)
-            // .attr("height", height)
-            .style("border", "1px solid black");
-
-        const xScale = d3
-            .scaleLinear()
-            .domain([x[0], x[x.length - 1]])
-            .range([margin.left, width - margin.right]);
-        const yScale = d3
-            .scaleLinear()
-            .domain(extentY)
-            .nice()
-            .range([height - margin.bottom, margin.top]);
-
-        const xAxis = svg
-            .append("g")
-            .attr("transform", `translate(0,${margin.top})`)
-            .call(d3.axisTop(xScale));
-        const yAxis = svg
-            .append("g")
-            .attr("transform", `translate(${margin.left - 1}, 0)`)
-            .call(d3.axisLeft(yScale));
-
         const pline = svg
             .append("polyline")
             .attr("fill", "none")
@@ -768,7 +858,7 @@ function createPlots() {
         // d3.select("body").append("svg", svg.node());
 
         // Return early for our test
-        return;
+        // return;
     }
 }
 

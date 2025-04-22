@@ -19,6 +19,7 @@ from fastapi.responses import (FileResponse, JSONResponse, Response,
 import gymdash
 from gymdash.backend.core.api.config.config import tags
 from gymdash.backend.core.api.models import (SimulationIDModel,
+                                             SimulationIDsModel,
                                              SimulationInteractionModel,
                                              SimulationStartConfig,
                                              StoredSimulationInfo, StatQuery)
@@ -213,7 +214,16 @@ async def get_delete_all_simulations():
     ProjectManager.delete_all_simulations_immediate()
     return responses
 
-    
+@app.post("/delete-sims")
+async def get_delete_simulations(sim_ids: SimulationIDsModel):
+    if simulation_tracker.is_clearing:
+        return {}
+    # Stop specific current simulations
+    responses = await simulation_tracker.clear_specific(sim_ids.ids)
+    # Remove from backend DB of simulations
+    ProjectManager.delete_specific_simulations_immediate(sim_ids.ids)
+    # ProjectManager.delete_all_simulations_immediate()
+    return responses
     
 @app.get("/all-recent-scalars")
 async def get_all_recent_scalars():

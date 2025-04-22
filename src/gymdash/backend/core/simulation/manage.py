@@ -201,10 +201,13 @@ class SimulationTracker:
         return self._is_clearing
     
     async def stop_simulation(self, sim_id):
-        await self.fulfill_query_interaction(SimulationInteractionModel(
-            id=str(sim_id),
-            stop_simulation=InteractorChannelModel(triggered=True, value=None)
-        ))
+        if (sim_id not in self.running_sim_map):
+            await asyncio.sleep(0)
+        else:
+            await self.fulfill_query_interaction(SimulationInteractionModel(
+                id=str(sim_id),
+                stop_simulation=InteractorChannelModel(triggered=True, value=None)
+            ))
 
     async def clear(self):
         """
@@ -254,6 +257,35 @@ class SimulationTracker:
         self.callback_groups.clear()
         self._is_clearing_internal = False
         self._is_clearing = False
+        return responses
+    
+    async def clear_specific(self, sim_ids: List[Union[str, UUID]]):
+        stop_sim_tasks = []
+        stop_sim_ids = []
+        with self._access_mutex:
+            stop_sim_ids = [self._to_key(id) for id in sim_ids]
+            for sim_id in stop_sim_ids:
+                stop_sim_tasks.append(
+                    asyncio.create_task(
+                        self.stop_simulation(sim_id)
+                    )
+                )
+        # Must first GATHER the stop interactions to make sure that all
+        # relevant simulations have had stop called. After that, we can abort
+        # other interactions early if needed.
+        responses = await asyncio.gather(*stop_sim_tasks)
+        # Wait still for individual Simulation threads to finish.
+        # We want to be sure that all simulation threads are done
+        # so that we prevent them from using resources (like tb directories)
+        # that may be cleared in other parts of the code after this
+        # (like from ProjectManager)
+        while self.any_running(stop_sim_ids):
+            print(f"Waiting on selected simulation thread shutdowns")
+            await asyncio.sleep(self._clear_poll_period)
+        # Now clear out all my maps and such
+        for sim_id in stop_sim_ids:
+            if self.running_sim_map.pop(sim_id, None) is None:
+                self.done_sim_map.pop(sim_id, None)
         return responses
         
     def load_old_simulations_from_info(self, stored_infos: List[StoredSimulationInfo]):

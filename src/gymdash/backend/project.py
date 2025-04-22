@@ -11,7 +11,7 @@ import shutil
 from datetime import date, datetime
 from pathlib import Path
 from threading import Lock
-from typing import Any, List, Tuple, Dict, Union, Literal
+from typing import Any, List, Tuple, Dict, Union, Literal, Iterable
 
 from typing_extensions import Self
 
@@ -51,6 +51,16 @@ sqlite3.register_converter("KWARGS", text2kwargs)
 sqlite3.register_converter("BOOL", lambda i: bool(int(i)))
 
 class ProjectManager:
+    def immediate(func):
+        def wrapper(*args, **kwargs):
+            # Run cached executions early so we don't
+            # immediately repopulate with old stuff
+            ProjectManager.run_cached_executions()
+            ProjectManager._execution_mutex.acquire()
+            result = func(*args, **kwargs)
+            ProjectManager._execution_mutex.release()
+            return result
+        return wrapper
 
     ARGS_FILENAME   = "args.pickle"
     TB_FOLDER       = "tb"
@@ -391,12 +401,9 @@ class ProjectManager:
         return results
     
     @staticmethod
+    @immediate
     def delete_all_simulations_immediate():
-        # Run cached executions early so we don't
-        # immediately repopulate with old stuff
-        ProjectManager.run_cached_executions()
-        with ProjectManager._execution_mutex:
-            ProjectManager._delete_all_simulations()
+        ProjectManager._delete_all_simulations()
     @staticmethod
     def _delete_all_simulations():
         # Clear simulation table
@@ -414,3 +421,31 @@ class ProjectManager:
         ProjectManager._cached_executions.append(
             functools.partial(ProjectManager._delete_all_simulations)
         )
+    
+    @staticmethod
+    @immediate
+    def delete_specific_simulations_immediate(sim_ids):
+        ProjectManager._delete_specific_simulations(sim_ids)
+    @staticmethod
+    def _delete_specific_simulations(sim_ids: Iterable[str]):
+        # Clear simulation table
+        con, cur = ProjectManager.get_con()
+        print(sim_ids)
+        ids = set(sim_ids)
+
+        sim_selection_text = " OR ".join(["sim_id=?" for _ in sim_ids])
+        query_text = f"""
+        DELETE FROM
+            simulations
+        WHERE
+            {sim_selection_text}
+        """
+        cur.execute(query_text, sim_ids)
+        con.commit()
+        logger.info(f"Cleared simulations '{sim_ids}' from simulations table")
+
+        # Delete all simulation subfolders if possible
+        for path in os.listdir(ProjectManager.sims_folder()):
+            if (os.path.isdir(path) and os.path.basename(path) in ids):
+                shutil.rmtree(path, ignore_errors=True)
+                logger.info(f"Cleared simulation subfolder at '{ProjectManager.sims_folder()}'")

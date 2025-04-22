@@ -41,6 +41,8 @@ class SimulationStartConfig(BaseModel):
         
 class SimulationIDModel(BaseModel):
     id:         UUID
+class SimulationIDsModel(BaseModel):
+    ids:        List[UUID]
 
 class StatQuery(BaseModel):
     id:         UUID    # Simulation ID

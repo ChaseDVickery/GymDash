@@ -46,13 +46,23 @@ input[type="text"] {
     gap: var(--std-gap);
 }
 .kwarg {
+    display: flex;
+    flex-direction: column;
+}
+.kwarg > .kwarg-kvp {
     display: grid;
-    grid-template-rows: 1f;
-    grid-template-columns: 23px 2fr 3fr;
+    grid-template-rows: 1fr;
+    grid-template-columns: 23px 2fr 3fr 23px;
 }
 .remove-kwarg-btn {
     border-radius: 50%;
     filter: saturate(25%);
+    font-weight: 900;
+    font-size: 1.0em;
+}
+.add-subkwarg-btn {
+    border-radius: 50%;
+    filter: saturate(125%);
     font-weight: 900;
     font-size: 1.0em;
 }
