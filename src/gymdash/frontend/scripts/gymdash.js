@@ -219,7 +219,10 @@ function displayVideoTest() {
     //     });
 
 
-    updateData();
+    updateData()
+        .then((allDataReports) => {
+            createPlots();
+        });
 }
 
 
@@ -234,7 +237,8 @@ function updateData() {
         const simID = selectionOptions[i].id;
         console.log(`Getting new data for sim: ${simID}`);
         dataRetrievalPromises.push(
-            dataUtils.getRecent(simID, [], [], true)
+            dataUtils.getAll(simID, [], [], true)
+            // dataUtils.getRecent(simID, [], [], true)
                 .then((dataReport) => {
                     console.log("Got data report.");
                     console.log(dataReport);
@@ -246,7 +250,7 @@ function updateData() {
                 })
         );
     }
-    Promise.all(dataRetrievalPromises)
+    return Promise.all(dataRetrievalPromises)
         .then((allDataReports) => {
             // Add the data from each new report to the current
             // allData report
@@ -259,6 +263,7 @@ function updateData() {
             }
             console.log("ALL DATA");
             console.log(allData);
+            return Promise.resolve(allDataReports);
         })
         .catch((error) => {
             console.error(`Error processing all data reports: ${error}`)
@@ -706,6 +711,68 @@ refreshSimulationSidebar();
 openTab(null, "tab-analyze");
 
 
+
+
+function createPlots() {
+
+    const key = "rollout/ep_rew_mean";
+    // const key = "train/learning_rate";
+
+    const margin = {top: 30, right: 30, bottom: 30, left: 60};
+
+    for (const simID in allData) {
+        console.log(allData[simID].media["scalars"][key]);
+        const data = allData[simID].media["scalars"][key];
+        const x = data.map(p => p.step);
+        const y = data.map(p => p.value);
+
+        const extentY = d3.extent(y);
+
+        const width = 500;
+        const height = 500;
+        const svg = d3
+            .select("#plots-area")
+            .append("svg")
+            .attr("viewBox", "0 0 700 500")
+            // .attr("preserveAspectRatio", "xMinYMin meet")
+            // .attr("width", width)
+            // .attr("height", height)
+            .style("border", "1px solid black");
+
+        const xScale = d3
+            .scaleLinear()
+            .domain([x[0], x[x.length - 1]])
+            .range([margin.left, width - margin.right]);
+        const yScale = d3
+            .scaleLinear()
+            .domain(extentY)
+            .nice()
+            .range([height - margin.bottom, margin.top]);
+
+        const xAxis = svg
+            .append("g")
+            .attr("transform", `translate(0,${margin.top})`)
+            .call(d3.axisTop(xScale));
+        const yAxis = svg
+            .append("g")
+            .attr("transform", `translate(${margin.left - 1}, 0)`)
+            .call(d3.axisLeft(yScale));
+
+        const pline = svg
+            .append("polyline")
+            .attr("fill", "none")
+            .attr("stroke", "steelblue")
+            .attr("stroke-width", 1.5)
+            .attr("points", polyline(x, y, xScale, yScale));
+
+        // d3.select("body").append("svg", svg.node());
+
+        // Return early for our test
+        return;
+    }
+}
+
+
 function polyline(T, Y, tscale, yscale) {
     return T.map((t, i) => tscale(t).toFixed(1) + "," + yscale(Y[i]).toFixed(1)).join(
         " "
@@ -762,7 +829,7 @@ function test(nodeThing="body") {
     // d3.select("body").append("svg", svg.node());
 }
 
-test("#plots-area");
+// test("#plots-area");
 
 
 function plotVideosTest() {

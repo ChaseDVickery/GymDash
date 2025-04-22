@@ -73,7 +73,7 @@ class StableBaselinesSimulation(Simulation):
         self.streamer.get_or_register(TensorboardStreamer(
             tb_path,
             {
-                stat_tags.TB_SCALARS: ["rewards", "rollout/ep_rew_mean"],
+                stat_tags.TB_SCALARS: ["rewards", "rollout/ep_rew_mean", "train/learning_rate"],
                 stat_tags.TB_IMAGES: ["episode_video", "episode_video_thumbnail"]
             }
         ))

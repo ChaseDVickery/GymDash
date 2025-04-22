@@ -72,6 +72,9 @@ class TensorboardStreamWrapper(gym.Wrapper):
     def get_recent_from_key(self, key:str) -> List[Any]:
         return self.streamer.get_recent_from_key(key)
     
+    def reset_streamer(self):
+        self.streamer.reset_streamer()
+    
         
 
 class TensorboardStreamer:
@@ -117,6 +120,10 @@ class TensorboardStreamer:
     @property
     def streamer_name(self):
         return self.tb_log_path
+    
+    def reset_streamer(self):
+        self.set_log_path(self.tb_log_path)
+        self.check_tb()
         
     def add_tag_keys(self, tag_key_map:Dict[str, Iterable[str]]):
         # Combine the input tag key map

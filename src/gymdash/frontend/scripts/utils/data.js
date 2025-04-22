@@ -13,7 +13,20 @@ const dataUtils = (
             responseType: 'blob',
             body: JSON.stringify({id: sim_id})
         });}
-        const fetchRecentForSimulation    = (sim_id, tags=[], keys=[], exclusion_mode=false) => {return fetch(apiURL(`all-recent`), {
+        const fetchRecentForSimulation    = (sim_id, tags=[], keys=[], exclusion_mode=false) => {return fetch(apiURL(`sim-data-recent`), {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            responseType: 'blob',
+            body: JSON.stringify({
+                id: sim_id,
+                tags: tags,
+                keys: keys,
+                exclusion_mode: exclusion_mode
+            })
+        });}
+        const fetchAllForSimulation    = (sim_id, tags=[], keys=[], exclusion_mode=false) => {return fetch(apiURL(`sim-data-all`), {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
@@ -271,6 +284,20 @@ const dataUtils = (
                     console.error(`Problem calling getRecent on '${simID}': ${error}`)
                 })
         }
+        const getAll = function(simID, tags=[], keys=[], exclusion_mode=false) {
+            return fetchAllForSimulation(simID, tags, keys, exclusion_mode)
+                .then((response) => {
+                    // The backend already sent a zip blob,
+                    // we just need to interpret it as a zip.
+                    console.log("Done fetching ALL simulation data");
+                    const blob = response.blob();
+                    // Return promise of media report
+                    return generateStatReportFromZip(blob);
+                })
+                .catch((error) => {
+                    console.error(`Problem calling getAll on '${simID}': ${error}`)
+                })
+        }
 
         const dataReportUnion_CombineType = function(dr1, dr2, dataType) {
             for (const statKey in dr2.media[dataType]) {
@@ -351,6 +378,7 @@ const dataUtils = (
             getAllNewImages,
             getSimNewMedia,
             getRecent,
+            getAll,
             createEmptyDataReport,
             dataReportUnion,
         };
