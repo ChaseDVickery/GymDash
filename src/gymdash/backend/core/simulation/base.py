@@ -456,7 +456,6 @@ class Simulation():
         self._meta_end_time = info.ended
         self.config = info.config
         self.force_stopped = info.force_stopped
-        self.create_streamers()
         
     # Maybe something like you call this when you get or register streamer
     # (new callback wrapper around streamer.get_or_register?)

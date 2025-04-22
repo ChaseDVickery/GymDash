@@ -1,3 +1,4 @@
+import os
 from typing import Any, Dict, Iterable, List, Set, SupportsFloat, Union
 
 from gymdash.backend.core.api.config.config import CONFIG
@@ -153,7 +154,7 @@ class TensorboardStreamer:
         if (not self.tb_log_path): return False
         # Setup using new EventAccumulator
         self._ea = event_accumulator.EventAccumulator(
-            self.tb_log_path,
+            os.path.abspath(self.tb_log_path),
             size_guidance=CONFIG.tb_size_guidance
         )
         # Create new TensorboardStreamableStats for all keys under each tag

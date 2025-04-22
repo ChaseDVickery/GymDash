@@ -298,6 +298,8 @@ class SimulationTracker:
                 # Also set from_disk so we cannot accidentally run it again.
                 revived_sim: Simulation = sim_type(sim_info.config)
                 revived_sim.fill_from_stored_info(sim_info)
+                revived_sim.set_project_info(ProjectManager.sims_folder(), revived_sim._project_sim_id)
+                revived_sim.create_streamers()
                 print(f"SimulationTracker adding old simulation at: {sim_id}")
                 self.done_sim_map[sim_id] = revived_sim
                 print(f"SimulationTracker done_sim_map: {self.done_sim_map}")
