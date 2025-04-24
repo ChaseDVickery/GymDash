@@ -37,6 +37,7 @@ class MediaMetadata:
     key: str            # stat key
     mimetype: str       # MIME type of the media
     step:   int         # step of the logged media
+    wall_time: float
 
 @dataclass(frozen=True)
 class JSONMetadata:
@@ -243,10 +244,10 @@ def pack_simulation_streamer_media_to_zip(sim: Simulation, key_event_map: Dict[s
                 filename = file_prefix + str(i) + f".{ext}"
                 if isinstance(event, ImageEvent):
                     zip_file.writestr(filename, event.encoded_image_string)
-                    media_index[filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step)
+                    media_index[filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step, wall_time=event.wall_time)
                 elif isinstance(event, AudioEvent):
                     zip_file.writestr(filename, event.encoded_audio_string)
-                    media_index[filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step)
+                    media_index[filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step, wall_time=event.wall_time)
         # Add the index file to the zip
         index_data = ZippedMediaFile(streamer_key="", sim_id=str(sim._project_sim_id), metadata=media_index)
         zip_file.writestr("index.json", json.dumps(index_data, cls=DataclassJSONEncoder))

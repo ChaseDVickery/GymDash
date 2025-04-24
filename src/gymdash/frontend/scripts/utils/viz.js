@@ -23,7 +23,7 @@ const vizUtils = (
          * Returns the extent of a scalar data key's value
          * or step.
          * 
-         * @param {dataReport} allData 
+         * @param {Object[DataReport]} allData 
          * @param {string} key 
          * @param {Array} simIDs 
          * @param {value_or_step} dataPointAttribute 
@@ -38,11 +38,18 @@ const vizUtils = (
             if (simIDs.length < 1) {
                 return extent;
             }
-            if (!Object.hasOwn(allData[simIDs[0]].media["scalars"], key)) {
+            if (!allData[simIDs[0]].has(key)) {
+                return extent;
+            }
+            // If the given key is not scalar and we are trying to find the
+            // extent of it's "value", then that's not possible. We can find
+            // the extent of its "step" or "wall_time", but "value" only
+            // makes sense for scalars.
+            if (!allData[simIDs[0]].isScalar(key) && dataPointAttribute === "value") {
                 return extent;
             }
             for (const simID of simIDs) {
-                const tempExt = d3.extent(allData[simID].media["scalars"][key].map(x => x[dataPointAttribute]));
+                const tempExt = d3.extent(allData[simID].getData(key).map(x => x[dataPointAttribute]));
                 if (tempExt[0] !== undefined && tempExt[0] < extent[0]) {
                     extent[0] = tempExt[0];
                 }
@@ -104,7 +111,7 @@ const vizUtils = (
                 .call(d3.axisLeft(yScale));
 
             for (const simID in allData) {
-                const data = allData[simID].media["scalars"][key];
+                const data = allData[simID].getScalar(key);
                 const pline = svg
                     .append("path")
                     .datum(data)
@@ -187,7 +194,7 @@ const vizUtils = (
                 .range([margin.left, width - margin.right]);
 
             for (const simID in allData) {
-                const data = allData[simID].media[type][key];
+                const data = allData[simID].getData(key);
                 if (data === undefined) { continue; }
                 for (const point of data) {
                     createMMI(point, svg, xScale)

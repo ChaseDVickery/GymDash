@@ -282,9 +282,11 @@ function updateData() {
             for (let j = 0; j < allDataReports.length; j++) {
                 const simID = allDataReports[j].simID;
                 if (!Object.hasOwn(allData, simID)) {
-                    allData[simID] = dataUtils.createEmptyDataReport(simID);
+                    // allData[simID] = dataUtils.createEmptyDataReport(simID);
+                    allData[simID] = new dataUtils.DataReport(simID);
                 }
-                dataUtils.dataReportUnion(allData[simID], allDataReports[j]);
+                // dataUtils.dataReportUnion(allData[simID], allDataReports[j]);
+                allData[simID].addDataReport(allDataReports[j]);
             }
             console.log("ALL DATA");
             console.log(allData);
