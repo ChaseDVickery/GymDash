@@ -59,10 +59,12 @@ class RecordVideoToTensorboard(RecordVideo):
             vid_tensor = th.from_numpy(frame_stack)
             # Video
             logger.info(f"Adding video tensor: {vid_tensor.shape}")
-            self.logger.add_video(self.tag, vid_tensor, self.episode_id, fps=30)
+            self.logger.add_video(self.tag, vid_tensor, self.step_id, fps=30)
+            # self.logger.add_video(self.tag, vid_tensor, self.episode_id, fps=30)
             # Thumbnail
             logger.info(f"Adding video thumbnail tensor: {vid_tensor[0, 0, :, :, :].shape}")
-            self.logger.add_image(self.tag+"_thumbnail", vid_tensor[0, 0, :, :, :], self.episode_id)
+            self.logger.add_image(self.tag+"_thumbnail", vid_tensor[0, 0, :, :, :], self.step_id)
+            # self.logger.add_image(self.tag+"_thumbnail", vid_tensor[0, 0, :, :, :], self.episode_id)
 
         self.recorded_frames = []
         self.recording = False

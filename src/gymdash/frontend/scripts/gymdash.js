@@ -1,5 +1,6 @@
 import { resourceUsageUtils, resourceUsageDisplayUtils } from "./utils/usage.js";
 import { dataUtils } from "./utils/data.js";
+import { vizUtils } from "./utils/viz.js";
 import { mediaUtils } from "./utils/media_utils.js";
 import { apiURL } from "./utils/api_link.js";
 
@@ -673,6 +674,7 @@ function deleteAllSimulations() {
         .then((response) => { return response.json(); })
         .then((info) => {
             sim_selections = {};
+            allData = {};
             refreshSimulationSidebar();
         })
         .catch((error) => { console.error(`Error while deleting all simulations: ${error}`)});
@@ -708,6 +710,7 @@ function deleteSimulations(simIDs) {
     .then((response) => { return response.json(); })
     .then((info) => {
         sim_selections = {};
+        allData = {};
         refreshSimulationSidebar();
     })
     .catch((error) => { console.error(`Error while deleting all simulations: ${error}`)});
@@ -799,67 +802,15 @@ refreshSimulationSidebar();
 openTab(null, "tab-analyze");
 
 
+function createLinePlotForKey(key) {
 
+}
 
 function createPlots() {
-
     const key = "rollout/ep_rew_mean";
-    // const key = "train/learning_rate";
-
-    const margin = {top: 30, right: 30, bottom: 30, left: 60};
-    const tempID = Object.keys(allData)[0]
-    const dataTemp = allData[tempID].media["scalars"][key];
-    const x = dataTemp.map(p => p.step);
-
-    // const extentY = d3.extent(y);
-    const extentY = [0, 500];
-
-    const width = 500;
-    const height = 500;
-    const svg = d3
-        .select("#plots-area")
-        .append("svg")
-        .attr("viewBox", "0 0 700 500")
-        // .attr("preserveAspectRatio", "xMinYMin meet")
-        // .attr("width", width)
-        // .attr("height", height)
-        .style("border", "1px solid black");
-
-    const xScale = d3
-        .scaleLinear()
-        .domain([x[0], x[x.length - 1]])
-        .range([margin.left, width - margin.right]);
-    const yScale = d3
-        .scaleLinear()
-        .domain(extentY)
-        .nice()
-        .range([height - margin.bottom, margin.top]);
-
-    const xAxis = svg
-        .append("g")
-        .attr("transform", `translate(0,${margin.top})`)
-        .call(d3.axisTop(xScale));
-    const yAxis = svg
-        .append("g")
-        .attr("transform", `translate(${margin.left - 1}, 0)`)
-        .call(d3.axisLeft(yScale));
-
-    for (const simID in allData) {
-        console.log(allData[simID].media["scalars"][key]);
-        const data = allData[simID].media["scalars"][key];
-        const y = data.map(p => p.value);
-        const pline = svg
-            .append("polyline")
-            .attr("fill", "none")
-            .attr("stroke", "steelblue")
-            .attr("stroke-width", 1.5)
-            .attr("points", polyline(x, y, xScale, yScale));
-
-        // d3.select("body").append("svg", svg.node());
-
-        // Return early for our test
-        // return;
-    }
+    let svg = vizUtils.createLinePlotForKey(key, allData);
+    svg = vizUtils.addMMIs("episode_video_thumbnail", allData, svg);
+    d3.select("#plots-area").append(() => svg.node());
 }
 
 
