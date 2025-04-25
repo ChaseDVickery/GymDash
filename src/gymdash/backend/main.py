@@ -199,7 +199,7 @@ async def get_sim_progress(sim_query: SimulationInteractionModel):
     query_response = await simulation_tracker.fulfill_query_interaction(sim_query)
     return query_response
 
-@app.get("/get_sims_history")
+@app.get("/get-sims-history")
 async def get_stored_simulations():
     sim_infos = ProjectManager.get_filtered_simulations()
     return sim_infos

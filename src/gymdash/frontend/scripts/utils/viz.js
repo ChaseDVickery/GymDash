@@ -1,7 +1,46 @@
-import { mediaUtils } from "./media_utils.js";
 
 const vizUtils = (
     function() {
+
+        class MMIData {
+            static COLOR_DEFAULT    = "rgba(0,255,0,0.2)";
+            static COLOR_HOVER      = "rgba(0,255,0,1)";
+            static COLOR_SELECT     = "rgba(255,50,0,1)";
+
+            constructor() {
+                this.reports = [];
+                this.keys = [];
+                this.steps = [];
+                this.idxs = [];
+            }
+
+            addData(simDataReport, key, step) {
+                this.reports.push(simDataReport);
+                this.keys.push(key);
+                this.steps.push(step);
+                this.idxs.push(simDataReport.getData(key).findIndex(d => d.step == step));
+                console.log(this);
+            }
+
+            getData() {
+                const data = [];
+                for (let i = 0; i < this.idxs.length; i++) {
+                    const report = this.reports[i];
+                    const key = this.keys[i];
+                    const idx = this.idxs[i];
+                    const datum = report.getData(key)[idx];
+                    const type = report.getKeyType(key);
+                    data.push(
+                        {
+                            simID: report.simID,
+                            type: type,
+                            datum: datum
+                        }
+                    );
+                }
+                return data;
+            }
+        }
 
         // Constants
         const plotWidth = 700;
@@ -10,7 +49,9 @@ const vizUtils = (
         // MMIs
         const mmiDefaultColor = "rgba(0,255,0,0.2)";
         const mmiHoverColor = "rgba(0,255,0,1)";
-        const mmiSelectColor = "rgba(255,50,0,1);"
+        const mmiSelectColor = "rgba(255,50,0,1)";
+        const mmiSideLength = 20;
+        let selectedMMI;
 
         const polyline = function(T, Y, tscale, yscale) {
             return T.map((t, i) => tscale(t).toFixed(1) + "," + yscale(Y[i]).toFixed(1)).join(
@@ -127,24 +168,22 @@ const vizUtils = (
         }
 
         const getMMIPoints = function(offset=[0,0]) {
-            const sideLength = 20;
-
             const data = [
                 [0,0],
-                [-sideLength/2,Math.sqrt(3)*sideLength/2],
-                [sideLength/2,Math.sqrt(3)*sideLength/2],
+                [-mmiSideLength/2,Math.sqrt(3)*mmiSideLength/2],
+                [mmiSideLength/2,Math.sqrt(3)*mmiSideLength/2],
             ]
             return data.map((pt) => pt.map((v, idx) => v + offset[idx]));
         }
-        const createMMI = function(point, svg, xScale) {
+        const createMMI = function(svg, markerPoints) {
             if (svg === undefined) { return undefined; }
-            const width = plotWidth;
-            const height = plotHeight;
-            console.log(point);
-            console.log(xScale(point.step));
-            const markerPoints = getMMIPoints([xScale(point.step), height-margin.bottom]);
+            // const width = plotWidth;
+            // const height = plotHeight;
+            // console.log(point);
+            // console.log(xScale(point.step));
+            // const markerPoints = getMMIPoints([xScale(point.step), height-margin.bottom]);
             const markerPointsString = markerPoints.map(pt => `${pt[0]},${pt[1]}`).join(" ");
-            console.log(markerPointsString);
+            // console.log(markerPointsString);
             return svg.append("polygon")
                 .attr("points", markerPointsString)
                 .attr("stroke", "yellow")
@@ -152,6 +191,7 @@ const vizUtils = (
                 .attr("fill", mmiDefaultColor);
         }
         const mouseoverMMI = function(mmi) {
+            if (selectedMMI === mmi.target) { return; }
             d3.select(this)
                 .attr("fill", mmiHoverColor);
         }
@@ -160,32 +200,39 @@ const vizUtils = (
             //     .attr("fill", "rgba(0,255,0,1)");
         }
         const mouseleaveMMI = function(mmi) {
+            if (selectedMMI === mmi.target) { return; }
             d3.select(this)
                 .attr("fill", mmiDefaultColor);
         }
         const clickMMI = function(mmi) {
-            console.log(mmi);
-            d3.select(this)
+            console.log(selectedMMI);
+            console.log(mmi.target);
+            if (selectedMMI && selectedMMI !== mmi.target) {
+                d3.select(selectedMMI).attr("fill", mmiDefaultColor);
+            }
+            selectedMMI = mmi.target;
+            console.log(selectedMMI);
+            d3.select(selectedMMI)
                 .attr("fill", mmiSelectColor);
         }
-        const addMMIs = function(key, allData, svg) {
+        const addAllMMIs = function(allData, svg, onclick, condense=true) {
+            const mediaKeys = new Set();
+            for (const simID in allData) {
+                allData[simID].getMediaKeys().forEach(mediaKeys.add, mediaKeys);
+            }
+            console.log("mediaKeys");
+            console.log(mediaKeys);
+            const createdMMIs = [];
+            for (const key of mediaKeys) {
+                addMMIs(key, allData, svg, onclick, condense, createdMMIs);
+            }
+        }
+        const addMMIs = function(key, allData, svg, onclick, condense=true, createdMMIs=[]) {
             svg = getPlotOrMakeNew(svg);
 
             const width = plotWidth;
             const height = plotHeight;
 
-            const tempID = Object.keys(allData)[0]
-            let type = "images";
-            // let type = undefined;
-            // if (Object.hasOwn(allData[tempID].media["images"], key)) {
-            //     type = "images";
-            // } else if (Object.hasOwn(allData[tempID].media["audio"], key)) {
-            //     type = "audio";
-            // }
-            // if (type === undefined) { console.error("No media key " + key); return svg; }
-
-            // const extentY = d3.extent(y);
-            // const extentX = extentOf(allData, key, undefined, "step");
             const extentX = [0, 100000];
 
             const xScale = d3
@@ -193,23 +240,59 @@ const vizUtils = (
                 .domain(extentX)
                 .range([margin.left, width - margin.right]);
 
+            // const createdMMIs = [];
+
             for (const simID in allData) {
                 const data = allData[simID].getData(key);
                 if (data === undefined) { continue; }
                 for (const point of data) {
-                    createMMI(point, svg, xScale)
-                        .on("mouseover", mouseoverMMI)
-                        .on("mousemove", mousemoveMMI)
-                        .on("mouseleave", mouseleaveMMI)
-                        .on("click", clickMMI);
+                    // Check if this point would be too close to an existing
+                    // MMI. If so, then get that MMI's MMIData and add this
+                    // point's data to it.
+                    const closestMMIIdx = d3.bisectCenter(createdMMIs.map(d => d.step), point.step);
+                    console.log(closestMMIIdx);
+                    // Check the difference in step value and convert to actual length.
+                    // Compare against the width of MMI markers
+                    if (closestMMIIdx >= 0 && closestMMIIdx < createdMMIs.length) {
+                        console.log("step difference: " + Math.abs(createdMMIs[closestMMIIdx].step - point.step) + ". scale difference: " + Math.abs(xScale(createdMMIs[closestMMIIdx].step) - xScale(point.step)));
+                    }
+                    if (
+                        condense &&
+                        closestMMIIdx >= 0 &&
+                        closestMMIIdx < createdMMIs.length &&
+                        Math.abs(xScale(createdMMIs[closestMMIIdx].step) - xScale(point.step)) < (mmiSideLength)
+                    ) {
+                        // console.log(createdMMIs[closestMMIIdx]);
+                        // console.log(createdMMIs[closestMMIIdx].selection);
+                        // console.log(createdMMIs[closestMMIIdx].selection.data()[0]);
+                        createdMMIs[closestMMIIdx].selection.data()[0].addData(allData[simID], key, point.step);
+                    }
+                    else {
+                        const markerPoints = getMMIPoints([xScale(point.step), height-margin.bottom]);
+                        const mmiData = new MMIData();
+                        mmiData.addData(allData[simID], key, point.step);
+                        const mmi = createMMI(svg, markerPoints)
+                            .data([mmiData])
+                            .on("mouseover", mouseoverMMI)
+                            .on("mousemove", mousemoveMMI)
+                            .on("mouseleave", mouseleaveMMI)
+                            .on("click", function(d) {
+                                clickMMI(d);
+                                if (onclick) { onclick(d); }
+                            });
+                        const created = {step: point.step, selection: mmi};
+                        const insertIdx = sortedIndex(createdMMIs, created, (x) => x.step);
+                        createdMMIs.splice(insertIdx, 0, created);
+                    }
                 }
             }
-            return svg;
+            return createdMMIs;
         }
 
         return {
             createLinePlotForKey,
             addMMIs,
+            addAllMMIs,
         };
     }
 )();

@@ -360,11 +360,11 @@ def pack_simulation_events_to_zip(sim: Simulation, key_event_map: Dict[str, List
                     filename = file_prefix + str(i) + f".{ext}"
                     if isinstance(event, ImageEvent):
                         zip_file.writestr(filename, event.encoded_image_string)
-                        index["images"][filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step)
+                        index["images"][filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step, wall_time=event.wall_time)
                         logger.info(f"packing image for key '{key}' at step '{event.step}' to file '{filename}'")
                     elif isinstance(event, AudioEvent):
                         zip_file.writestr(filename, event.encoded_audio_string)
-                        index["audio"][filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step)
+                        index["audio"][filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step, wall_time=event.wall_time)
                         logger.info(f"packing audio for key '{key}' at step '{event.step}' to file '{filename}'")
         # Add the index file to the zip
         index_data = ZippedIndex(streamer_key="", sim_id=str(sim._project_sim_id), metadata=index)

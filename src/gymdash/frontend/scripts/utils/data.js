@@ -27,6 +27,15 @@ const dataUtils = (
                 this.data = new Map();
             }
 
+            static types() {
+                return [
+                    SCALAR,
+                    IMAGE,
+                    AUDIO,
+                    VIDEO,
+                ];
+            }
+
             /**
              * Combines the data array otherData into the
              * data array in the dataReport's key. This
@@ -151,34 +160,6 @@ const dataUtils = (
                         otherReport.meta.get(key).type
                     );
                 }
-                // for (const key of otherReport.scalar_keys) {
-                //     this.addScalarData(
-                //         key,
-                //         otherReport.data.get(key),
-                //         otherReport.meta.get(key),
-                //     );
-                // }
-                // for (const key of otherReport.image_keys) {
-                //     this.addImageData(
-                //         key,
-                //         otherReport.data.get(key),
-                //         otherReport.meta.get(key),
-                //     );
-                // }
-                // for (const key of otherReport.audio_keys) {
-                //     this.addAudioData(
-                //         key,
-                //         otherReport.data.get(key),
-                //         otherReport.meta.get(key),
-                //     );
-                // }
-                // for (const key of otherReport.video_keys) {
-                //     this.addVideoData(
-                //         key,
-                //         otherReport.data.get(key),
-                //         otherReport.meta.get(key),
-                //     );
-                // }
             }
 
             // QUERY DATA REPORT
@@ -193,6 +174,13 @@ const dataUtils = (
             isImage(key) { return this.image_keys.has(key); }
             isAudio(key) { return this.audio_keys.has(key); }
             isVideo(key) { return this.video_keys.has(key); }
+            getMediaKeys() {
+                return new Set([
+                    ...this.image_keys,
+                    ...this.audio_keys,
+                    ...this.video_keys
+                ]);
+            }
 
             getData(key) {
                 if (!this.data.has(key)) { return []; }
@@ -317,7 +305,7 @@ const dataUtils = (
                                     // Push new object representing media with
                                     // the media url and the step
                                     mediaReport.media[meta.mimetype].push({
-                                        url: mediaSrc,
+                                        value: mediaSrc,
                                         step: meta.step
                                     });
                                 }

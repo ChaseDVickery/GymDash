@@ -58,6 +58,14 @@ const configKeyEntry            = startPanel.querySelector("#config-key1");
 const configFamilyEntry         = startPanel.querySelector("#config-family1");
 const configTypeEntry           = startPanel.querySelector("#config-type1");
 const startSimBtn               = startPanel.querySelector("#start-sim-btn");
+// Plots
+const plotArea                  = document.querySelector("#plots-area");
+// Multimedia Panel
+const mmInstancePanel           = document.querySelector(".media-panel");
+const mmImageSubmediaArea       = mmInstancePanel.querySelector("#image-panel > .media-instance-area");
+const mmAudioSubmediaArea       = mmInstancePanel.querySelector("#audio-panel > .media-instance-area");
+const mmVideoSubmediaArea       = mmInstancePanel.querySelector("#video-panel > .media-instance-area");
+
 
 
 // Prefabs
@@ -104,6 +112,26 @@ function getAllSelections() {
     )
     console.log(mapping);
     return mapping;
+}
+function getSelectedSelections() {
+    const mapping = Array.from(document.querySelectorAll(".sim-selection-checkbox")).reduce(
+        (curr_map, curr_chkbox) => {
+            if (curr_chkbox.checked) {
+                curr_map[curr_chkbox.id] = curr_chkbox.parentElement.parentElement;
+            }
+            return curr_map;
+        },
+        {}
+    )
+    return mapping;
+}
+function getSelectedData() {
+    const selectedSelections = getSelectedSelections();
+    const selectedData = {};
+    for (const id in selectedSelections) {
+        selectedData[id] = allData[id];
+    }
+    return selectedData;
 }
 
 function displayNumberOutput(num) {
@@ -535,7 +563,7 @@ function refreshSimulationSidebar() {
         selection.parentElement.removeChild(selection);
     });
     // Fetch sim history in backend DB
-    fetch(apiURL("get_sims_history"))
+    fetch(apiURL("get-sims-history"))
     .then((response) => response.json())
     .then((infos) => {
         // Should be list of StartedSimulationInfo
@@ -595,7 +623,8 @@ function createSimSelection(config, simID) {
     const label = newSelection.querySelector("label");
     const input = newSelection.querySelector(".sim-selection-checkbox")
     input.id            = selectionID;
-    label.htmlFor           = selectionID;
+    input.checked       = true;
+    label.htmlFor       = selectionID;
     label.textContent   = config.name;
     simSidebar.appendChild(newSelection);
     // Set up cancel button
@@ -803,15 +832,73 @@ setInterval(updateAllSimSelectionProgress, defaultSimProgressUpdateInterval);
 refreshSimulationSidebar();
 openTab(null, "tab-analyze");
 
-
-function createLinePlotForKey(key) {
-
+function clearMainPlot() {
+    const svgs = plotArea.querySelectorAll("svg");
+    for (let i = 0; i < svgs.length; i++) {
+        plotArea.removeChild(svgs[i]);
+    }
 }
-
+function clearMediaPanel() {
+    const submediaAreas = document.querySelectorAll(".media-instance-area");
+    for (let i = 0; i < submediaAreas.length; i++) {
+        const mmInstancePanels = submediaAreas[i].querySelectorAll(".multimedia-instance-panel");
+        for (const mmip of mmInstancePanels) {
+            submediaAreas[i].removeChild(mmip);
+        }
+    }
+}
+function showMMInstance(simID, type, datum) {
+    let panel;
+    if (type === dataUtils.DataReport.IMAGE) {
+        panel = prefabImageMedia.cloneNode(true);
+        mmImageSubmediaArea.appendChild(panel);
+    }
+    else if (type === dataUtils.DataReport.AUDIO) {
+        panel = prefabAudioMedia.cloneNode(true);
+        mmAudioSubmediaArea.appendChild(panel);
+    }
+    else if (type === dataUtils.DataReport.VIDEO) {
+        panel = prefabVideoMedia.cloneNode(true);
+        mmVideoSubmediaArea.appendChild(panel);
+    }
+    if (!panel) { return panel; }
+    const mediaArea = panel.querySelector(".media-area");
+    mediaArea.firstElementChild.src = datum.value;
+    const caption = panel.querySelector(".media-info");
+    const simSelection = getAllSelections()[simID];
+    caption.textContent = `sim: ${simSelection.querySelector("label").textContent}`;
+    return panel;
+}
+function displayMMIData(mmiData) {
+    console.log("display mmi data");
+    console.log(mmiData);
+    clearMediaPanel();
+    const data = mmiData.getData();
+    for (const datapoint of data) {
+        const newInstancePanel = showMMInstance(datapoint.simID, datapoint.type, datapoint.datum);
+    }
+}
+function onClickMMI(d) {
+    const mmiData = d3.select(d.target).data()[0];
+    displayMMIData(mmiData);
+}
 function createPlots() {
     const key = "rollout/ep_rew_mean";
-    let svg = vizUtils.createLinePlotForKey(key, allData);
-    svg = vizUtils.addMMIs("episode_video_thumbnail", allData, svg);
+
+    clearMainPlot();
+
+    const selectedData = getSelectedData();
+
+    let svg = vizUtils.createLinePlotForKey(key, selectedData);
+
+    const condense = true;
+    vizUtils.addAllMMIs(selectedData, svg, onClickMMI, condense);
+
+    // vizUtils.addAllMMIs(allData, svg, onClickMMI);
+
+    // const createdMMIs = vizUtils.addMMIs("episode_video_thumbnail", allData, svg, onClickMMI);
+    // vizUtils.addMMIs("episode_video", allData, svg, onClickMMI, createdMMIs);
+    
     d3.select("#plots-area").append(() => svg.node());
 }
 
