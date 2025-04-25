@@ -445,7 +445,9 @@ class ProjectManager:
         logger.info(f"Cleared simulations '{sim_ids}' from simulations table")
 
         # Delete all simulation subfolders if possible
+        sim_dir_names = [str(id) for id in sim_ids]
         for path in os.listdir(ProjectManager.sims_folder()):
-            if (os.path.isdir(path) and os.path.basename(path) in ids):
-                shutil.rmtree(path, ignore_errors=True)
-                logger.info(f"Cleared simulation subfolder at '{ProjectManager.sims_folder()}'")
+            final_path = os.path.join(ProjectManager.sims_folder(), path)
+            if (os.path.isdir(final_path) and os.path.basename(final_path) in sim_dir_names):
+                shutil.rmtree(final_path, ignore_errors=True)
+                logger.info(f"Cleared simulation subfolder at '{final_path}'")

@@ -49,8 +49,10 @@ let allData = {};
 const simSidebar = document.querySelector(".sim-selection-sidebar");
 // Control
 const startPanel                = document.querySelector("#start-panel");
+const controlColumn             = document.querySelector(".control-column");
 const controlPanel              = document.querySelector("#control-panel");
 const controlResponsePanel      = document.querySelector("#control-response-panel");
+const queryColumn               = document.querySelector(".query-column");
 const queryPanel                = document.querySelector("#query-panel");
 const queryResponsePanel        = document.querySelector("#query-response-panel");
 const configNameEntry           = startPanel.querySelector("#config-name1");
@@ -58,6 +60,8 @@ const configKeyEntry            = startPanel.querySelector("#config-key1");
 const configFamilyEntry         = startPanel.querySelector("#config-family1");
 const configTypeEntry           = startPanel.querySelector("#config-type1");
 const startSimBtn               = startPanel.querySelector("#start-sim-btn");
+const scheduleSimBtn            = startPanel.querySelector("#schedule-sim-btn");
+
 // Plots
 const plotArea                  = document.querySelector("#plots-area");
 // Multimedia Panel
@@ -75,6 +79,7 @@ const prefabKwarg               = document.querySelector(".prefab.kwarg");
 const prefabImageMedia          = document.querySelector(".prefab.multimedia-instance-panel.image-instance-panel");
 const prefabAudioMedia          = document.querySelector(".prefab.multimedia-instance-panel.audio-instance-panel");
 const prefabVideoMedia          = document.querySelector(".prefab.multimedia-instance-panel.video-instance-panel");
+const resizerBarPrefab          = document.querySelector(".prefab.resizer-bar");
 prefabSimSelectBox.parentElement.removeChild(prefabSimSelectBox);
 prefabKwargPanel.parentElement.removeChild(prefabKwargPanel);
 prefabKwarg.parentElement.removeChild(prefabKwarg);
@@ -634,6 +639,7 @@ function createSimSelection(config, simID) {
     return newSelection;
 }
 function validID(simID) { return noID !== simID; }
+
 function startSimulation() {
     // Read relevant information and gather kwargs
     const config = entryToConfig();
@@ -822,6 +828,7 @@ simTestTimestepsSlider.addEventListener("change", (e) => {
 
 
 startSimBtn.addEventListener("click", startSimulation);
+// scheduleSimBtn.addEventListener("click", scheduleSimulation);
 
 
 
@@ -903,70 +910,76 @@ function createPlots() {
 }
 
 
-function polyline(T, Y, tscale, yscale) {
-    return T.map((t, i) => tscale(t).toFixed(1) + "," + yscale(Y[i]).toFixed(1)).join(
-        " "
-    );
-}
+addResizeBar(plotArea, "ew");
+addResizeBar(startPanel);
+// addResizeBar(controlColumn);
+addResizeBar(queryColumn, "ew", "before");
+// addResizeBar(queryColumn, "ew", "after");
+// queryPanel
 
-function test(nodeThing="body") {
-    const margin = {top: 30, right: 30, bottom: 30, left: 60};
-    const n = 10;
-    const x = d3.range(0, n);
-    const y = x.map((t) => 0.5 * Math.pow(t, 1.5));
+// Adapted from:
+// https://stackoverflow.com/questions/8960193/how-to-make-html-element-resizable-using-pure-javascript
+function addResizeBar(resizablePanel, direction="ew", position="after") {
+    var startX, startY, startWidth, startHeight;
+    const newBar = resizerBarPrefab.cloneNode(true);
+    newBar.classList.add(direction);
+    if (position === "after") {
+        resizablePanel.after(newBar);
+    } else if (position === "before") {
+        resizablePanel.before(newBar);
+    }
 
-    const extentY = d3.extent(y);
+    // var resizer = document.querySelector(".resizer-bar");
+    // var p = plotArea;
+    function initDrag(e) {
+        startX = e.clientX;
+        startY = e.clientY;
+        startWidth = parseInt(document.defaultView.getComputedStyle(resizablePanel).width, 10);
+        startHeight = parseInt(document.defaultView.getComputedStyle(resizablePanel).height, 10);
+        document.documentElement.addEventListener('mousemove', doDrag, false);
+        document.documentElement.addEventListener('mouseup', stopDrag, false);
+    }
+    
+    function doDrag(e) {
+        if (direction === "ew") {
+            const change = e.clientX;
+            if (position === "after") {
+                resizablePanel.style.width = (startWidth + change - startX) + 'px';
+            } else {
+                resizablePanel.style.width = (startWidth + startX - change) + 'px';
+            }
+            
+        } else if (direction === "ns") {
+            const change = e.clientY;
+            if (position === "after") {
+                resizablePanel.style.height = (startHeight + change - startY) + 'px';
+            } else {
+                resizablePanel.style.height = (startHeight + startY - change) + 'px';
+            }
+        }
+       
+    //    p.style.height = (startHeight + e.clientY - startY) + 'px';
+    }
+    
+    function stopDrag(e) {
+        document.documentElement.removeEventListener('mousemove', doDrag, false);
+        document.documentElement.removeEventListener('mouseup', stopDrag, false);
+    }
 
-    const width = 500;
-    const height = 500;
-    const svg = d3
-        .select(nodeThing)
-        .append("svg")
-        .attr("viewBox", "0 0 700 500")
-        // .attr("preserveAspectRatio", "xMinYMin meet")
-        // .attr("width", width)
-        // .attr("height", height)
-        .style("border", "1px solid black");
+    // var p = document.querySelector('.media-panel'); // element to make resizable
+    
 
-    const xScale = d3
-        .scaleLinear()
-        .domain([x[0], x[x.length - 1]])
-        .range([margin.left, width - margin.right]);
-    const yScale = d3
-        .scaleLinear()
-        .domain(extentY)
-        .nice()
-        .range([height - margin.bottom, margin.top]);
-    console.log("xScale: " + xScale);
-    console.log("yScale: " + yScale);
+    newBar.addEventListener('mousedown', initDrag, false);
 
-    const xAxis = svg
-        .append("g")
-        .attr("transform", `translate(0,${margin.top})`)
-        .call(d3.axisTop(xScale));
-    const yAxis = svg
-        .append("g")
-        .attr("transform", `translate(${margin.left - 1}, 0)`)
-        .call(d3.axisLeft(yScale));
-
-    const pline = svg
-        .append("polyline")
-        .attr("fill", "none")
-        .attr("stroke", "steelblue")
-        .attr("stroke-width", 1.5)
-        .attr("points", polyline(x, y, xScale, yScale));
-
-    // d3.select("body").append("svg", svg.node());
-}
-
-// test("#plots-area");
-
-
-function plotVideosTest() {
-    dataUtils.getAllNewImages()
-        .then((results) => {
-            console.log(results);
-            const gif_src = mediaUtils.binaryToGIF(results);
-            imageTestOut.src = gif_src;
-        });
+    // resizer.addEventListener('click', function init() {
+    //     p.removeEventListener('click', init, false);
+    //     p.className = p.className + ' resizable';
+    //     // var resizer = document.createElement('div');
+    //     // resizer.className = 'resizer';
+    //     // p.appendChild(resizer);
+    //     resizer.addEventListener('mousedown', initDrag, false);
+    //     // resizer.style.minWidth = "50px";
+    //     // resizer.style.width = "50px";
+    //     // resizer.style.flex = "1 1 50px";
+    // }, false);
 }

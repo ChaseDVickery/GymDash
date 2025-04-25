@@ -44,3 +44,18 @@
         align-items: center;
     }
 }
+
+
+
+.resizer-bar.ew {
+    border: dashed 1px var(--main-contrast-color);
+    min-width: 10px;
+    max-width: 10px;
+    cursor: ew-resize;
+}
+.resizer-bar.ns {
+    border: dashed 1px var(--main-contrast-color);
+    min-height: 10px;
+    max-height: 10px;
+    cursor: ns-resize;
+}

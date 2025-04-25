@@ -109,6 +109,9 @@
             This is some video.
         </p>
     </div>
+    <!-- OTHER -->
+    <!-- Resize Bar -->
+    <div class="prefab resizer-bar"></div>
 
 
 
@@ -190,12 +193,14 @@
     
         <div class="main-content content-panel">
             <div class="tabcontent" id="tab-control">
-                <h2 style="text-align: center;">Start</h2>
-                <h2 style="text-align: center;">Control</h2>
-                <h2 style="text-align: center;">Query</h2>
+                
+                
+                
                 <div class="control-panel content-panel" id="start-panel">
+                    <h2 style="text-align: center;">Start</h2>
                     <div class="config-details-panel">
                         <button class="send contrast-box-opp hoverable" id="start-sim-btn">START</button>
+                        <!-- <button class="send contrast-box-opp hoverable" id="schedule-sim-btn">SCHEDULE</button> -->
 
                         <div class="config-kwarg">
                             <label for="config-name1" class="key">name: </label>
@@ -226,6 +231,7 @@
                 </div>
                 
                 <div class="control-column">
+                    <h2 style="text-align: center;">Control</h2>
                     <!-- Send Control queries. Do not need to wait for response. -->
                     <div class="control-panel content-panel" id="control-panel">
                         <button class="send contrast-box-opp hoverable" id="start-sim-btn">SEND</button>
@@ -245,6 +251,7 @@
                 </div>
                 
                 <div class="query-column">
+                    <h2 style="text-align: center;">Query</h2>
                     <!-- Send information queries. We want to wait for a response or timeout. -->
                     <div class="control-panel content-panel" id="query-panel">
                         <button class="send contrast-box-opp hoverable" id="start-sim-btn">SEND</button>
@@ -274,14 +281,14 @@
 
                     <div class="submedia-panel" id="video-panel">
                         <h4>Videos</h4>
-                        <div class="media-instance-area">
+                        <div class="media-instance-area" id="video-media-area">
 
                         </div>
                     </div>
 
                     <div class="submedia-panel" id="image-panel">
                         <h4>Images</h4>
-                        <div class="media-instance-area">
+                        <div class="media-instance-area" id="image-media-area">
                             <div class="multimedia-instance-panel image-instance-panel">
                                 <!-- Actual media (image, gif, audio player) goes here -->
                                 <div class="media-area">
