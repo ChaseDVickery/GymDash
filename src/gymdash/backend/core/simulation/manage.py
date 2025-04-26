@@ -6,6 +6,7 @@ from datetime import datetime
 from threading import Lock
 from typing import Any, Callable, Dict, Iterable, List, Set, Tuple, Union
 from uuid import UUID, uuid4
+import queue
 
 from gymdash.backend.core.api.models import (InteractorChannelModel,
                                              SimulationInteractionModel,
@@ -168,6 +169,7 @@ class SimulationTracker:
         self.done_sim_map:              Dict[UUID, Simulation] = {}
         self._current_needed_outgoing:  Dict[UUID, Dict[UUID, Set[str]]] = defaultdict(dict)
         self._current_needed_incoming:  Dict[UUID, Dict[UUID, Set[str]]] = defaultdict(dict)
+        self.queued_sims:               List[Tuple[Simulation, Dict[str,Any]]] = []
 
         self._access_mutex:             Lock = Lock()
         
@@ -199,6 +201,32 @@ class SimulationTracker:
     @property
     def is_clearing(self):
         return self._is_clearing
+    
+    async def stop_simulation_call(self, sim_id) -> SimulationInteractionModel:
+        print("STOP_SIMULATION_CALL")
+        sim_id = self._to_key(sim_id)
+        if (sim_id in self.running_sim_map):
+            logger.info("HERE")
+            # Normal call to stop sim
+            results = await self.stop_simulation(sim_id)
+            return results
+        else:
+            logger.info("THERE")
+            # Check in queued simulations to remove it
+            num_queued = len(self.queued_sims)
+            for i in range(num_queued-1, -1, -1):
+                logger.info(f"{self.queued_sims[i][0]._project_sim_id} vs {sim_id}")
+                if (self.queued_sims[i][0]._project_sim_id is not None and self.queued_sims[i][0]._project_sim_id == sim_id):
+                    popped = self.queued_sims.pop(i)
+                    popped[0].set_cancelled()
+                    # self.update_sim_dbs([sim_id])
+                    ProjectManager.add_or_update_simulation(sim_id, popped[0])
+                    self._set_sim_done(sim_id, popped[0])
+                    return SimulationInteractionModel(
+                        id=str(sim_id),
+                        stop_simulation=InteractorChannelModel(triggered=True, value=""),
+                        cancelled=InteractorChannelModel(triggered=popped[0]._meta_cancelled, value=""),
+                    )
     
     async def stop_simulation(self, sim_id):
         if (sim_id not in self.running_sim_map):
@@ -255,6 +283,7 @@ class SimulationTracker:
         self._current_needed_outgoing.clear()
         self._current_needed_incoming.clear()
         self.callback_groups.clear()
+        self.queued_sims.clear()
         self._is_clearing_internal = False
         self._is_clearing = False
         return responses
@@ -285,7 +314,13 @@ class SimulationTracker:
         # Now clear out all my maps and such
         for sim_id in stop_sim_ids:
             if self.running_sim_map.pop(sim_id, None) is None:
-                self.done_sim_map.pop(sim_id, None)
+                if self.done_sim_map.pop(sim_id, None) is None:
+                    # Now try to remove from queud sims if queued
+                    num_queued = len(self.queued_sims)
+                    for i in range(num_queued-1, -1, -1):
+                        if (self.queued_sims[i][0]._project_sim_id is not None and self.queued_sims[i][0]._project_sim_id == sim_id):
+                            self.queued_sims.pop(i)
+
         return responses
         
     def load_old_simulations_from_info(self, stored_infos: List[StoredSimulationInfo]):
@@ -384,7 +419,7 @@ class SimulationTracker:
         else:
             return (True, sim)
     def get_sim(self, sim_key: Union[str, UUID]) -> Union[Simulation, None]:
-        print(f"SimulationTracker done_sim_map: {self.done_sim_map}")
+        logger.debug(f"SimulationTracker done_sim_map: {self.done_sim_map}")
         return self._get_sim_internal(sim_key)
     def get_sims(self, sim_keys: List[Union[str, UUID]]) -> List[Union[Simulation, None]]:
         return [self.get_sim(key) for key in sim_keys]
@@ -481,9 +516,11 @@ class SimulationTracker:
             to_create: SimulationStartConfig = to_create
             simulation = SimulationRegistry.make(to_create.sim_key, to_create)
             logger.info(f"Created simulation object with config (type='{to_create.sim_key}', id='{new_id}')")
-        else:
+        elif is_sim:
             to_create: Simulation = to_create
             simulation = to_create
+            new_id = new_id if simulation._project_sim_id is None else simulation._project_sim_id
+            simulation._project_sim_id = new_id
             logger.info(f"Creating existing simulation object (id='{new_id}')")
         if simulation is None:
             logger.warning(f"Could not create valid simulation.")
@@ -554,7 +591,34 @@ class SimulationTracker:
         logger.warning(f"Could not start simulation (key='{id}')")
         return (SimulationTracker.no_id, None)
     
-    
+    def start_next_queued_sim(self) -> Tuple[UUID, Simulation]:
+        if self._is_clearing:
+            return (SimulationTracker.no_id, None)
+        if len(self.queued_sims) > 0:
+            # with self._access_mutex:
+            to_start, kwargs = self.queued_sims.pop(0)
+            logger.info(f"Starting queued simulation {to_start._project_sim_id}")
+            logger.debug(f"Starting queued simulation {to_start._project_sim_id} with kwargs {kwargs}")
+            return self.start_sim(to_start, **kwargs)
+
+    def queue_sim(
+        self,
+        to_start: Union[str, SimulationStartConfig, Simulation],
+        **kwargs
+    ) -> Tuple[UUID, Simulation]:
+        # Create new simulation with config, then queue
+        # it if it was created correctly
+        new_id, sim = self.create_simulation(to_start)
+        if (new_id != SimulationTracker.no_id and sim is not None):
+            self.queued_sims.append((
+                sim,
+                kwargs
+            ))
+        else:
+            logger.warning(f"Could not queue simulation because created simulation was invalid")
+        if len(self.running_sim_map) < 1 and len(self.queued_sims) > 0:
+            return self.start_next_queued_sim()
+        return (new_id, sim)
 
     def add_running_sim(
         self,
@@ -581,6 +645,11 @@ class SimulationTracker:
     def on_sim_done(self, sim_ids: Iterable[Union[str, UUID]]) -> None:
         self.remove_sims(sim_ids)
         self.update_sim_dbs(sim_ids)
+        # If there are not simulations left running,
+        # then start a queued simulation
+        if len(self.running_sim_map) < 1:
+                self.start_next_queued_sim()
+            
     def update_sim_dbs(self, sim_ids: Iterable[Union[str, UUID]]) -> None:
         for sim_key in sim_ids:
             key = self._to_key(sim_key)
@@ -735,9 +804,3 @@ class SimulationTracker:
 
         self._end_query(interaction_id)
         return response_data
-
-    # async def fulfill_post_interaction(self, sim_query: SimulationInteractionModel):
-
-    def send_interactions(self, sim_key, interactions: Dict[str, Any]):
-        """Send interactions"""
-        pass

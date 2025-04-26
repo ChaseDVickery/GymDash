@@ -508,12 +508,18 @@ const dataUtils = (
                     // The backend already sent a zip blob,
                     // we just need to interpret it as a zip.
                     console.log("Done fetching ALL simulation data");
-                    const blob = response.blob();
-                    // Return promise of media report
-                    return generateStatReportFromZip(blob);
+                    if (response.ok) {
+                        const blob = response.blob();
+                        // Return promise of media report
+                        return generateStatReportFromZip(blob);
+                    } else {
+                        return Promise.resolve(new DataReport(simID));
+                    }
+                    
                 })
                 .catch((error) => {
-                    console.error(`Problem calling getAll on '${simID}': ${error}`)
+                    console.error(`Problem calling getAll on '${simID}': ${error}. Returning promise of empty data report`);
+                    return Promise.resolve(new DataReport(simID));
                 })
         }
 

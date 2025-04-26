@@ -436,7 +436,7 @@ class Simulation():
 
         self._project_info_set: bool            = False
         self._project_sim_id: UUID              = None
-        self._project_sim_base_path: str             = None
+        self._project_sim_base_path: str        = None
 
     @property
     def sim_path(self) -> Union[str, None]:
@@ -502,7 +502,10 @@ class Simulation():
         return self.config.name
     @property
     def is_done(self) -> bool:
-        return self.from_disk or self.force_stopped or not self.thread.is_alive() 
+        return  self.from_disk or \
+                self.force_stopped or \
+                self.thread is None or \
+                not self.thread.is_alive()
 
     def _overwrite_new_kwargs(self, old_kwargs, *args) -> Dict[str, Any]:
         """

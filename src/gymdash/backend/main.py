@@ -8,6 +8,7 @@ import traceback
 from contextlib import asynccontextmanager
 from random import randint
 from threading import Thread
+from typing import Union
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
@@ -191,7 +192,21 @@ async def start_new_simulation_call(config: SimulationStartConfig):
         return { "id": str(simulation_tracker.no_id) }
     id, _ = simulation_tracker.start_sim(config)
     return { "id": str(id) }
+@app.post("/queue-new-sim")
+async def queue_new_simulation_call(config: SimulationStartConfig):
+    logger.debug(f"API called queue-new-sim with config: {config}")
+    if simulation_tracker.is_clearing:
+        return { "id": str(simulation_tracker.no_id) }
+    # id, _ = simulation_tracker.start_sim(config)
+    id, _ = simulation_tracker.queue_sim(config)
+    return { "id": str(id) }
 
+@app.post("/cancel-sim")
+async def cancel_sim(sim_query: Union[SimulationInteractionModel, SimulationIDModel]):
+    if simulation_tracker.is_clearing:
+        return {}
+    query_response = await simulation_tracker.stop_simulation_call(sim_query.id)
+    return query_response
 @app.post("/query-sim")
 async def get_sim_progress(sim_query: SimulationInteractionModel):
     if simulation_tracker.is_clearing:

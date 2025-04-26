@@ -60,7 +60,7 @@ const configKeyEntry            = startPanel.querySelector("#config-key1");
 const configFamilyEntry         = startPanel.querySelector("#config-family1");
 const configTypeEntry           = startPanel.querySelector("#config-type1");
 const startSimBtn               = startPanel.querySelector("#start-sim-btn");
-const scheduleSimBtn            = startPanel.querySelector("#schedule-sim-btn");
+const queueSimBtn               = startPanel.querySelector("#queue-sim-btn");
 
 // Plots
 const plotArea                  = document.querySelector("#plots-area");
@@ -304,7 +304,8 @@ function updateData() {
                     return Promise.resolve(dataReport);
                 })
                 .catch((error) => {
-
+                    console.error("Problem updating data for simulation " + simID + ". Returning promise of empty data report");
+                    return Promise.resolve(new dataUtils.DataReport(simID));
                 })
         );
     }
@@ -436,7 +437,13 @@ function controlStopSim(simID) {
         timeout: defaultTimeout,
         stop_simulation: {triggered: true, value: null},
     };
-    return query(q);
+    return fetch(apiURL("cancel-sim"), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(q),
+    }).then((response) => { return response.json(); });
 }
 // Returns a promise of the simulation query
 function query(queryBody) {
@@ -639,7 +646,33 @@ function createSimSelection(config, simID) {
     return newSelection;
 }
 function validID(simID) { return noID !== simID; }
-
+function queueSimulation() {
+    // Read relevant information and gather kwargs
+    const config = entryToConfig();
+    fetch(apiURL("queue-new-sim"), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(config),
+    })
+    .then((response) => response.json())
+    .then((info) => {
+        console.log(info);
+        const simID = info.id;
+        if (!validID(simID)) {
+            return info;
+        }
+        const newSelection = createSimSelection(config, simID);
+        // Store new simulation in tracker
+        sim_selections[simID] = newSelection;
+        console.log(info);
+        return info;
+    })
+    .catch((error) => {
+        console.error("Error: " + error);
+    });
+}
 function startSimulation() {
     // Read relevant information and gather kwargs
     const config = entryToConfig();
@@ -828,7 +861,7 @@ simTestTimestepsSlider.addEventListener("change", (e) => {
 
 
 startSimBtn.addEventListener("click", startSimulation);
-// scheduleSimBtn.addEventListener("click", scheduleSimulation);
+queueSimBtn.addEventListener("click", queueSimulation);
 
 
 
