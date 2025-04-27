@@ -30,7 +30,7 @@ const deleteSelectedSimsTestBtn = document.querySelector("#delete-selected-sims-
 
 // Constants
 const defaultSimProgressUpdateInterval = 2000;  // (ms)
-const defaultTimeout = 5.0; // (s)
+const defaultTimeout = 0.5; // (s)
 const noID = "00000000-0000-0000-0000-000000000000"; // (str(UUID))
 
 // Structures
@@ -61,6 +61,8 @@ const configFamilyEntry         = startPanel.querySelector("#config-family1");
 const configTypeEntry           = startPanel.querySelector("#config-type1");
 const startSimBtn               = startPanel.querySelector("#start-sim-btn");
 const queueSimBtn               = startPanel.querySelector("#queue-sim-btn");
+const sendControlBtn            = document.querySelector("#send-control-btn");
+const sendQueryBtn              = document.querySelector("#send-query-btn");
 
 // Plots
 const plotArea                  = document.querySelector("#plots-area");
@@ -118,6 +120,12 @@ function getAllSelections() {
     console.log(mapping);
     return mapping;
 }
+/**
+ * Return a mapping from each selected simulation ID to the selected
+ * selection object.
+ * 
+ * @returns Object mapping each selected simulation ID to the selection object.
+ */
 function getSelectedSelections() {
     const mapping = Array.from(document.querySelectorAll(".sim-selection-checkbox")).reduce(
         (curr_map, curr_chkbox) => {
@@ -416,6 +424,12 @@ function testQueryProgress() {
     })
 }
 
+function createQueryBody(simID, timeout=defaultTimeout) {
+    return {
+        id: simID,
+        timeout: timeout
+    };
+}
 function queryProgress(simID, onlyStatus=False) {
     if (!validID(simID)) { return Promise.resolve({id: noID}); }
     const q = {
@@ -495,9 +509,13 @@ function convertKwargValue(valueString) {
     else if (!Number.isNaN(Number(valueString))) {
         return Number(valueString);
     }
-    // Just return the trimmed value
+    // Try JSON parsing or Just return the trimmed value
     else {
-        return valueString;
+        try {
+            return JSON.parse(valueString);
+        } catch (e) {
+            return valueString;
+        }
     }
 }
 /**
@@ -569,11 +587,16 @@ function updateSimSelectionProgress(simID, simSelection) {
 
 function refreshSimulationSidebar() {
     // Clear all the current sim selections and remove from DOM
-    const selections = simSidebar.querySelectorAll(".sim-selection-box");
+    // const selections = simSidebar.querySelectorAll(".sim-selection-box");
+    // selections.forEach(selection => {
+    //     selection.parentElement.removeChild(selection);
+    // });
+    const selections = getAllSelections();
+    const selected = getSelectedSelections();
+    for (const id in selections) {
+        selections[id].remove();
+    }
     sim_selections = {};
-    selections.forEach(selection => {
-        selection.parentElement.removeChild(selection);
-    });
     // Fetch sim history in backend DB
     fetch(apiURL("get-sims-history"))
     .then((response) => response.json())
@@ -586,7 +609,8 @@ function refreshSimulationSidebar() {
             if (!validID(simID)) {
                 return info;
             }
-            const newSelection = createSimSelection(config, simID);
+            const startChecked = Object.hasOwn(selected, simID);
+            const newSelection = createSimSelection(config, simID, startChecked);
             // Note: Check to store the simulation in sim_selections because
             // we only want running simulations in sim_selections.
             const meter = newSelection.querySelector(".radial-meter")
@@ -610,6 +634,27 @@ function refreshSimulationSidebar() {
     });
 }
 
+function sendSingleQuery(simID) {
+    // Gather kwargs
+    const kwargs = getKwargs(controlColumn.querySelector(".kwarg-panel"));
+    // Create and send custom query
+    const queryBody = createQueryBody(simID);
+    queryBody.custom_query = {triggered: true, value: kwargs};
+    return query(queryBody);
+}
+function sendQuery() {
+    const selections = getSelectedSelections();
+    const promises = [];
+    for (const simID in selections) {
+        promises.push(sendSingleQuery(simID));
+    }
+    Promise.all(promises)
+        .then((queryInfos) => {
+            console.log("QUERY INFOS:");
+            console.log(queryInfos);
+        })
+}
+
 
 // Turns the entry into a SimulationStartConfig data layout
 function entryToConfig() {
@@ -627,7 +672,7 @@ function entryToConfig() {
     };
     return config;
 }
-function createSimSelection(config, simID) {
+function createSimSelection(config, simID, startChecked=true) {
     const newSelection = prefabSimSelectBox.cloneNode(true);
     // Set up new selection box
     const selectionID = `${simID}`;
@@ -635,7 +680,7 @@ function createSimSelection(config, simID) {
     const label = newSelection.querySelector("label");
     const input = newSelection.querySelector(".sim-selection-checkbox")
     input.id            = selectionID;
-    input.checked       = true;
+    input.checked       = startChecked;
     label.htmlFor       = selectionID;
     label.textContent   = config.name;
     simSidebar.appendChild(newSelection);
@@ -862,7 +907,8 @@ simTestTimestepsSlider.addEventListener("change", (e) => {
 
 startSimBtn.addEventListener("click", startSimulation);
 queueSimBtn.addEventListener("click", queueSimulation);
-
+sendControlBtn.addEventListener("click", sendQuery);
+sendQueryBtn.addEventListener("click", sendQuery);
 
 
 // Setup intervals

@@ -155,6 +155,7 @@ class SimulationInteractor:
     ALL_CHANNELS: Set[str] = set((
         "stop_simulation",
         "progress",
+        "custom_query",
     ))
 
     def __init__(self) -> None:
@@ -221,7 +222,7 @@ class SimulationInteractor:
         else:
             return (False, None)
 
-    def get_in(self, channel_key):
+    def get_in(self, channel_key) -> Tuple[bool, Any]:
         found, channel = self._try_get_channel(channel_key)
         return channel.get_in() if found else (False, None)
         

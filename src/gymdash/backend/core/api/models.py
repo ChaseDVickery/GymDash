@@ -65,12 +65,16 @@ class StoredSimulationInfo(BaseModel):
     sim_type_name: str                  = None
     sim_module_name: str                = None
 
-class InteractorChannelModel(BaseModel):
+class ChannelModel(BaseModel):
     triggered:  bool                = False
+class InteractorChannelModel(ChannelModel):
     value:      Union[str, None]    = None
-
     def __str__(self) -> str:
         return f"ICM(triggered={self.triggered}, value={self.value})"
+class CustomInteractorChannelModel(ChannelModel):
+    value:      Union[Any, None]    = None
+    def __str__(self) -> str:
+        return f"CustomICM(triggered={self.triggered}, value={self.value})"
 
 class SimulationInteractionModel(BaseModel):
     """
@@ -79,7 +83,7 @@ class SimulationInteractionModel(BaseModel):
     """
     # ID really should be a UUID
     id:                 str
-    timeout:            float                               = 0.0
+    timeout:            float                     = 0.0
     # Interaction channels
     stop_simulation:    Union[InteractorChannelModel,None]  = None
     progress:           Union[InteractorChannelModel,None]  = None
@@ -89,8 +93,12 @@ class SimulationInteractionModel(BaseModel):
 
     error_details:      Union[InteractorChannelModel,None]  = None
 
+    custom_query:       Union[CustomInteractorChannelModel,None]  = None
+
+    def get_channel(self, channel_key) -> Union[InteractorChannelModel, CustomInteractorChannelModel, None]:
+        return getattr(self, channel_key, None)
     @property
-    def channels(self) -> List[Tuple[str, InteractorChannelModel]]:
+    def channels(self) -> List[Tuple[str, ChannelModel]]:
         return [
             ("stop_simulation", self.stop_simulation),
             ("progress",        self.progress),
@@ -98,10 +106,11 @@ class SimulationInteractionModel(BaseModel):
             ("cancelled",       self.cancelled),
             ("failed",          self.failed),
             ("error_details",   self.error_details),
+            ("custom_query",    self.custom_query)
         ]
     @property
-    def triggered_channels(self) -> Iterable[Tuple[str, InteractorChannelModel]]:
+    def triggered_channels(self) -> Iterable[Tuple[str, ChannelModel]]:
         return filter(lambda channel: channel[1] is not None and channel[1].triggered, self.channels)
     
     def __str__(self) -> str:
-        return f"SimulationInteractionModel(id={self.id}, timeout={self.timeout}, channels=(stop_simulation={str(self.stop_simulation)}, progress={str(self.progress)}, is_done={str(self.is_done)}, cancelled={str(self.cancelled)}, failed={str(self.failed)}))"
+        return f"SimulationInteractionModel(id={self.id}, timeout={self.timeout}, channels=(stop_simulation={str(self.stop_simulation)}, progress={str(self.progress)}, is_done={str(self.is_done)}, cancelled={str(self.cancelled)}, failed={str(self.failed)}, custom_query={str(self.custom_query)}))"

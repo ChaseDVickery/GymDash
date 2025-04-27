@@ -748,6 +748,7 @@ class SimulationTracker:
         needed_response_keys = set((
             channel_tuple[0] for channel_tuple in query.triggered_channels
         ))
+        logger.debug(f"Query needed response keys: {needed_response_keys}")
         response_data = {}
         # Add the channels keys needed to fulfill this response to the list
         self._current_needed_outgoing[id][interaction_id] = needed_response_keys
@@ -755,7 +756,9 @@ class SimulationTracker:
         # Mark needed response channels by triggering them so the simulation
         # knows to populate the outgoing channel with an update.
         for channel_key in needed_response_keys:
-            sim.interactor.set_in(channel_key, True)
+            incoming_query_channel_ref = query.get_channel(channel_key)
+            if incoming_query_channel_ref is not None:
+                sim.interactor.set_in(channel_key, incoming_query_channel_ref.value)
         
         # After marking channels for output, begin polling loop
         await asyncio.sleep(0)

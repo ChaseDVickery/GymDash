@@ -1,5 +1,8 @@
 import logging
 import os
+import time
+
+from torch.utils.tensorboard import SummaryWriter
 
 try:
     import gymnasium as gym
@@ -19,21 +22,23 @@ try:
     _has_sb = True
 except ImportError:
     _has_sb = False
+try:
+    import numpy as np
+    _has_np = True
+except ImportError:
+    _has_np = False
 from typing import Any, Dict
 
 import gymdash.backend.core.api.config.stat_tags as stat_tags
 from gymdash.backend.core.api.models import SimulationStartConfig
 from gymdash.backend.core.simulation.base import Simulation
 from gymdash.backend.core.simulation.manage import SimulationRegistry
-from gymdash.backend.core.utils.kwarg_utils import overwrite_new_kwargs
 from gymdash.backend.gymnasium.wrappers.RecordVideoToTensorboard import \
     RecordVideoToTensorboard
 from gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import (
     TensorboardStreamer, TensorboardStreamWrapper)
-from gymdash.backend.project import ProjectManager
 from gymdash.backend.stable_baselines.callbacks import \
     SimulationInteractionCallback
-from gymdash.start import start
 
 logger = logging.getLogger(__name__)
 
@@ -185,6 +190,126 @@ class StableBaselinesSimulation(Simulation):
         env.close()
 
 
+class CustomControlSimulation(Simulation):
+    def __init__(self, config: SimulationStartConfig) -> None:
+        if not _has_np:
+            raise ImportError(f"Install numpy to use example simulation {type(self)}.")
+        super().__init__(config)
+        
+    def _create_streamers(self, kwargs: Dict[str, Any]):
+        experiment_name = f"custom"
+        tb_path = os.path.join("tb", experiment_name)
+        if self._project_info_set:
+            tb_path = os.path.join(self.sim_path, tb_path)
+        self.streamer.get_or_register(TensorboardStreamer(
+            tb_path,
+            {
+                stat_tags.TB_SCALARS: ["my_number"],
+            }
+        ))
+
+    def create_kwarg_defaults(self):
+        return {
+            "poll_period":      0.5,
+            "total_runtime":    30,
+            "pause_points":     [],
+            "other_kwargs":     {}
+        }
+    
+    def handle_interactions(self):
+        self.interactor.set_out_if_in("progress", (self.curr_timesteps, self.total_timesteps))
+        # HANDLE INCOMING INFORMATION
+        if self.interactor.set_out_if_in("stop_simulation", True):
+            self.simulation.set_cancelled()
+            return False
+        return True
+
+    def _setup(self, **kwargs):
+        kwargs = self._overwrite_new_kwargs(self.kwarg_defaults, self.config.kwargs, kwargs)
+
+    def _run(self, **kwargs):
+        kwargs = self._overwrite_new_kwargs(self.kwarg_defaults, self.config.kwargs, kwargs)
+        config = self.config
+
+        # Check required kwargs
+        poll_period         = kwargs["poll_period"]
+        total_runtime       = kwargs["total_runtime"]
+        pause_points        = sorted(kwargs["pause_points"])
+        other_kwargs        = kwargs["other_kwargs"]
+
+        experiment_name = f"custom"
+        tb_path = os.path.join("tb", experiment_name)
+        if self._project_info_set:
+            tb_path = os.path.join(self.sim_path, tb_path)
+
+        # Wrappers
+        # Use StreamerRegistry to see if there is an existing Streamer with
+        # the same streamer_name. In this case, the streamer_name checked is
+        # just the tensorboard path (tb_path). This helps keep only one streamer
+        # in charge of one tb folder.
+        tb_streamer = self.streamer.get_or_register(TensorboardStreamer(
+                tb_path,
+                {
+                    stat_tags.TB_SCALARS: ["my_number"]
+                }
+            ))
+        
+        writer = SummaryWriter(tb_path)
+
+        st = time.time()
+        try:
+            step = 0
+            timer = 0
+            curr_pause_point = 0
+            while (timer < total_runtime):
+                # Manage pause points
+                # Pause if we are at the next pause point time
+                if curr_pause_point < len(pause_points) and timer >= pause_points[curr_pause_point]:
+                    # Once we get a custom query with a "continue" key, then
+                    # we can increment the pause point index and move on
+                    while True:
+                        # Handle normal
+                        self.interactor.set_out_if_in("progress", (timer, total_runtime))
+                        # Handle custom
+                        triggered, custom = self.interactor.get_in("custom_query")
+                        if triggered and "continue" in custom:
+                            self.interactor.set_out("custom_query", custom)
+                            break
+                        else:
+                            time.sleep(0.1)
+                        # HANDLE INCOMING INFORMATION
+                        if self.interactor.set_out_if_in("stop_simulation", True):
+                            self.set_cancelled()
+                            writer.close()
+                            return
+                    curr_pause_point += 1
+                start_time = time.time()
+                # Perform functions
+                writer.add_scalar("my_number", step + 2*np.random.random(), step)
+                step += 1
+                # Handle interactions
+                self.interactor.set_out_if_in("progress", (timer, total_runtime))
+                # HANDLE INCOMING INFORMATION
+                if self.interactor.set_out_if_in("stop_simulation", True):
+                    self.set_cancelled()
+                    writer.close()
+                    return
+                # Sleep until the poll period is done
+                end_time = time.time()
+                time_taken = end_time - start_time
+                sleep_time = max(poll_period - time_taken, 0)
+                time.sleep(sleep_time)
+                timer += max(time_taken, poll_period)
+        except Exception as e:
+            self._meta_failed = True
+            self.add_error_details(str(e))
+            
+        et = time.time()
+        logger.debug(f"total time taken: {et-st}")
+        writer.close()
+
+
 
 def register_example_simulations():
     SimulationRegistry.register("stable_baselines", StableBaselinesSimulation)
+    SimulationRegistry.register("custom_control", CustomControlSimulation)
