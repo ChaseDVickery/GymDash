@@ -65,6 +65,14 @@ class StoredSimulationInfo(BaseModel):
     sim_type_name: str                  = None
     sim_module_name: str                = None
 
+class ControlRequestDetails(BaseModel):
+    key: str
+    details: str = ""
+    subkeys: Union[List[str], None] = None
+
+class ControlRequestBatch(BaseModel):
+    requests: Dict[UUID, Dict[str, List[ControlRequestDetails]]]
+
 class ChannelModel(BaseModel):
     triggered:  bool                = False
 class InteractorChannelModel(ChannelModel):

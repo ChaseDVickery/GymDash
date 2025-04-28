@@ -81,13 +81,16 @@ const prefabKwarg               = document.querySelector(".prefab.kwarg");
 const prefabImageMedia          = document.querySelector(".prefab.multimedia-instance-panel.image-instance-panel");
 const prefabAudioMedia          = document.querySelector(".prefab.multimedia-instance-panel.audio-instance-panel");
 const prefabVideoMedia          = document.querySelector(".prefab.multimedia-instance-panel.video-instance-panel");
-const resizerBarPrefab          = document.querySelector(".prefab.resizer-bar");
-prefabSimSelectBox.parentElement.removeChild(prefabSimSelectBox);
-prefabKwargPanel.parentElement.removeChild(prefabKwargPanel);
-prefabKwarg.parentElement.removeChild(prefabKwarg);
-prefabImageMedia.parentElement.removeChild(prefabImageMedia);
-prefabAudioMedia.parentElement.removeChild(prefabAudioMedia);
-prefabVideoMedia.parentElement.removeChild(prefabVideoMedia);
+const prefabResizerBar          = document.querySelector(".prefab.resizer-bar");
+const prefabcontrolRequestBox   = document.querySelector(".prefab.control-request");
+prefabSimSelectBox.remove();
+prefabKwargPanel.remove();
+prefabKwarg.remove();
+prefabImageMedia.remove();
+prefabAudioMedia.remove();
+prefabVideoMedia.remove();
+prefabResizerBar.remove();
+prefabcontrolRequestBox.remove();
 
 const testImageOutputs = []
 
@@ -879,6 +882,10 @@ function clearKwargBox(kwargPanel, deleteRows=false) {
 
 }
 
+function updateControlRequestQueue(requests) {
+
+}
+
 setupKwargBoxes();
 
 
@@ -902,6 +909,18 @@ deleteSelectedSimsTestBtn.addEventListener("click", deleteSelectedSimulations);
 
 simTestTimestepsSlider.addEventListener("change", (e) => {
     testSimTimesteps = Number(e.target.value);
+});
+
+// Listening for control requests sent from server
+const ctrlReqSrc = new EventSource(apiURL("get-control-requests"));
+ctrlReqSrc.onopen = () => {
+    console.log("EventSource connected");
+}
+ctrlReqSrc.addEventListener("retrieval", (event) => {
+    const requests = JSON.parse(event.data);
+    console.log("EventSource REQUESTS");
+    console.log(requests);
+    updateControlRequestQueue(requests);
 });
 
 
@@ -1000,7 +1019,7 @@ addResizeBar(queryColumn, "ew", "before");
 // https://stackoverflow.com/questions/8960193/how-to-make-html-element-resizable-using-pure-javascript
 function addResizeBar(resizablePanel, direction="ew", position="after") {
     var startX, startY, startWidth, startHeight;
-    const newBar = resizerBarPrefab.cloneNode(true);
+    const newBar = prefabResizerBar.cloneNode(true);
     newBar.classList.add(direction);
     if (position === "after") {
         resizablePanel.after(newBar);

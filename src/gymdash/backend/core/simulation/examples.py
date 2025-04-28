@@ -265,6 +265,7 @@ class CustomControlSimulation(Simulation):
                 # Manage pause points
                 # Pause if we are at the next pause point time
                 if curr_pause_point < len(pause_points) and timer >= pause_points[curr_pause_point]:
+                    self.interactor.add_control_request("custom_query", "Please send custom_query with 'continue' key to continue.")
                     # Once we get a custom query with a "continue" key, then
                     # we can increment the pause point index and move on
                     while True:

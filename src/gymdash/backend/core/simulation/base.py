@@ -1,4 +1,5 @@
 import logging
+import copy
 import os
 from abc import abstractmethod
 from collections import defaultdict
@@ -11,7 +12,8 @@ from uuid import UUID, uuid4
 from typing_extensions import Self
 
 from gymdash.backend.core.api.models import (SimulationStartConfig,
-                                             StoredSimulationInfo)
+                                             StoredSimulationInfo,
+                                             ControlRequestDetails)
 from gymdash.backend.core.utils.kwarg_utils import overwrite_new_kwargs
 
 logger = logging.getLogger(__name__)
@@ -150,7 +152,6 @@ class InteractorFlagChannel:
     #     self._consume_in_queued = False
     #     self._consume_out_queued = False
 
-
 class SimulationInteractor:
     ALL_CHANNELS: Set[str] = set((
         "stop_simulation",
@@ -170,6 +171,15 @@ class SimulationInteractor:
         self.triggered_in   = []
         self.triggered_out  = []
 
+        self._has_requests = False
+        self._requests_lock = Lock()
+        self.requests: Dict[str, List[ControlRequestDetails]] = {
+            channel_key:  [] for channel_key in SimulationInteractor.ALL_CHANNELS
+        }
+
+    @property
+    def has_requests(self):
+        return self._has_requests
     @property
     def outgoing(self):
         return { channel_key: channel for channel_key, channel in self.channels.items() if channel.outgoing.triggered }
@@ -193,6 +203,45 @@ class SimulationInteractor:
         self._channel_locks[channel_key].acquire()
     def _release(self, channel_key: str):
         self._channel_locks[channel_key].release()
+
+    def add_control_request(self, channel_key: str, details: str="", *other_keys) -> bool:
+        with self._requests_lock:
+            if channel_key in self.requests:
+                request = ControlRequestDetails(key=channel_key, details=details, subkeys=[*other_keys])
+                self.requests[channel_key].append(request)
+                self._has_requests = True
+                return True
+            else:
+                logger.warning(f"Cannot set new control request for channel '{channel_key}'")
+                return False
+    # def clear_control_requests_for(self, channel_key: str) -> bool:
+    #     with self._requests_lock:
+    #         if channel_key in self.requests:
+    #             self.requests[channel_key].clear()
+    #             return True
+    #         else:
+    #             logger.warning(f"Cannot clear control requests for channel '{channel_key}'")
+    #             return False
+    def clear_all_control_requests(self):
+        with self._requests_lock:
+            self._has_requests = False
+            for request_list in self.requests.values():
+                request_list.clear()
+    # def get_control_requests_for(self, channel_key: str) -> List[ControlRequestDetails]:
+    #     with self._requests_lock:
+    #         if channel_key in self.requests:
+    #             return self.requests[channel_key]
+    #         else:
+    #             logger.warning(f"Cannot get control request for channel '{channel_key}'")
+    #             return []
+    def get_all_control_requests(self) -> Dict[str, List[ControlRequestDetails]]:
+        with self._requests_lock:
+            batch = {}
+            for channel_key in self.requests.keys():
+                # Add requests for channel if any are there
+                if len(self.requests[channel_key]) > 0:
+                    batch[channel_key] = copy.copy(self.requests[channel_key])
+            return batch
             
 
     # def update(self):

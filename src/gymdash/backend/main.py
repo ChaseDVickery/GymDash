@@ -283,6 +283,9 @@ async def get_sim_data_all(query: StatQuery):
         media_type="application/zip"
     )
     
+@app.get("/get-control-requests")
+async def get_control_requests():
+    return StreamingResponse(simulation_tracker.control_request_generator(), media_type="text/event-stream")
 
 # @app.get("/read-key/")
 # async def get_read_test(exp_key: str, key: str, recent: bool = True):

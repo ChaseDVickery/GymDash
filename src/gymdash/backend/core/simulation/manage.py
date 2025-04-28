@@ -1,6 +1,7 @@
 import asyncio
 import functools
 import logging
+import copy
 from collections import defaultdict
 from datetime import datetime
 from threading import Lock
@@ -11,7 +12,8 @@ import queue
 from gymdash.backend.core.api.models import (InteractorChannelModel,
                                              SimulationInteractionModel,
                                              SimulationStartConfig,
-                                             StoredSimulationInfo)
+                                             StoredSimulationInfo,
+                                             ControlRequestBatch)
 from gymdash.backend.core.simulation.base import Simulation
 from gymdash.backend.project import ProjectManager
 from gymdash.backend.core.utils.type_utils import get_type
@@ -203,15 +205,12 @@ class SimulationTracker:
         return self._is_clearing
     
     async def stop_simulation_call(self, sim_id) -> SimulationInteractionModel:
-        print("STOP_SIMULATION_CALL")
         sim_id = self._to_key(sim_id)
         if (sim_id in self.running_sim_map):
-            logger.info("HERE")
             # Normal call to stop sim
             results = await self.stop_simulation(sim_id)
             return results
         else:
-            logger.info("THERE")
             # Check in queued simulations to remove it
             num_queued = len(self.queued_sims)
             for i in range(num_queued-1, -1, -1):
@@ -807,3 +806,28 @@ class SimulationTracker:
 
         self._end_query(interaction_id)
         return response_data
+    
+    async def control_request_generator(self):
+        while True:
+            try:
+                await asyncio.sleep(2)
+                requests = self.get_control_requests()
+                requests_json = requests.model_dump_json()
+                logger.debug(f"control request json: '{requests_json}'")
+                requests_message = f"event: retrieval\ndata: {requests_json}\n\n"
+                yield requests_message
+            except Exception as e:
+                await asyncio.sleep(10)
+    
+    def get_control_requests(self) -> ControlRequestBatch:
+        """
+        Retrieve all control requests for all running simulations and
+        clear the control requests.
+        """
+        control_requests = {}
+        with self._access_mutex:
+            for id, sim in self.running_sim_map.items():
+                if sim.interactor.has_requests:
+                    control_requests[id] = sim.interactor.get_all_control_requests()
+                    sim.interactor.clear_all_control_requests()
+        return ControlRequestBatch(requests=control_requests)
