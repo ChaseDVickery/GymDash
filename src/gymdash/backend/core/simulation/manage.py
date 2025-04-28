@@ -192,7 +192,7 @@ class SimulationTracker:
 
         self.callback_groups:           Dict[UUID, TriggeredCallback] = {}
         
-        
+        self._is_stopping:              bool = False
 
         # loop = asyncio.get_event_loop()
         # loop.create_task(self.purge_loop())
@@ -203,6 +203,9 @@ class SimulationTracker:
     @property
     def is_clearing(self):
         return self._is_clearing
+    
+    def stop(self):
+        self._is_stopping = True
     
     async def stop_simulation_call(self, sim_id) -> SimulationInteractionModel:
         sim_id = self._to_key(sim_id)
@@ -807,17 +810,43 @@ class SimulationTracker:
         self._end_query(interaction_id)
         return response_data
     
+    async def sleep(self, wait_time: float) -> bool:
+        """
+        Special sleep method that periodically checks for the tracker's
+        stopping flag. If the tracker has been stopped, return True,
+        otherwise, the full wait_time should be awaited and it should
+        return False. This is useful for sleeping during infinite polling
+        loops that should be stopped when the application shuts down.
+
+        Args:
+            wait_time: The total time to be asynchronously awaited
+        Returns:
+            stopped: Whether the tracker has been stopped during this time.
+        """
+        poll_period = 2
+        while (wait_time > poll_period):
+            if self._is_stopping:
+                return True
+            await asyncio.sleep(poll_period)
+            wait_time -= poll_period
+        if self._is_stopping:
+            return True
+        await asyncio.sleep(wait_time)
+        return False
+    
     async def control_request_generator(self):
         while True:
             try:
-                await asyncio.sleep(2)
+                done = await self.sleep(2)
+                if done: break
                 requests = self.get_control_requests()
                 requests_json = requests.model_dump_json()
                 logger.debug(f"control request json: '{requests_json}'")
                 requests_message = f"event: retrieval\ndata: {requests_json}\n\n"
                 yield requests_message
             except Exception as e:
-                await asyncio.sleep(10)
+                done = await self.sleep(10)
+                if done: break
     
     def get_control_requests(self) -> ControlRequestBatch:
         """

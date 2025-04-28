@@ -1,12 +1,13 @@
 import argparse
 import os
+import signal
 import subprocess
+import uvicorn
 import http.server
 import multiprocessing
 import socket
-import pickle
+import time
 import logging
-from typing import Callable, Union, List, Tuple, Any
 from gymdash.backend.core.api.config.config import set_global_config
 from gymdash.backend.project import ProjectManager
 
@@ -26,9 +27,9 @@ def socket_used_or_invalid(port) -> bool:
 def check_port(port):
     try:
         if socket_used(port):
-            print(f"Port {port} is already in use. Choose a different port.")
+            logger.error(f"Port {port} is already in use. Choose a different port.")
     except:
-        print(f"Problem testing port {port}. Choose a different port.")
+        logger.error(f"Problem testing port {port}. Choose a different port.")
 
 # Change JS template to match the input port and address
 def setup_frontend(args):
@@ -67,8 +68,6 @@ def get_frontend_server(args) -> http.server.HTTPServer:
     # Patch in the correct extensions
     HandlerClass.extensions_map['.js'] = 'application/javascript'
     HandlerClass.extensions_map['.mjs'] = 'application/javascript'
-    # HandlerClass.directory = "src/frontend/"
-    print(HandlerClass.extensions_map)
     # Run the server (like `python -m http.server` does)
     httpd = http.server.HTTPServer(("localhost", args.port), HandlerClass)
     return httpd
@@ -79,12 +78,13 @@ def run_frontend_server(args):
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        print("Shutting down HTTP server")
+        logger.info("Shutting down HTTP server")
         server.shutdown()
 
 # Starts a subprocess running the Uvicorn FastAPI server
 def run_backend_server(args):
-    print("Starting API server")
+    logger.info("Starting API server")
+    # uvicorn.run("src.gymdash.backend.main:app", host=str(args.apiaddr), port=args.apiport, workers=args.apiworkers)
     subprocess.run(["uvicorn", "src.gymdash.backend.main:app", "--host", str(args.apiaddr), "--port", str(args.apiport), "--workers", str(args.apiworkers)])
 
 # Starts the frontend and backend servers
@@ -93,12 +93,49 @@ def start(args):
     # Start the servers
     set_global_config(args)
     setup_frontend(args)
-    if not args.no_backend:
-        check_port(args.port)
-        multiprocessing.Process(target=run_backend_server, args=(args,)).start()
-    if not args.no_frontend:
-        check_port(args.apiport)
-        multiprocessing.Process(target=run_frontend_server, args=(args,)).start()
+    proc_back: multiprocessing.Process = None
+    proc_front: multiprocessing.Process = None
+    try:
+        if not args.no_backend:
+            check_port(args.port)
+            proc_back = multiprocessing.Process(target=run_backend_server, args=(args,))
+            proc_back.start()
+        if not args.no_frontend:
+            check_port(args.apiport)
+            proc_front = multiprocessing.Process(target=run_frontend_server, args=(args,))
+            proc_front.start()
+    except KeyboardInterrupt:
+        logger.info("Shutdown called.")
+        if proc_back is not None:
+            os.kill(proc_back.pid, signal.SIGINT)
+            # proc_back.terminate()
+            proc_back.join()
+        if proc_front is not None:
+            os.kill(proc_front.pid, signal.SIGINT)
+            # proc_front.terminate()
+            proc_front.join()
+
+    try:
+        while True:
+            time.sleep(10)
+    except KeyboardInterrupt:
+        logger.info("Shutdown called.")
+        if proc_back is not None:
+            try:
+                os.kill(proc_back.pid, signal.SIGINT)
+            except:
+                print("Terminating backend process.")
+                proc_back.terminate()
+            time.sleep(5)
+            # proc_back.terminate()
+            proc_back.join()
+        if proc_front is not None:
+            try:
+                os.kill(proc_front.pid, signal.SIGINT)
+            except:
+                print("Terminating frontend process.")
+                proc_front.terminate()
+            proc_front.join()
 
 def add_gymdash_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     parser.add_argument("-d", "--project-dir",  default="./.gymdash-projects", type=str, help="Base relative path for the GymDash project")

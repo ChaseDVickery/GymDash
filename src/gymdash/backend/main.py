@@ -67,9 +67,11 @@ async def lifespan(app: FastAPI):
     # Clearing the simulation tracker also
     # tells all running simulations to shutdown
     try:
+        logger.info(f"Shutting down API server.")
+        simulation_tracker.stop()
         await simulation_tracker.clear()
     except KeyboardInterrupt:
-        print(f"Force shutdown may cause unfinishable simulations.")
+        logger.warning(f"Force shutdown may cause unfinishable simulations.")
     finally:
         for id, sim in simulation_tracker.running_sim_map.items():
             sim.force_stopped = True

@@ -286,7 +286,7 @@ class CustomControlSimulation(Simulation):
                     curr_pause_point += 1
                 start_time = time.time()
                 # Perform functions
-                writer.add_scalar("my_number", step + 2*np.random.random(), step)
+                writer.add_scalar("my_number", step + 4*np.random.random(), step)
                 step += 1
                 # Handle interactions
                 self.interactor.set_out_if_in("progress", (timer, total_runtime))

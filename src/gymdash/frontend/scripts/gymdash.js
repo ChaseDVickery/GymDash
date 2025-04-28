@@ -1010,7 +1010,8 @@ function onClickMMI(d) {
     displayMMIData(mmiData);
 }
 function createPlots() {
-    const key = "rollout/ep_rew_mean";
+    // const key = "rollout/ep_rew_mean";
+    const key = "my_number";
 
     clearMainPlot();
 
