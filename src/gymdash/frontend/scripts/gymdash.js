@@ -106,6 +106,16 @@ function call_random() {
 function getActiveSelections() {
 
 }
+function getSimName(simIDorSelection) {
+    if (typeof simIDorSelection === "string") {
+        const selections = getAllSelections();
+        if (Object.hasOwn(getAllSelections(), simIDorSelection)) {
+            return selections[simIDorSelection].querySelector("label").textContent;
+        }
+    } else {
+        return simIDorSelection.querySelector("label").textContent;
+    }
+}
 /**
  * Return a mapping from all simulation selection IDs to the simulation
  * selection nodes.
@@ -120,7 +130,6 @@ function getAllSelections() {
         },
         {}
     )
-    console.log(mapping);
     return mapping;
 }
 /**
@@ -882,8 +891,21 @@ function clearKwargBox(kwargPanel, deleteRows=false) {
 
 }
 
-function updateControlRequestQueue(requests) {
-
+function updateControlRequestQueue(requests_model) {
+    const requests = requests_model.requests;
+    const selections = getAllSelections();
+    for (const simID in requests) {
+        const selection = selections[simID];
+        for (const channel_key in requests[simID]) {
+            console.log(requests[simID]);
+            console.log(requests[simID][channel_key]);
+            for (const request of requests[simID][channel_key]) {
+                const requestBox = prefabcontrolRequestBox.cloneNode(true);
+                requestBox.textContent = `sim='${getSimName(selection)}'(${simID}), channel='${request.key}', details='${request.details}'.`;
+                controlResponsePanel.appendChild(requestBox);
+            }
+        }        
+    }
 }
 
 setupKwargBoxes();
@@ -971,7 +993,7 @@ function showMMInstance(simID, type, datum) {
     mediaArea.firstElementChild.src = datum.value;
     const caption = panel.querySelector(".media-info");
     const simSelection = getAllSelections()[simID];
-    caption.textContent = `sim: ${simSelection.querySelector("label").textContent}`;
+    caption.textContent = `sim: ${getSimName(simSelection)}`;
     return panel;
 }
 function displayMMIData(mmiData) {
