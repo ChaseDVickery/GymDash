@@ -45,8 +45,10 @@ let sim_selections = {};
 //      }
 let allData = {};
 
-// Elements
+// Sidebar
 const simSidebar = document.querySelector(".sim-selection-sidebar");
+const deselectAllBtn            = simSidebar.querySelector("#deselect-all-btn");
+const selectAllBtn              = simSidebar.querySelector("#select-all-btn");
 // Control
 const startPanel                = document.querySelector("#start-panel");
 const controlColumn             = document.querySelector(".control-column");
@@ -157,6 +159,24 @@ function getSelectedData() {
         selectedData[id] = allData[id];
     }
     return selectedData;
+}
+function forEachSelection(doThis) {
+    const selections = getAllSelections();
+    for (const simID in selections) {
+        doThis(selections[simID]);
+    }
+}
+function selectAll() {
+    forEachSelection((selection) => {
+        const input = selection.querySelector(".sim-selection-checkbox")
+        input.checked = true;
+    })
+}
+function deselectAll() {
+    forEachSelection((selection) => {
+        const input = selection.querySelector(".sim-selection-checkbox")
+        input.checked = false;
+    })
 }
 
 function displayNumberOutput(num) {
@@ -599,10 +619,6 @@ function updateSimSelectionProgress(simID, simSelection) {
 
 function refreshSimulationSidebar() {
     // Clear all the current sim selections and remove from DOM
-    // const selections = simSidebar.querySelectorAll(".sim-selection-box");
-    // selections.forEach(selection => {
-    //     selection.parentElement.removeChild(selection);
-    // });
     const selections = getAllSelections();
     const selected = getSelectedSelections();
     for (const id in selections) {
@@ -945,7 +961,8 @@ ctrlReqSrc.addEventListener("retrieval", (event) => {
     updateControlRequestQueue(requests);
 });
 
-
+deselectAllBtn.addEventListener("click", deselectAll);
+selectAllBtn.addEventListener("click", selectAll);
 startSimBtn.addEventListener("click", startSimulation);
 queueSimBtn.addEventListener("click", queueSimulation);
 sendControlBtn.addEventListener("click", sendQuery);

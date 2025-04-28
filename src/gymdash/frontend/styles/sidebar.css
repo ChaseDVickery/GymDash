@@ -131,8 +131,8 @@
     height: 80%;
     aspect-ratio: 1 / 1;
 }
-/* .sim-selection-checkbox:after {
-    background-color: var(--main-contrast-color);
-    height: 80%;
-    aspect-ratio: 1 / 1;
-} */
+
+#sim-sidebar-buttons {
+    display: grid;
+    grid-template: 1fr / 1fr 1fr;
+}
