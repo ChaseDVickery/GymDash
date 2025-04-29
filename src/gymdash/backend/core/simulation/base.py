@@ -496,6 +496,7 @@ class Simulation():
             return None
         
     def fill_from_stored_info(self, info: StoredSimulationInfo):
+        logger.debug(f"fill_from_stored_info config: {info.config}")
         self.from_disk = True
         self._project_sim_id = info.sim_id
         self.start_kwargs = info.start_kwargs
@@ -517,7 +518,7 @@ class Simulation():
         if kwargs is None:
             kwargs = {}
         self._create_streamers(
-            overwrite_new_kwargs(self.kwarg_defaults, config_kwargs, kwargs)
+            self._overwrite_new_kwargs(self.kwarg_defaults, config_kwargs, kwargs)
         )
     @abstractmethod
     def _create_streamers(self, kwargs: Dict[str, Any]):

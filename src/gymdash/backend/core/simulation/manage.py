@@ -164,6 +164,7 @@ class SimulationGroup:
 
 class SimulationTracker:
 
+    QUERY_POLL_PERIOD = 0.2
     no_id = UUID('{00000000-0000-0000-0000-000000000000}')
 
     def __init__(self) -> None:
@@ -368,7 +369,7 @@ class SimulationTracker:
                 revived_sim: Simulation = sim_type(sim_info.config)
                 revived_sim.fill_from_stored_info(sim_info)
                 revived_sim.set_project_info(ProjectManager.sims_folder(), revived_sim._project_sim_id)
-                revived_sim.create_streamers()
+                revived_sim.create_streamers(sim_info.config, sim_info.start_kwargs)
                 print(f"SimulationTracker adding old simulation at: {sim_id}")
                 self.done_sim_map[sim_id] = revived_sim
                 print(f"SimulationTracker done_sim_map: {self.done_sim_map}")
@@ -764,7 +765,7 @@ class SimulationTracker:
         
         # After marking channels for output, begin polling loop
         await asyncio.sleep(0)
-        poll_period = 0.05
+        poll_period = SimulationTracker.QUERY_POLL_PERIOD
         done = False
         timer = 0
         while not done:

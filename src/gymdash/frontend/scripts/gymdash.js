@@ -54,6 +54,7 @@ const startPanel                = document.querySelector("#start-panel");
 const controlColumn             = document.querySelector(".control-column");
 const controlPanel              = document.querySelector("#control-panel");
 const controlResponsePanel      = document.querySelector("#control-response-panel");
+const controlRequestDetails     = document.querySelector("#control-request-details-panel");
 const queryColumn               = document.querySelector(".query-column");
 const queryPanel                = document.querySelector("#query-panel");
 const queryResponsePanel        = document.querySelector("#query-response-panel");
@@ -74,8 +75,6 @@ const mmImageSubmediaArea       = mmInstancePanel.querySelector("#image-panel > 
 const mmAudioSubmediaArea       = mmInstancePanel.querySelector("#audio-panel > .media-instance-area");
 const mmVideoSubmediaArea       = mmInstancePanel.querySelector("#video-panel > .media-instance-area");
 
-
-
 // Prefabs
 const prefabSimSelectBox        = document.querySelector(".prefab.sim-selection-box");
 const prefabKwargPanel          = document.querySelector(".prefab.kwarg-panel");
@@ -93,6 +92,9 @@ prefabAudioMedia.remove();
 prefabVideoMedia.remove();
 prefabResizerBar.remove();
 prefabcontrolRequestBox.remove();
+
+// Variables
+let selectedControlRequest;
 
 const testImageOutputs = []
 
@@ -907,6 +909,42 @@ function clearKwargBox(kwargPanel, deleteRows=false) {
 
 }
 
+function selectControlRequest(requestBox, detailsString) {
+    if (selectedControlRequest) {
+        selectedControlRequest.classList.remove("contrast-box-opp");
+        selectedControlRequest.classList.add("contrast-box");
+    }
+    selectedControlRequest = requestBox;
+    if (selectedControlRequest) {
+        selectedControlRequest.classList.add("contrast-box-opp");
+        selectedControlRequest.classList.remove("contrast-box");
+    }
+    controlRequestDetails.textContent = detailsString;
+}
+function setupControlRequest(simID, simSelection, request_data) {
+    const requestBox = prefabcontrolRequestBox.cloneNode(true);
+    const previewText = `${getSimName(simSelection)}: ${request_data.details}`;
+    const detailText =
+`sim='${getSimName(simSelection)}'
+id=${simID}
+details=${request_data.details}
+channel_key=${request_data.key}
+subkeys=${request_data.subkeys}`;
+    // Set the preview text
+    requestBox.querySelector(".control-request-preview").textContent = previewText;
+    // Ready event listener to show details on click
+    requestBox.addEventListener("click", selectControlRequest.bind(null, requestBox, detailText));
+    // Set event listener for removal button
+    requestBox.querySelector(".control-request-delete").addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (selectedControlRequest === requestBox) {
+            selectControlRequest(undefined, "");
+        }
+        requestBox.remove();
+    });
+
+    controlResponsePanel.appendChild(requestBox);
+}
 function updateControlRequestQueue(requests_model) {
     const requests = requests_model.requests;
     const selections = getAllSelections();
@@ -916,9 +954,10 @@ function updateControlRequestQueue(requests_model) {
             console.log(requests[simID]);
             console.log(requests[simID][channel_key]);
             for (const request of requests[simID][channel_key]) {
-                const requestBox = prefabcontrolRequestBox.cloneNode(true);
-                requestBox.textContent = `sim='${getSimName(selection)}'(${simID}), channel='${request.key}', details='${request.details}'.`;
-                controlResponsePanel.appendChild(requestBox);
+                setupControlRequest(simID, selection, request);
+                // const requestBox = prefabcontrolRequestBox.cloneNode(true);
+                // requestBox.textContent = `sim='${getSimName(selection)}'(${simID}), channel='${request.key}', details='${request.details}'.`;
+                // controlResponsePanel.appendChild(requestBox);
             }
         }        
     }
@@ -1027,8 +1066,8 @@ function onClickMMI(d) {
     displayMMIData(mmiData);
 }
 function createPlots() {
-    // const key = "rollout/ep_rew_mean";
-    const key = "my_number";
+    const key = "rollout/ep_rew_mean";
+    // const key = "my_number";
 
     clearMainPlot();
 

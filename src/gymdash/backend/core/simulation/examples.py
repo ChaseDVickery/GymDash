@@ -210,6 +210,7 @@ class CustomControlSimulation(Simulation):
 
     def create_kwarg_defaults(self):
         return {
+            "interactive":      False,
             "poll_period":      0.5,
             "total_runtime":    30,
             "pause_points":     [],
@@ -232,6 +233,7 @@ class CustomControlSimulation(Simulation):
         config = self.config
 
         # Check required kwargs
+        interactive         = kwargs["interactive"]
         poll_period         = kwargs["poll_period"]
         total_runtime       = kwargs["total_runtime"]
         pause_points        = sorted(kwargs["pause_points"])
@@ -255,6 +257,39 @@ class CustomControlSimulation(Simulation):
             ))
         
         writer = SummaryWriter(tb_path)
+
+        interactive_text = (
+            "Interactive mode. Please send custom queries with any, all, or none "
+            "of the folling keys. When done, send a custom query with the 'continue' key:\n"
+            "\tpoll_period: float for the time between each stat logging.\n"
+            "\ttotal_runtime: float representing the minimum total runtime of the simulation.\n"
+            "\tpause_points: list of floats (e.g. [1, 3, etc...]) representing the times at which "
+            "the simulation asks for input from the user before continuing.\n"
+            "\tother_kwargs: Dictionary (subkwargs) for various other keyword arguments."
+        )
+        if interactive:
+            self.interactor.add_control_request("custom_query", interactive_text)
+            while True:
+                # HANDLE INCOMING INFORMATION
+                if self.interactor.set_out_if_in("stop_simulation", True):
+                    self.set_cancelled()
+                    writer.close()
+                    return
+                triggered, custom = self.interactor.get_in("custom_query")
+                if triggered:
+                    if "poll_period" in custom:
+                        poll_period = custom["poll_period"]
+                    if "total_runtime" in custom:
+                        total_runtime = custom["total_runtime"]
+                    if "pause_points" in custom:
+                        pause_points = custom["pause_points"]
+                    if "other_kwargs" in custom:
+                        other_kwargs = custom["other_kwargs"]
+                    self.interactor.set_out("custom_query", custom)
+                    if "continue" in custom:
+                        break
+                    else:
+                        time.sleep(0.1)
 
         st = time.time()
         try:

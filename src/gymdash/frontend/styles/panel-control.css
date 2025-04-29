@@ -36,18 +36,32 @@
     /* min-height: 50px; */
 }
 
-/* #start-panel {
-    grid-area: 2 / 1 / 4 / 2;
+.control-request {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
 }
-#control-panel {
-    grid-area: 2 / 2 / 3 / 3;
+.control-request:hover {
+    cursor: pointer;
 }
+.control-request-preview {
+    flex: 1 1 auto;
+}
+.control-request-buttons {
+    height: 100%;
+    width: 20px;
+    padding: 2px;
+    flex: 0 0 auto;
+    display: flex;
+    button {
+        width: 100%;
+    }
+}
+
 #control-response-panel {
-    grid-area: 3 / 2 / 4 / 3;
+    max-height: 50vh;
+    overflow: scroll;
 }
-#query-panel {
-    grid-area: 2 / 3 / 3 / 4;
+#control-request-details-panel {
+    white-space: pre-wrap;
 }
-#query-response-panel {
-    grid-area: 3 / 3 / 4 / 4;
-} */

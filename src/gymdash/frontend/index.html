@@ -114,9 +114,11 @@
     <div class="prefab resizer-bar"></div>
     <!-- CONTROL -->
     <div class="prefab control-request contrast-box hoverable">
-        Control Request
+        <div class="control-request-preview">Control Request</div>
+        <div class="control-request-buttons">
+            <button class="control-request-delete contrast-box-opp hoverable">X</button>
+        </div>
     </div>
-
 
 
     <header>
@@ -254,15 +256,22 @@
                     </div>
                     <!-- Recieve control requests and control responses. -->
                     <div class="control-panel response-panel content-panel" id="control-response-panel">
-                        <div class="prefab control-request contrast-box hoverable">
+                        <div class="control-request contrast-box hoverable">
+                            <div class="control-request-preview">Control Request</div>
+                            <div class="control-request-buttons">
+                                <button class="control-request-delete contrast-box-opp hoverable">X</button>
+                            </div>
+                        </div>
+                        <div class="control-request contrast-box hoverable">
                             Control Request
                         </div>
-                        <div class="prefab control-request contrast-box hoverable">
+                        <div class="control-request contrast-box hoverable">
                             Control Request
                         </div>
-                        <div class="prefab control-request contrast-box hoverable">
-                            Control Request
-                        </div>
+                    </div>
+                    <!-- Show details of control requests. -->
+                    <div class="control-panel content-panel" id="control-request-details-panel">
+
                     </div>
                 </div>
                 
