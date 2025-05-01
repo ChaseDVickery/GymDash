@@ -25,6 +25,7 @@
     <script type="module" src="./scripts/utils/media_utils.js" defer></script>
     <script type="module" src="./scripts/gymdash.js" defer></script>
 
+    <script src="./scripts/utils/debug.js"></script>
     <script src="./scripts/utils/sort.js"></script>
     <script src="./scripts/utils/tabs.js"></script>
     <!-- <script src="scripts/gymdash.js" defer></script> -->
@@ -80,7 +81,7 @@
     <div class="prefab multimedia-instance-panel image-instance-panel">
         <!-- Actual media (image, gif, audio player) goes here -->
         <div class="media-area">
-            <img src="resources/imgs/placeholder.png" alt="">
+            <img class="media" src="resources/imgs/placeholder.png" alt="">
         </div>
         <!-- Basically where captions go (key, step #, sim ID or name) -->
         <p class="media-info">
@@ -91,7 +92,7 @@
     <div class="prefab multimedia-instance-panel audio-instance-panel">
         <!-- Actual media (image, gif, audio player) goes here -->
         <div class="media-area">
-            <audio controls src="resources/audio/placeholder.wav"></audio>
+            <audio class="media" controls src="resources/audio/placeholder.wav"></audio>
         </div>
         <!-- Basically where captions go (key, step #, sim ID or name) -->
         <p class="media-info">
@@ -102,7 +103,9 @@
     <div class="prefab multimedia-instance-panel video-instance-panel">
         <!-- Actual media (image, gif, audio player) goes here -->
         <div class="media-area">
-            <video src="" type=""></video>
+            <video class="media" controls>
+                <source src="" type="">
+            </video>
         </div>
         <!-- Basically where captions go (key, step #, sim ID or name) -->
         <p class="media-info">
@@ -261,12 +264,6 @@
                             <div class="control-request-buttons">
                                 <button class="control-request-delete contrast-box-opp hoverable">X</button>
                             </div>
-                        </div>
-                        <div class="control-request contrast-box hoverable">
-                            Control Request
-                        </div>
-                        <div class="control-request contrast-box hoverable">
-                            Control Request
                         </div>
                     </div>
                     <!-- Show details of control requests. -->

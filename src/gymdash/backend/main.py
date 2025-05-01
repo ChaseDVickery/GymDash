@@ -37,7 +37,8 @@ from gymdash.backend.core.utils.zip import \
 from gymdash.backend.project import ProjectManager
 
 logger = logging.getLogger(__name__)
-logging.basicConfig(level = logging.DEBUG, format = '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s')
+# logging.basicConfig(level = logging.DEBUG, format = '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s')
+logging.basicConfig(level = logging.INFO, format = '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s')
 
 simulation_tracker = SimulationTracker()
 # Apply patching methods to other packages
@@ -182,7 +183,7 @@ async def get_sim_recent_media(sim_id: SimulationIDModel):
         content=get_recent_media_from_simulation_generator(
             sim,
             media_tags=[],
-            stat_keys=["episode_video", "episode_video_thumbnail"]
+            stat_keys=["episode_video"]
         ),
         media_type="application/zip"
     )

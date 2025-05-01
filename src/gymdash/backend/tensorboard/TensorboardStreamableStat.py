@@ -103,7 +103,7 @@ class TensorboardStreamableStat(StreamableStat):
         raise RuntimeError("TensorboardStreamableStat should only query the EventAccumulator, not update it.")
     
     def __str__(self) -> str:
-        return f"BasicStreamableStat(last_read={self._last_read_index}, values={self.get_values()})"
+        return f"TensorboardStreamableStat(last_read={self._last_read_index}, values={self.get_values()})"
     
     def get_recent(self):
         # Also want to clear the Reservoirs on the TB backend
@@ -134,7 +134,7 @@ class TensorboardStreamableStat(StreamableStat):
         # return self.ea.Scalars(self.key)
         return self._cached_data_access_method(self.key)
     def get_values(self):
-        self.ea.Reload()
+        # self.ea.Reload()
         if self.key_exists:
             print(f"TensorboardStreamableStat ({self.key}) has {len(self._get_values())} values.")
             return self._get_values()

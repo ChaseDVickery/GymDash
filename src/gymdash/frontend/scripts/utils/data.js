@@ -135,16 +135,16 @@ const dataUtils = (
                 console.log(meta);
                 console.log(data);
                 console.log(dataType);
-                if (dataType === "scalar" || dataType === "scalars") {
+                if (dataType === "scalar" || dataType === "scalars" || dataType === DataReport.SCALAR) {
                     this.addScalarData(key, data, meta);
                 }
-                else if (dataType === "image" || dataType === "images") {
+                else if (dataType === "image" || dataType === "images" || dataType === DataReport.IMAGE) {
                     this.addImageData(key, data, meta);
                 }
-                else if (dataType === "audio" || dataType === "audios") {
+                else if (dataType === "audio" || dataType === "audios" || dataType === DataReport.AUDIO) {
                     this.addAudioData(key, data, meta);
                 }
-                else if (dataType === "video" || dataType === "videos") {
+                else if (dataType === "video" || dataType === "videos" || dataType === DataReport.VIDEO) {
                     this.addVideoData(key, data, meta);
                 }
                 else {
@@ -244,13 +244,14 @@ const dataUtils = (
 
         // Public Utilities
         const createEmptyDataReport = function(simulationID) {
+            m = {};
+            m[DataReport.SCALAR] = {};
+            m[DataReport.IMAGE] = {};
+            m[DataReport.AUDIO] = {};
+            m[DataReport.VIDEO] = {};
             return {
                 simID: simulationID,
-                media: {
-                    "scalars": {},
-                    "images": {},
-                    "audio": {},
-                }
+                media: m
             }
         }
         const getAllNewScalars = function() {
@@ -399,14 +400,6 @@ const dataUtils = (
                     console.log("loaded index contents");
                     console.log(index);
                     // Setup report
-                    // const mediaReport = {
-                    //     simID: simulationID,
-                    //     media: {
-                    //         "scalars": {},
-                    //         "images": {},
-                    //         "audio": {},
-                    //     }
-                    // }
                     const report = new DataReport(index.sim_id);
                     
                     // Don't need to iterate the zip contents
@@ -415,24 +408,31 @@ const dataUtils = (
                     const fileMetadata_scalars = [];
                     const fileMetadata_images = [];
                     const fileMetadata_audio = [];
+                    const fileMetadata_videos = [];
                     const filePromises_scalars = [];
                     const filePromises_images = [];
                     const filePromises_audio = [];
+                    const filePromises_videos = [];
                     // Gather all promises and metadata for each info type
-                    for (const filename in index.metadata["scalars"]) {
-                        console.log(index.metadata["scalars"][filename]);
-                        fileMetadata_scalars.push(index.metadata["scalars"][filename]);
+                    for (const filename in index.metadata[DataReport.SCALAR]) {
+                        console.log(index.metadata[DataReport.SCALAR][filename]);
+                        fileMetadata_scalars.push(index.metadata[DataReport.SCALAR][filename]);
                         filePromises_scalars.push(zip.file(filename).async("string"));
                     }
-                    for (const filename in index.metadata["images"]) {
-                        console.log(index.metadata["images"][filename]);
-                        fileMetadata_images.push(index.metadata["images"][filename]);
+                    for (const filename in index.metadata[DataReport.IMAGE]) {
+                        console.log(index.metadata[DataReport.IMAGE][filename]);
+                        fileMetadata_images.push(index.metadata[DataReport.IMAGE][filename]);
                         filePromises_images.push(zip.file(filename).async("arraybuffer"));
                     }
-                    for (const filename in index.metadata["audio"]) {
-                        console.log(index.metadata["audio"][filename]);
-                        fileMetadata_audio.push(index.metadata["audio"][filename]);
+                    for (const filename in index.metadata[DataReport.AUDIO]) {
+                        console.log(index.metadata[DataReport.AUDIO][filename]);
+                        fileMetadata_audio.push(index.metadata[DataReport.AUDIO][filename]);
                         filePromises_audio.push(zip.file(filename).async("arraybuffer"));
+                    }
+                    for (const filename in index.metadata[DataReport.VIDEO]) {
+                        console.log(index.metadata[DataReport.VIDEO][filename]);
+                        fileMetadata_videos.push(index.metadata[DataReport.VIDEO][filename]);
+                        filePromises_videos.push(zip.file(filename).async("arraybuffer"));
                     }
                     // // Pre-make arrays for media types so when we process each file
                     // // we can use an existing array
@@ -466,18 +466,24 @@ const dataUtils = (
                     // and information into the image key array
                     const imagePromise = Promise.all(filePromises_images)
                         .then((files) => {
-                            processMediaFilesToReport(report, "images", files, fileMetadata_images);
+                            processMediaFilesToReport(report, DataReport.IMAGE, files, fileMetadata_images);
                         })
                         .catch((error) => {console.error(`Error processing images: ${error}`)});
                     // Process each audio file and place the processed url
                     // and information into the image key array
                     const audioPromise = Promise.all(filePromises_audio)
                         .then((files) => {
-                            processMediaFilesToReport(report, "audio", files, fileMetadata_audio);
+                            processMediaFilesToReport(report, DataReport.AUDIO, files, fileMetadata_audio);
                         })
                         .catch((error) => {console.error(`Error processing audio: ${error}`)});
+                    // Video
+                    const videoPromise = Promise.all(filePromises_videos)
+                        .then((files) => {
+                            processMediaFilesToReport(report, DataReport.VIDEO, files, fileMetadata_videos);
+                        })
+                        .catch((error) => {console.error(`Error processing videos: ${error}`)});
                     // Once all those promises are resolved, return the mediaReport promise
-                    return Promise.all([scalarPromise, imagePromise, audioPromise])
+                    return Promise.all([scalarPromise, imagePromise, audioPromise, videoPromise])
                         .then((resolved) => {
                             // return Promise.resolve(mediaReport);
                             return Promise.resolve(report);
@@ -522,80 +528,6 @@ const dataUtils = (
                     return Promise.resolve(new DataReport(simID));
                 })
         }
-
-        // const dataReportUnion_CombineType = function(dr1, dr2, dataType) {
-        //     for (const statKey in dr2.media[dataType]) {
-        //         if (!Object.hasOwn(dr1.media[dataType], statKey)) {
-        //             dr1.media[dataType][statKey] = [];
-        //         }
-        //         // Insert the new data in sorted order
-        //         const d1 = dr1.media[dataType][statKey];
-        //         const d2 = dr2.media[dataType][statKey];
-        //         // Some basic checks before getting into the weeds.
-        //         // If either is empty, then we just insert one into
-        //         // the other.
-        //         if (d1.length < 1 || d2.length < 1) {
-        //             d1.push(...d2);
-        //             continue;
-        //         }
-        //         // The typical use case means that the first value of
-        //         // dr2 is USUALLY greater than the greatest/last value
-        //         // of dr1, so we can just push all values right to the end.
-        //         if (d1[d1.length-1].step < d2[0].step) {
-        //             d1.push(...d2);
-        //             continue;
-        //         }
-        //         // Iterate all the datapoints of 2nd report's keys
-        //         let dr1_idx = 0;
-        //         let dr2_idx = 0;
-        //         while (dr2_idx < d2.length) {
-        //             // If we are out of bounds of dr1, then
-        //             // we know to just start inserting at the end.
-        //             if (dr1_idx >= d1.length) {
-        //                 d1.push(d2[dr2_idx]);
-        //                 dr2_idx += 1;
-        //                 continue;
-        //             }
-        //             // If current insert value is less than the current
-        //             // value at dr1
-        //             if (d2[dr2_idx].step < d1[dr1_idx].step) {
-        //                 d1.splice(dr1_idx, 0, d2[dr2_idx]);
-        //                 // Must push idx forward by 1 to keep place
-        //                 dr1_idx += 1;
-        //                 dr2_idx += 1;
-        //             }
-        //             // If current insert value is EQUAL, then
-        //             // we REPLACE the value at dr1
-        //             else if (d2[dr2_idx].step === d1[dr1_idx].step) {
-        //                 d1[dr1_idx] = d2[dr2_idx];
-        //                 dr2_idx += 1;
-        //             }
-        //             else {
-        //                 dr1_idx += 1;
-        //             }
-        //         }
-        //     }
-        //     return dr1;
-        // }
-        // /**
-        //  * Adds the contents of one data (dr2) report to another (dr1)
-        //  * returning the first (dr1), modified data report. The data
-        //  * reports must have the same simID. The data in both reports
-        //  * should be already be sorted to accelerate combining.
-        //  * 
-        //  * @param {dataReport} dr1 
-        //  * @param {dataReport} dr2 
-        //  */
-        // const dataReportUnion = function(dr1, dr2) {
-        //     if (dr1.simID !== dr2.simID) {
-        //         console.error(`Cannot combine data reports with different simID (${dr1.simID}, ${dr2.simID})`);
-        //         return dr1;
-        //     }
-        //     dr1 = dataReportUnion_CombineType(dr1, dr2, "scalars");
-        //     dr1 = dataReportUnion_CombineType(dr1, dr2, "images");
-        //     dr1 = dataReportUnion_CombineType(dr1, dr2, "audio");
-        //     return dr1;
-        // }
 
         return {
             getAllNewScalars,

@@ -29,7 +29,7 @@ def train():
     df['date'] = pd.to_datetime(df['date']).dt.date
     env = StockTradingEnv(df, initial_balance=100000, commission_fee=0.0001, slippage_cost=0.005)
     env = LogTrainingInfoWrapper(env, "testout")
-    env = StreamerRegistry.get_or_register(TensorboardStreamWrapper(env, tb_path, ["rewards", "rollout/ep_rew_mean"]))
+    env = StreamerRegistry.get_or_register(TensorboardStreamWrapper(env, tb_path, ["rollout/ep_rew_mean"]))
     # env = RecordVideoToTensorboard(env, tb_path, lambda x: True)
 
     logger = configure(tb_path, ["tensorboard"])
@@ -54,7 +54,7 @@ def train_cartpole(**kwargs):
     tb_path = os.path.join("tb", "cartpole", "train")
     env = gym.make("CartPole-v1", render_mode="rgb_array")
     env = LogTrainingInfoWrapper(env, "testout")
-    env = StreamerRegistry.get_or_register(TensorboardStreamWrapper(env, tb_path, ["rewards", "rollout/ep_rew_mean", "episode_video", "episode_video_thumbnail"]))
+    env = StreamerRegistry.get_or_register(TensorboardStreamWrapper(env, tb_path, ["rollout/ep_rew_mean", "episode_video"]))
     # env = RecordVideo(env, tb_path, lambda x: x%100 == 0, video_length=0, fps=30)
     r_env = RecordVideoToTensorboard(env, tb_path, lambda x: x%100==0, video_length=0, fps=30)
     env = r_env

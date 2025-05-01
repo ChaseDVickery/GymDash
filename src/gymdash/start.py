@@ -12,7 +12,8 @@ from gymdash.backend.core.api.config.config import set_global_config
 from gymdash.backend.project import ProjectManager
 
 logger = logging.getLogger("gymdash")
-logger.setLevel(logging.DEBUG)
+# logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 
 # https://stackoverflow.com/questions/2470971/fast-way-to-test-if-a-port-is-in-use-using-python
 def socket_used(port) -> bool:

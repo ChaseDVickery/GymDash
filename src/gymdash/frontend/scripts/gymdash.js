@@ -3,9 +3,6 @@ import { dataUtils } from "./utils/data.js";
 import { vizUtils } from "./utils/viz.js";
 import { mediaUtils } from "./utils/media_utils.js";
 import { apiURL } from "./utils/api_link.js";
-
-console.log(d3);
-console.log(JSZip);
 // console.log(range);
 
 const tryBtn        = document.querySelector("#try-api-btn");
@@ -29,8 +26,8 @@ const deleteSelectedSimsTestBtn = document.querySelector("#delete-selected-sims-
 
 
 // Constants
-const defaultSimProgressUpdateInterval = 2000;  // (ms)
-const defaultTimeout = 0.5; // (s)
+const defaultSimProgressUpdateInterval = 5000;  // (ms)
+const defaultTimeout = 2.0; // (s)
 const noID = "00000000-0000-0000-0000-000000000000"; // (str(UUID))
 
 // Structures
@@ -226,7 +223,6 @@ function testNumberAPI() {
                 times.push(response.time);
                 return response;
             }).then((response) => {
-                // console.log(times);
                 displayTestNumberOutput(times);
             })
         );
@@ -332,16 +328,18 @@ function updateData() {
     // const simID = randomSelection.id;
     const dataRetrievalPromises = [];
     const allDataReports = [];
-    const selectionOptions = document.querySelectorAll(".sim-selection-checkbox");
-    for (let i = 0; i < selectionOptions.length; i++) {
-        const simID = selectionOptions[i].id;
-        console.log(`Getting new data for sim: ${simID}`);
+    // const selectionOptions = document.querySelectorAll(".sim-selection-checkbox");
+    const selectionOptions = getSelectedSelections();
+    // for (let i = 0; i < selectionOptions.length; i++) {
+    for (const simID in selectionOptions){
+        // const simID = selectionOptions[i].id;
+        debug(`Getting new data for sim: ${simID}`);
         dataRetrievalPromises.push(
             dataUtils.getAll(simID, [], [], true)
             // dataUtils.getRecent(simID, [], [], true)
                 .then((dataReport) => {
-                    console.log("Got data report.");
-                    console.log(dataReport);
+                    debug("Got data report.");
+                    debug(dataReport);
                     allDataReports.push(dataReport);
                     return Promise.resolve(dataReport);
                 })
@@ -586,7 +584,6 @@ function getKwargs(elementWithKwargPanel) {
 
 function updateAllSimSelectionProgress() {
     // Iterates all incomplete sim selections and queries their progress
-    console.log("updateAllSimSelectionProgress: "+ sim_selections);
     for (const [simID, simSelection] of Object.entries(sim_selections)) {
         updateSimSelectionProgress(simID, simSelection);
     }
@@ -995,8 +992,6 @@ ctrlReqSrc.onopen = () => {
 }
 ctrlReqSrc.addEventListener("retrieval", (event) => {
     const requests = JSON.parse(event.data);
-    console.log("EventSource REQUESTS");
-    console.log(requests);
     updateControlRequestQueue(requests);
 });
 
@@ -1035,18 +1030,25 @@ function showMMInstance(simID, type, datum) {
     if (type === dataUtils.DataReport.IMAGE) {
         panel = prefabImageMedia.cloneNode(true);
         mmImageSubmediaArea.appendChild(panel);
+        const mediaElement = panel.querySelector(".media");
+        mediaElement.src = datum.value;
     }
     else if (type === dataUtils.DataReport.AUDIO) {
         panel = prefabAudioMedia.cloneNode(true);
         mmAudioSubmediaArea.appendChild(panel);
+        const mediaElement = panel.querySelector(".media");
+        mediaElement.src = datum.value;
     }
     else if (type === dataUtils.DataReport.VIDEO) {
         panel = prefabVideoMedia.cloneNode(true);
         mmVideoSubmediaArea.appendChild(panel);
+        const mediaElement = panel.querySelector(".media");
+        const sourceElement = mediaElement.querySelector("source");
+        sourceElement.src = datum.value;
+        sourceElement.type = "video/mp4";
     }
     if (!panel) { return panel; }
-    const mediaArea = panel.querySelector(".media-area");
-    mediaArea.firstElementChild.src = datum.value;
+    
     const caption = panel.querySelector(".media-info");
     const simSelection = getAllSelections()[simID];
     caption.textContent = `sim: ${getSimName(simSelection)}`;

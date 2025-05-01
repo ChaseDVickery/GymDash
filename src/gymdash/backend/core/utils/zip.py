@@ -23,6 +23,9 @@ from gymdash.backend.core.utils.file_format import (FileFormat,
                                                     format_from_bytes)
 from gymdash.backend.core.utils.json import DataclassJSONEncoder
 
+
+from gymdash.backend.tensorboard.MediaLinkStreamableStat import FileEvent
+
 logger = logging.getLogger(__name__)
 
 
@@ -83,6 +86,8 @@ def tb_event_to_media_format(event) -> Union[FileFormat, None]:
         fformat = format_from_bytes(event.encoded_image_string)
     elif isinstance(event, AudioEvent):
         fformat = format_from_bytes(event.encoded_audio_string)
+    elif isinstance(event, FileEvent):
+        fformat = format_from_bytes(event.encoded_string)
     return fformat
 
 def event_to_media_format(event) -> Union[FileFormat, None]:
@@ -248,6 +253,9 @@ def pack_simulation_streamer_media_to_zip(sim: Simulation, key_event_map: Dict[s
                 elif isinstance(event, AudioEvent):
                     zip_file.writestr(filename, event.encoded_audio_string)
                     media_index[filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step, wall_time=event.wall_time)
+                elif isinstance(event, FileEvent):
+                    zip_file.writestr(filename, event.encoded_string)
+                    media_index[filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step, wall_time=event.wall_time)
         # Add the index file to the zip
         index_data = ZippedMediaFile(streamer_key="", sim_id=str(sim._project_sim_id), metadata=media_index)
         zip_file.writestr("index.json", json.dumps(index_data, cls=DataclassJSONEncoder))
@@ -327,11 +335,12 @@ def pack_simulation_events_to_zip(sim: Simulation, key_event_map: Dict[str, List
     zip_buffer = io.BytesIO()
     streamer = sim.streamer
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        index = {
-            "scalars": {},
-            "images": {},
-            "audio": {},
-        }
+        index = defaultdict(dict)
+        # index = {
+        #     "scalars": {},
+        #     "images": {},
+        #     "audio": {},
+        # }
         # For each stat key, manage them appropriately
         for key, events in key_event_map.items():
             # Manage scalar key by stuffing into JSON file
@@ -348,7 +357,8 @@ def pack_simulation_events_to_zip(sim: Simulation, key_event_map: Dict[str, List
                 logger.info(f"packing scalars for key '{key}' to file '{filename}'")
             # Manage media keys (images, audio)
             elif    streamer.key_has_tag(key, tags.TB_IMAGES) or \
-                    streamer.key_has_tag(key, tags.TB_AUDIO):
+                    streamer.key_has_tag(key, tags.TB_AUDIO) or \
+                    streamer.key_has_tag(key, tags.VIDEOS):
                 file_prefix = f"{key}_"
                 for i, event in enumerate(events):
                     # Get true file format from event point data
@@ -366,8 +376,12 @@ def pack_simulation_events_to_zip(sim: Simulation, key_event_map: Dict[str, List
                         zip_file.writestr(filename, event.encoded_audio_string)
                         index["audio"][filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step, wall_time=event.wall_time)
                         logger.info(f"packing audio for key '{key}' at step '{event.step}' to file '{filename}'")
+                    elif isinstance(event, FileEvent):
+                        zip_file.writestr(filename, event.encoded_string)
+                        index[event.tag][filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step, wall_time=event.wall_time)
+                        logger.info(f"packing audio for key '{key}' at step '{event.step}' to file '{filename}'")
         # Add the index file to the zip
-        index_data = ZippedIndex(streamer_key="", sim_id=str(sim._project_sim_id), metadata=index)
+        index_data = ZippedIndex(streamer_key="", sim_id=str(sim._project_sim_id), metadata=dict(index))
         zip_file.writestr("index.json", json.dumps(index_data, cls=DataclassJSONEncoder))
         logger.info(f"packing index.json")
     zip_buffer.seek(0)
@@ -426,8 +440,8 @@ def get_recent_from_simulation(
     
     zip_buffer = pack_simulation_events_to_zip(sim, streamer_responses)
     with zipfile.ZipFile(zip_buffer, "r") as zip:
-        print(f"zip file for sim '{sim._project_sim_id}': {zip.filelist}")
-        print("index: ", zip.open("index.json").read())
+        logger.debug(f"zip file for sim '{sim._project_sim_id}': {zip.filelist}")
+        logger.debug("index: ", zip.open("index.json").read())
 
     zip_buffer.seek(0)
     return zip_buffer
@@ -483,16 +497,19 @@ def get_all_from_simulation(
         # When not exclusionary, set the final keys to the
         # union of tag keys and specific keys
         final_keys = tag_key_set.union(specific_key_set)
-    logger.info(f"get_recent_from_simulation final keys: {final_keys}")
+    logger.info(f"get_all_from_simulation final keys: {final_keys}")
     
     # dictionary containing valid results from all streamers
     # with the key being each stat key and the values being
     # a list of the key's new events
     # Maps [stat key -> List[tb event value]]
     streamer_responses: Dict[str, List[Any]] = {}
+    for s in sim.streamer.streamers():
+        s.reset_streamer()
+        s.Reload()
     for key in final_keys:
         streamer = sim.streamer.get_streamer_for_key(key)
-        streamer.reset_streamer()
+        logger.debug(f"got streamer for key '{key}': {streamer}")
         streamer_responses[key] = streamer.get_recent_from_key(key)
         logger.info(f"Got {len(streamer_responses[key])} recent from key '{key}'")
     

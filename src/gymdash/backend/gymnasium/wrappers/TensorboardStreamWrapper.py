@@ -59,6 +59,9 @@ class TensorboardStreamWrapper(gym.Wrapper):
     
     def set_log_path(self, new_path):
         self.streamer.set_log_path(new_path)
+
+    def Reload(self):
+        self.streamer.Reload()
     
     def get_all_from_tag(self, tag: str):
         return self.streamer.get_all_from_tag(tag)
@@ -139,15 +142,15 @@ class TensorboardStreamer:
                     self.tag_key_map[tag] = set(keys)
             for tag in tag_key_map.keys():
                 keys = tag_key_map[tag]
-                print(f"TensorboardStreamWrapper Adding keys: {keys}")
+                print(f"TensorboardStreamer Adding keys: {keys}")
                 # Extend the key -> tags map
                 for key in keys:
                     if key in self.key_tag_map:
                         self.key_tag_map[key].add(tag)
                     else:
                         self.key_tag_map[key] = set(tag)
-        print(f"TensorboardStreamWrapper New tag_key_map: {self.tag_key_map}")
-        print(f"TensorboardStreamWrapper New key_tag_map: {self.key_tag_map}")
+        print(f"TensorboardStreamer New tag_key_map: {self.tag_key_map}")
+        print(f"TensorboardStreamer New key_tag_map: {self.key_tag_map}")
     
     def set_log_path(self, new_path):
         self.tb_log_path = new_path
@@ -175,6 +178,10 @@ class TensorboardStreamer:
         self._tb_exists = True
         return True
     
+    def Reload(self):
+        if self.check_tb():
+            self._ea.Reload()
+
     def _valid_stats(self, tag: str):
         """Returns stats whose determined tag is tag."""
         # [stat for stat in self.streamed.values() if stat.found_key_tag==tag]
@@ -183,27 +190,27 @@ class TensorboardStreamer:
     
     def get_all_from_tag(self, tag: str):
         if self.check_tb():
-            self._ea.Reload()
+            # self._ea.Reload()
             return {stat.key: stat.get_values() for stat in self._valid_stats(tag)}
     
     def get_all_recent(self):
         if self.check_tb():
-            self._ea.Reload()
+            # self._ea.Reload()
             return {key: self.streamed[key].get_recent() for key in self.keys}
         return {key: [] for key in self.keys}
     
     def get_recent_from_tag(self, tag: str):
-        print(f"TensorboardStreamWrapper get_recent_from_tag: '{tag}'")
-        print(f"TensorboardStreamWrapper valid stats: '{self._valid_stats(tag)}'")
+        print(f"TensorboardStreamer get_recent_from_tag: '{tag}'")
+        print(f"TensorboardStreamer valid stats: '{self._valid_stats(tag)}'")
         if self.check_tb():
-            self._ea.Reload()
+            # self._ea.Reload()
             return {stat.key: stat.get_recent() for stat in self._valid_stats(tag)}
         return {key: [] for key in self.streamed_tag_exclusive[tag]}
 
     def get_recent_from_key(self, key:str) -> List[Any]:
-        print(f"TensorboardStreamWrapper get_recent_from_key: '{key}'")
+        print(f"TensorboardStreamer get_recent_from_key: '{key}'")
         if self.check_tb():
-            self._ea.Reload()
+            # self._ea.Reload()
             if key in self.streamed:
                 return self.streamed[key].get_recent()
             else:

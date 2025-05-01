@@ -35,10 +35,15 @@ from gymdash.backend.core.simulation.base import Simulation
 from gymdash.backend.core.simulation.manage import SimulationRegistry
 from gymdash.backend.gymnasium.wrappers.RecordVideoToTensorboard import \
     RecordVideoToTensorboard
+from gymdash.backend.gymnasium.wrappers.RecordVideoCustom import \
+    RecordVideoCustom
+from gymdash.backend.gymnasium.wrappers.MediaFileStatLinker import \
+    MediaFileStatLinker
 from gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import (
     TensorboardStreamer, TensorboardStreamWrapper)
 from gymdash.backend.stable_baselines.callbacks import \
     SimulationInteractionCallback
+from gymdash.backend.tensorboard.MediaLinkStreamableStat import MediaLinkStreamableStat
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +64,11 @@ class StableBaselinesSimulation(Simulation):
             "sac":  SAC,
         }
 
+        self.tb_tag_key_map = {
+            stat_tags.TB_SCALARS: ["rollout/ep_rew_mean", "train/learning_rate"],
+            # stat_tags.TB_IMAGES: ["episode_video"]
+        }
+
     def _to_alg_initializer(self, alg_key: str):
         return self.algs.get(alg_key, self.algs["ppo"])
 
@@ -68,19 +78,27 @@ class StableBaselinesSimulation(Simulation):
         else:
             return value
         
-    
-        
     def _create_streamers(self, kwargs: Dict[str, Any]):
         experiment_name = f"{kwargs['env']}_{kwargs['algorithm']}"
         tb_path = os.path.join("tb", experiment_name, "train")
+        video_path = os.path.join(self.sim_path, "media", "episode_video")
         if self._project_info_set:
             tb_path = os.path.join(self.sim_path, tb_path)
         self.streamer.get_or_register(TensorboardStreamer(
             tb_path,
-            {
-                stat_tags.TB_SCALARS: ["rewards", "rollout/ep_rew_mean", "train/learning_rate"],
-                stat_tags.TB_IMAGES: ["episode_video", "episode_video_thumbnail"]
-            }
+            self.tb_tag_key_map
+        ))
+        self.streamer.get_or_register(MediaFileStatLinker(
+            "media_" + tb_path,
+            [
+                MediaLinkStreamableStat(
+                    "episode_video",
+                    stat_tags.VIDEOS,
+                    video_path,
+                    r"rl-video-(episode|step)-[0-9]+_[0-9]+\.mp4",
+                    lambda fname: int(fname.split("_")[-1][:-4])
+                )
+            ]
         ))
 
     def create_kwarg_defaults(self):
@@ -120,6 +138,7 @@ class StableBaselinesSimulation(Simulation):
         tb_path = os.path.join("tb", experiment_name, "train")
         if self._project_info_set:
             tb_path = os.path.join(self.sim_path, tb_path)
+        video_path = os.path.join(self.sim_path, "media", "episode_video")
 
         try:
             env = gym.make(env_name, render_mode="rgb_array")
@@ -133,30 +152,39 @@ class StableBaselinesSimulation(Simulation):
         env = self.streamer.get_or_register(TensorboardStreamWrapper(
                 env,
                 tb_path,
-                {
-                    stat_tags.TB_SCALARS: ["rewards", "rollout/ep_rew_mean"],
-                    stat_tags.TB_IMAGES: ["episode_video", "episode_video_thumbnail"]
-                }
+                self.tb_tag_key_map
             ))
+        self.streamer.get_or_register(MediaFileStatLinker(
+            "media_" + tb_path,
+            [
+                MediaLinkStreamableStat(
+                    "episode_video",
+                    stat_tags.VIDEOS,
+                    video_path,
+                    r"rl-video-(episode|step)-[0-9]+_[0-9]+\.mp4",
+                    lambda fname: int(fname.split("_")[-1][:-4])
+                )
+            ]
+        ))
         # Record every X episodes to video.
-        env = RecordVideo(
+        env = RecordVideoCustom(
             env,
-            tb_path,
+            video_path,
             episode_trigger,
             step_trigger,
             video_length=video_length,
             fps=fps,
         )
         # Also Store the video record in the tb file.
-        r_env = RecordVideoToTensorboard(
-            env,
-            tb_path,
-            episode_trigger,
-            step_trigger,
-            video_length=video_length, 
-            fps=fps
-        )
-        env = r_env
+        # r_env = RecordVideoToTensorboard(
+        #     env,
+        #     tb_path,
+        #     episode_trigger,
+        #     step_trigger,
+        #     video_length=video_length, 
+        #     fps=fps
+        # )
+        # env = r_env
         # Callbacks
         # Hook into the running simulation.
         # This callback provides communication channels between the
@@ -175,9 +203,11 @@ class StableBaselinesSimulation(Simulation):
         )
         self.model.set_logger(backend_logger)
         tb_loggers = [t for t in self.model.logger.output_formats if isinstance(t, TensorBoardOutputFormat)]
+
         # Change the video recorder wrapper to point to the same SummaryWriter
         # as used by the model for recording stats.
-        r_env.configure_recorder("episode_video", tb_loggers[0].writer)
+        # r_env.configure_recorder("episode_video", tb_loggers[0].writer)
+
         # Train
         try:
             self.model.learn(total_timesteps=num_steps, progress_bar=False, callback=sim_interact_callback)
