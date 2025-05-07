@@ -112,6 +112,18 @@
             This is some video.
         </p>
     </div>
+    <!-- FILTER -->
+    <!-- "Discrete" Filter Settings (when you want to filter on a discrete set of options) -->
+    <div class="prefab discrete-filter-setting filter-setting" data-filter-value="filterValue">
+        <input type="checkbox" id="" name="" value="" class="discrete-filter-checkbox" checked>
+        <label for="">Filter Option</label>
+    </div>
+    <!-- "Between" Filter Setting (when you want to filter for values between two given values) -->
+    <div class="prefab between-filter-setting filter-setting" data-filter-value="filterValue">
+        <label>Between</label>
+        <input type="number" value="0" min="0" id="" name="" class="between-filter-begin">
+        <input type="number" value="0" min="0" id="" name="" class="between-filter-end">
+    </div>
     <!-- OTHER -->
     <!-- Resize Bar -->
     <div class="prefab resizer-bar"></div>
@@ -259,12 +271,7 @@
                     </div>
                     <!-- Recieve control requests and control responses. -->
                     <div class="control-panel response-panel content-panel" id="control-response-panel">
-                        <div class="control-request contrast-box hoverable">
-                            <div class="control-request-preview">Control Request</div>
-                            <div class="control-request-buttons">
-                                <button class="control-request-delete contrast-box-opp hoverable">X</button>
-                            </div>
-                        </div>
+                        
                     </div>
                     <!-- Show details of control requests. -->
                     <div class="control-panel content-panel" id="control-request-details-panel">
@@ -301,15 +308,47 @@
                 <div class="media-panel analyze-panel content-panel">
                     <h3>Multimedia</h3>
 
+                    <div class="submedia-panel filter-panel sort-panel" id="media-filter-sort-panel">
+                        <h4 class="filter-sort-label">Filter & Sort</h4>
+                        <div class="filter-sort-options-area">
+                            <div class="filter-options-panel">
+                                <!-- Key -->
+                                <div class="filter-setting">
+                                    <input type="checkbox" id="mm-filter-key" name="mm-filter-key" value="Key" class="filter-checkbox">
+                                    <label for="mm-filter-key">Keys</label>
+                                </div>
+                                <div class="discrete-filter-area" id="mm-filter-key-area">
+                                    
+                                </div>
+                                <!-- Simulation -->
+                                <div class="filter-setting">
+                                    <input type="checkbox" id="mm-filter-sim" name="mm-filter-sim" value="Sim" class="filter-checkbox">
+                                    <label for="mm-filter-sim">Sims</label>
+                                </div>
+                                <div class="discrete-filter-area" id="mm-filter-sim-area">
+                                    
+                                </div>
+                                <!-- Step -->
+                                <div class="filter-setting">
+                                    <input type="checkbox" id="mm-filter-step" name="mm-filter-step" value="Step" class="filter-checkbox">
+                                    <label for="mm-filter-step">Step</label>
+                                </div>
+                                <div class="between-filter-area" id="mm-filter-step-area">
+                                    
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="submedia-panel" id="video-panel">
-                        <h4>Videos</h4>
+                        <h4 class="media-type-label">Videos</h4>
                         <div class="media-instance-area" id="video-media-area">
 
                         </div>
                     </div>
 
                     <div class="submedia-panel" id="image-panel">
-                        <h4>Images</h4>
+                        <h4 class="media-type-label">Images</h4>
                         <div class="media-instance-area" id="image-media-area">
                             <div class="multimedia-instance-panel image-instance-panel">
                                 <!-- Actual media (image, gif, audio player) goes here -->
@@ -325,7 +364,7 @@
                     </div>
 
                     <div class="submedia-panel" id="audio-panel">
-                        <h4>Audio</h4>
+                        <h4 class="media-type-label">Audio</h4>
                         <div class="media-instance-area" id="audio-media-area">
                             <div class="prefab multimedia-instance-panel">
                                 <div class="media-area">
@@ -333,33 +372,6 @@
                                 </div>
                                 <p class="media-info">
                                     This is some audio.
-                                </p>
-                            </div>
-        
-                            <div class="prefab multimedia-instance-panel">
-                                <div class="media-area">
-                                    <audio controls src="resources/audio/placeholder.wav"></audio>
-                                </div>
-                                <p class="media-info">
-                                    This is more audio.
-                                </p>
-                            </div>
-    
-                            <div class="prefab multimedia-instance-panel">
-                                <div class="media-area">
-                                    <audio controls src="resources/audio/placeholder.wav"></audio>
-                                </div>
-                                <p class="media-info">
-                                    This is more audio.
-                                </p>
-                            </div>
-    
-                            <div class="prefab multimedia-instance-panel">
-                                <div class="media-area">
-                                    <audio controls src="resources/audio/placeholder.wav"></audio>
-                                </div>
-                                <p class="media-info">
-                                    This is more audio.
                                 </p>
                             </div>
                         </div>

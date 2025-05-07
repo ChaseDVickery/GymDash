@@ -27,7 +27,7 @@ const deleteSelectedSimsTestBtn = document.querySelector("#delete-selected-sims-
 
 // Constants
 const defaultSimProgressUpdateInterval = 5000;  // (ms)
-const defaultTimeout = 2.0; // (s)
+const defaultTimeout = 2.5; // (s)
 const noID = "00000000-0000-0000-0000-000000000000"; // (str(UUID))
 
 // Structures
@@ -66,11 +66,24 @@ const sendQueryBtn              = document.querySelector("#send-query-btn");
 
 // Plots
 const plotArea                  = document.querySelector("#plots-area");
-// Multimedia Panel
+// Multimedia Filter
 const mmInstancePanel           = document.querySelector(".media-panel");
+const mmFilterSortPanel         = mmInstancePanel.querySelector("#media-filter-sort-panel");
+const mmFilterSortOptionsArea   = mmFilterSortPanel.querySelector(".filter-sort-options-area");
+const mmFilterSortHeader        = mmFilterSortPanel.querySelector(".filter-sort-label");
+const mmFilterCheckKey          = mmFilterSortPanel.querySelector("#mm-filter-key");
+const mmFilterCheckSim          = mmFilterSortPanel.querySelector("#mm-filter-sim");
+const mmFilterCheckStep         = mmFilterSortPanel.querySelector("#mm-filter-step");
+const mmFilterAreaKey           = mmFilterSortPanel.querySelector("#mm-filter-key-area");
+const mmFilterAreaSim           = mmFilterSortPanel.querySelector("#mm-filter-sim-area");
+const mmFilterAreaStep          = mmFilterSortPanel.querySelector("#mm-filter-step-area");
+// Multimedia Displays
 const mmImageSubmediaArea       = mmInstancePanel.querySelector("#image-panel > .media-instance-area");
 const mmAudioSubmediaArea       = mmInstancePanel.querySelector("#audio-panel > .media-instance-area");
 const mmVideoSubmediaArea       = mmInstancePanel.querySelector("#video-panel > .media-instance-area");
+const mmImageHeader             = mmInstancePanel.querySelector("#image-panel > .media-type-label");
+const mmAudioHeader             = mmInstancePanel.querySelector("#audio-panel > .media-type-label");
+const mmVideoHeader             = mmInstancePanel.querySelector("#video-panel > .media-type-label");
 
 // Prefabs
 const prefabSimSelectBox        = document.querySelector(".prefab.sim-selection-box");
@@ -81,6 +94,8 @@ const prefabAudioMedia          = document.querySelector(".prefab.multimedia-ins
 const prefabVideoMedia          = document.querySelector(".prefab.multimedia-instance-panel.video-instance-panel");
 const prefabResizerBar          = document.querySelector(".prefab.resizer-bar");
 const prefabcontrolRequestBox   = document.querySelector(".prefab.control-request");
+const prefabFilterDiscrete      = document.querySelector(".prefab.discrete-filter-setting");
+const prefabFilterBetween       = document.querySelector(".prefab.between-filter-setting");
 prefabSimSelectBox.remove();
 prefabKwargPanel.remove();
 prefabKwarg.remove();
@@ -89,9 +104,135 @@ prefabAudioMedia.remove();
 prefabVideoMedia.remove();
 prefabResizerBar.remove();
 prefabcontrolRequestBox.remove();
+prefabFilterDiscrete.remove();
+prefabFilterBetween.remove();
+
+// https://stackoverflow.com/questions/44447847/enums-in-javascript-with-es6
+const FilterType = Object.freeze({
+    NONE:       Symbol("none"),
+    DISCRETE:   Symbol("discrete"),
+    MULTIDISCRETE: Symbol("multidiscrete"),
+    BETWEEN:    Symbol("between"),
+    MULTIBETWEEN: Symbol("multibetween"),
+});
+
+class Filter {
+    constructor(element) {
+        this.element = element;
+        this.filterType = FilterType.NONE;
+
+        this.inputs = [];
+        
+        if (element.classList.contains("discrete-filter-setting")) {
+            this.filterType = FilterType.DISCRETE;
+            this.inputs.push(this.element.querySelector("input"));
+        } else if (element.classList.contains("between-filter-setting")) {
+            this.filterType = FilterType.BETWEEN;
+            this.inputs.push(this.element.querySelector(".between-filter-begin"));
+            this.inputs.push(this.element.querySelector(".between-filter-end"));
+        } else if (element.classList.contains("discrete-filter-area")) {
+            this.filterType = FilterType.MULTIDISCRETE;
+            const allOptions = this.element.querySelectorAll(".discrete-filter-setting");
+            for (const option of allOptions) {
+                this.inputs.push(option.querySelector("input"));
+            }
+        } else if (element.classList.contains("between-filter-area")) {
+            this.filterType = FilterType.MULTIBETWEEN;
+            const allOptions = this.element.querySelectorAll(".between-filter-setting");
+            for (const option of allOptions) {
+                this.inputs.push(option.querySelector(".between-filter-begin"));
+                this.inputs.push(option.querySelector(".between-filter-end"));
+            }
+        }
+        else {
+            console.error("Filter is of unknown type");
+        }
+    }
+
+    getInputs() {
+        return [...this.inputs];
+    }
+
+    /**
+     * Applies the filter to an Array of data objects.
+     * When accessFunction is supplied, it is used to access a specific
+     * key of each data element for filtering. Returns the
+     * filtered data array or the original array if not filtered.
+     * 
+     * @param {Array} data 
+     * @param {Function} accessFunction
+     * @returns Filtered data.
+     */
+    apply(data, accessFunction=(x) => x) {
+        if (this.filterType === FilterType.NONE) { return data; }
+        if (this.filterType === FilterType.DISCRETE) {
+            // If this filter input is not checked, then we don't need to filter.
+            if (!this.inputs[0].checked) { return data; }
+            // Get the desired filter value from the element
+            const filterValue = this.element.dataset.filterValue;
+            return data.filter((datum) => accessFunction(datum) === filterValue);
+            // if (useKey) {
+            //     return data.filter((datum) => datum[this.key] === filterValue)
+            // } else {
+            //     return data.filter((datum) => datum === filterValue)
+            // }
+        }
+        else if (this.filterType === FilterType.BETWEEN) {
+            const startValue = this.inputs[0].value;
+            const endValue = this.inputs[1].value;
+            return data.filter((datum) => {
+                const finalValue = accessFunction(datum);
+                return finalValue >= startValue && finalValue <= endValue
+            });
+        }
+        // Works like discrete, but ANY of the options may match and the
+        // value will be included. If we were to just chain discrete filters,
+        // it would work like an AND filter (all must be true), but
+        // multidiscrete works like an OR filter (any must be true).
+        else if (this.filterType === FilterType.MULTIDISCRETE) {
+            const filterValues = this.inputs
+                .filter((i) => i.checked)
+                .map((q) => q.parentElement.dataset.filterValue);
+            debug("filterValues");
+            debug(filterValues);
+            return data.filter((datum) => {
+                const finalValue = accessFunction(datum);
+                debug("finalValue");
+                debug(finalValue);
+                return filterValues.some((filterValue) => filterValue === finalValue);
+            });
+        }
+        // Similar to multidiscrete, filters using an OR rule using the
+        // between-type filtering. I.e. "if the data value is within this
+        // range or that range, then we include it".
+        else if (this.filterType === FilterType.MULTIBETWEEN) {
+            const startValues = [];
+            const endValues = [];
+            for (let i = 0; i < this.inputs.length; i+=2) {
+                startValues.push(this.inputs[i].value);
+                endValues.push(this.inputs[i+1].value);
+            }
+            return data.filter((datum) => {
+                const finalValue = accessFunction(datum);
+                for (let i = 0; i < startValues.length; i++) {
+                    if (finalValue >= startValues[i] && finalValue <= endValues[i]) {
+                        debug(`Value ${finalValue} is >= than ${startValues[i]} and <= ${endValues[i]}`);
+                        return true;
+                    }
+                }
+                return false;
+            });
+        }
+
+        console.error("Could not properly apply any filter for some reason.");
+        return data;
+    }
+}
+
 
 // Variables
 let selectedControlRequest;
+let selectedMMIData;
 
 const testImageOutputs = []
 
@@ -270,51 +411,6 @@ function setImageOutput(index, imgSrc) {
     testImageOutputs[index].src = imgSrc;
 }
 function displayVideoTest() {
-    // dataUtils.getAllNewImages()
-    //     .then((mediaReport) => {
-    //         console.log(`mediaReport for ${mediaReport.simID}: ${mediaReport}`);
-    //         for (let i = 0; i < mediaReport.media["image/gif"].length; i++) {
-    //             setImageOutput(i, results[i]);
-    //         }
-    //     })
-    //     .catch((error) => {
-
-    //     });
-
-
-
-    // const selectionOptions = document.querySelectorAll(".sim-selection-checkbox");
-    // const randomSelection = selectionOptions[Math.floor(Math.random()*selectionOptions.length)];
-    // const simID = randomSelection.id;
-    // console.log(`Getting new media for random selection: ${simID}`);
-    // dataUtils.getSimNewMedia(simID)
-    //     .then((mediaReport) => {
-    //         console.log(`mediaReport for ${mediaReport.simID}: ${mediaReport}`);
-    //         console.log(mediaReport.media["image/gif"]);
-    //         for (let i = 0; i < mediaReport.media["image/gif"].length; i++) {
-    //             console.log(mediaReport.media["image/gif"][i]);
-    //             setImageOutput(i, mediaReport.media["image/gif"][i].url);
-    //         }
-    //     })
-    //     .catch((error) => {
-
-    //     });
-
-
-    // const selectionOptions = document.querySelectorAll(".sim-selection-checkbox");
-    // const randomSelection = selectionOptions[Math.floor(Math.random()*selectionOptions.length)];
-    // const simID = randomSelection.id;
-    // console.log(`Getting new media for random selection: ${simID}`);
-    // dataUtils.getRecent(simID, [], [], true)
-    //     .then((mediaReport) => {
-    //         console.log("Got media report.");
-    //         console.log(mediaReport);
-    //     })
-    //     .catch((error) => {
-
-    //     });
-
-
     updateData()
         .then((allDataReports) => {
             createPlots();
@@ -1002,6 +1098,22 @@ queueSimBtn.addEventListener("click", queueSimulation);
 sendControlBtn.addEventListener("click", sendQuery);
 sendQueryBtn.addEventListener("click", sendQuery);
 
+// MMI Filter Objects
+mmImageHeader.addEventListener("click", toggleMediaType.bind(null, dataUtils.DataReport.IMAGE));
+mmAudioHeader.addEventListener("click", toggleMediaType.bind(null, dataUtils.DataReport.AUDIO));
+mmVideoHeader.addEventListener("click", toggleMediaType.bind(null, dataUtils.DataReport.VIDEO));
+mmFilterSortHeader.addEventListener("click", toggleDisplay.bind(null, mmFilterSortOptionsArea));
+mmFilterCheckKey.addEventListener("change", refreshMMIDisplay);
+mmFilterCheckSim.addEventListener("change", refreshMMIDisplay);
+mmFilterCheckStep.addEventListener("change",refreshMMIDisplay);
+mmFilterCheckKey.addEventListener("change", toggleDisplay.bind(null, mmFilterAreaKey));
+mmFilterCheckSim.addEventListener("change", toggleDisplay.bind(null, mmFilterAreaSim));
+mmFilterCheckStep.addEventListener("change", toggleDisplay.bind(null, mmFilterAreaStep));
+toggleDisplay(mmFilterAreaKey);
+toggleDisplay(mmFilterAreaSim);
+toggleDisplay(mmFilterAreaStep);
+
+
 
 // Setup intervals
 setInterval(updateAllSimSelectionProgress, defaultSimProgressUpdateInterval);
@@ -1009,6 +1121,24 @@ setInterval(updateAllSimSelectionProgress, defaultSimProgressUpdateInterval);
 
 refreshSimulationSidebar();
 openTab(null, "tab-analyze");
+
+
+function toggleDisplay(element) {
+    if (element.style.display === "none") {
+        element.style.display = "";
+    } else {
+        element.style.display = "none";
+    }
+}
+function toggleMediaType(type) {
+    if (type === dataUtils.DataReport.IMAGE) {
+        toggleDisplay(mmImageSubmediaArea);
+    } else if (type === dataUtils.DataReport.AUDIO) {
+        toggleDisplay(mmAudioSubmediaArea);
+    } else if (type === dataUtils.DataReport.VIDEO) {
+        toggleDisplay(mmVideoSubmediaArea);
+    }
+}
 
 function clearMainPlot() {
     const svgs = plotArea.querySelectorAll("svg");
@@ -1054,17 +1184,155 @@ function showMMInstance(simID, type, datum) {
     caption.textContent = `sim: ${getSimName(simSelection)}`;
     return panel;
 }
+// function gatherFilters(filterPanel) {
+//     const filters = [];
+//     const discreteFilterArea   = filterPanel.querySelectorAll(".discrete-filter-area");
+//     const betweenFilters    = filterPanel.querySelectorAll(".between-filter-setting");
+//     // Create Filters for each area
+//     for (const elem of discreteFilterArea) {
+//         filters.push(new Filter(elem));
+//     }
+//     for (const elem of betweenFilters) {
+//         filters.push(new Filter(elem));
+//     }
+//     return filters;
+// }
+function filterMMIData(data) {
+    debug(`MMI data starts with ${data.length} datapoints`);
+    // Gather up filter information from inputs
+    const useKey = mmFilterCheckKey.checked;
+    const useSim = mmFilterCheckSim.checked;
+    const useStp = mmFilterCheckStep.checked;
+    if (useKey) {
+        const filter = new Filter(mmFilterAreaKey);
+        data = filter.apply(data, (datum) => datum.key);
+    }
+    debug(`Key filtered: ${data.length} datapoints`);
+    if (useSim) {
+        const filter = new Filter(mmFilterAreaSim);
+        data = filter.apply(data, (datum) => datum.simID);
+    }
+    debug(`Sim filtered: ${data.length} datapoints`);
+    if (useStp) {
+        const filter = new Filter(mmFilterAreaStep);
+        data = filter.apply(data, (datum) => datum.datum.step);
+    }
+    debug(`Step filtered: ${data.length} datapoints`);
+    return data;
+    // datum -> datum -> wall_time
+    // datum -> datum -> value
+    // datum -> datum -> step
+    // datum -> simID
+    // datum -> key
+    // datum -> type
+    // Apply all filters based on filter type
+}
 function displayMMIData(mmiData) {
     console.log("display mmi data");
     console.log(mmiData);
     clearMediaPanel();
-    const data = mmiData.getData();
+    let data = mmiData.getData();
+    data = filterMMIData(data);
+    console.log("filtered mmi data");
+    console.log(data);
     for (const datapoint of data) {
         const newInstancePanel = showMMInstance(datapoint.simID, datapoint.type, datapoint.datum);
     }
 }
+function updateMMIFilters(mmiData) {
+    const data = mmiData.getData();
+
+    // Clear the filter input areas
+    mmFilterAreaKey.replaceChildren();
+    mmFilterAreaSim.replaceChildren();
+    mmFilterAreaStep.replaceChildren();
+    // Update the areas with new inputs matching
+    // the mmi data
+
+    // Get unique keys
+    const keySet = new Set(data.map((d) => d.key));
+    // Get unique simIDs
+    const idSet = new Set(data.map((d) => d.simID));
+    // Get last (greatest) step value
+    const lastStep = data.reduce(
+        (currGreatest, currDatum) => currDatum.datum.step > currGreatest ? currDatum.datum.step : currGreatest,
+        0
+    )
+    
+    const inputs = [];
+
+    // Setup key options
+    const prefix = "mmi-filter-option-";
+    let k = 0;
+    for (const key of keySet) {
+        const newOption = prefabFilterDiscrete.cloneNode(true);
+        const newCheckbox = newOption.querySelector("input");
+        const newLabel = newOption.querySelector("label");
+        const newID = `${prefix}${k}`;
+        newOption.dataset.filterValue = key;
+        newCheckbox.id = newID;
+        newCheckbox.name = newID;
+        newCheckbox.value = newID;
+        newCheckbox.checked = true;
+        newLabel.for = newID;
+        newLabel.textContent = key;
+        mmFilterAreaKey.appendChild(newOption);
+        inputs.push(newCheckbox);
+        k += 1;
+    }
+    // Setup id options
+    for (const id of idSet) {
+        const newOption = prefabFilterDiscrete.cloneNode(true);
+        const newCheckbox = newOption.querySelector("input");
+        const newLabel = newOption.querySelector("label");
+        const newID = `${prefix}${k}`;
+        newOption.dataset.filterValue = id;
+        newCheckbox.id = newID;
+        newCheckbox.name = newID;
+        newCheckbox.value = newID;
+        newCheckbox.checked = true;
+        newLabel.for = newID;
+        newLabel.textContent = id;
+        mmFilterAreaSim.appendChild(newOption);
+        inputs.push(newCheckbox);
+        k += 1;
+    }
+    // Setup step options
+    const newOption = prefabFilterBetween.cloneNode(true);
+    const newBegin = newOption.querySelector(".between-filter-begin");
+    const newEnd = newOption.querySelector(".between-filter-end");
+    const newLabel = newOption.querySelector("label");
+    const newID = `${prefix}${k}`;
+    // newOption.dataset.filterValue = id;
+    newBegin.id = newID + "-begin";
+    newBegin.name = newID + "-begin";
+    newBegin.value = "0";
+    newEnd.id = newID + "-end";
+    newEnd.name = newID + "-end";
+    newEnd.value = lastStep;
+    newLabel.textContent = "Steps";
+    mmFilterAreaStep.appendChild(newOption);
+    inputs.push(newBegin);
+    inputs.push(newEnd);
+    k += 1;
+
+    // Add a change listener to retrigger the MMI display
+    // when a filter input is changed
+    for (const newInput of inputs) {
+        newInput.addEventListener("change", (e) => {
+            displayMMIData(mmiData);
+        });
+    }
+}
+function refreshMMIDisplay() {
+    if (selectedMMIData) {
+        displayMMIData(selectedMMIData);
+    }
+}
 function onClickMMI(d) {
     const mmiData = d3.select(d.target).data()[0];
+    selectedMMIData = mmiData;
+    updateMMIFilters(mmiData);
     displayMMIData(mmiData);
 }
 function createPlots() {
@@ -1075,17 +1343,14 @@ function createPlots() {
 
     const selectedData = getSelectedData();
 
-    let svg = vizUtils.createLinePlotForKey(key, selectedData);
+    let plot = vizUtils.createLinePlotForKey(key, selectedData);
+    // vizUtils.setMainPlot(plot);
 
     const condense = true;
-    vizUtils.addAllMMIs(selectedData, svg, onClickMMI, condense);
-
-    // vizUtils.addAllMMIs(allData, svg, onClickMMI);
-
-    // const createdMMIs = vizUtils.addMMIs("episode_video_thumbnail", allData, svg, onClickMMI);
-    // vizUtils.addMMIs("episode_video", allData, svg, onClickMMI, createdMMIs);
+    // vizUtils.addAllMMIs(selectedData, plot.svg, onClickMMI, condense);
+    plot.addAllMMIs(selectedData, onClickMMI, condense);
     
-    d3.select("#plots-area").append(() => svg.node());
+    d3.select("#plots-area").append(() => plot.svg.node());
 }
 
 

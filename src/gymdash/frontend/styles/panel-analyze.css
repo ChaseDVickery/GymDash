@@ -22,7 +22,7 @@
     gap: var(--panel-gap);
     width: 15px;
     /* max-width: 50%; */
-    /* max-height: 80vh; */
+    max-height: 80vh;
     flex: 1 1 auto;
     overflow: scroll;
     /* resize: horizontal; */
@@ -82,4 +82,11 @@
     grid-template-rows: 1fr;
     grid-template-columns: repeat(auto-fit, minmax(182px, 1fr));
     /* grid-template-columns: repeat(auto-fit, clamp(0px, minmax(182px, 1fr), 1000px)); */
+}
+
+.media-type-label:hover {
+    cursor: pointer;
+}
+#media-filter-sort-panel > .filter-sort-label:hover {
+    cursor: pointer;
 }
