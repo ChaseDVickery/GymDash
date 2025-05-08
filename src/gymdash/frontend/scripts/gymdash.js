@@ -1274,7 +1274,7 @@ function updateMMIFilters(mmiData) {
         newCheckbox.name = newID;
         newCheckbox.value = newID;
         newCheckbox.checked = true;
-        newLabel.for = newID;
+        newLabel.htmlFor = newID;
         newLabel.textContent = key;
         mmFilterAreaKey.appendChild(newOption);
         inputs.push(newCheckbox);
@@ -1291,8 +1291,8 @@ function updateMMIFilters(mmiData) {
         newCheckbox.name = newID;
         newCheckbox.value = newID;
         newCheckbox.checked = true;
-        newLabel.for = newID;
-        newLabel.textContent = id;
+        newLabel.htmlFor = newID;
+        newLabel.textContent = getSimName(id);
         mmFilterAreaSim.appendChild(newOption);
         inputs.push(newCheckbox);
         k += 1;
@@ -1341,16 +1341,21 @@ function createPlots() {
 
     clearMainPlot();
 
+    const condense = true;
     const selectedData = getSelectedData();
 
     let plot = vizUtils.createLinePlotForKey(key, selectedData);
-    // vizUtils.setMainPlot(plot);
-
-    const condense = true;
-    // vizUtils.addAllMMIs(selectedData, plot.svg, onClickMMI, condense);
     plot.addAllMMIs(selectedData, onClickMMI, condense);
+    plot.addBrushX();
+
+    // let detailsPlot = vizUtils.createLinePlotForKey(key, selectedData);
+    // plot.addBrushX(function() {
+    //     line.select(".brush").call(brush.move, null)
+    //     detailsPlot.
+    // })
     
     d3.select("#plots-area").append(() => plot.svg.node());
+    // d3.select("#plots-area").append(() => detailsPlot.svg.node());
 }
 
 

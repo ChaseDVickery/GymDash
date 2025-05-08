@@ -25,6 +25,9 @@ const vizUtils = (
                 this.steps = [];
                 this.idxs = [];
 
+                this.brushX = undefined;
+                this.brushY = undefined;
+
                 this._cachedExtent = [-Infinity, Infinity];
                 this._dirtyExtent = true;
             }
@@ -58,6 +61,12 @@ const vizUtils = (
                 return data;
             }
 
+            /**
+             * Return the extent of the steps of all the
+             * media data in this MMI.
+             * 
+             * @returns Step Extent Array
+             */
             getStepExtent() {
                 if (this._dirtyExtent) {
                     const steps = this.getData().map(d => d.datum.step);
@@ -69,16 +78,58 @@ const vizUtils = (
         }
 
         class Plot {
-            constructor(svg, extentX, extentY, scaleX, scaleY) {
+            constructor(svg, data, key, extentX, extentY, scaleX, scaleY, axisX, axisY, lines) {
                 this.svg        = svg;
+                this.data       = data;
+                this.key        = key;
                 this.extentX    = extentX;
                 this.extentY    = extentY;
                 this.scaleX     = scaleX;
                 this.scaleY     = scaleY;
+                this.axisX      = axisX;
+                this.axisY      = axisY;
+                this.lines      = lines;
 
                 this.onClickMMI = undefined;
                 this.selectedMMI = undefined;
                 this.createdMMIs = [];
+            }
+
+            #rebuildLines() {
+                const sx = this.scaleX;
+                const sy = this.scaleY;
+                for (const line of this.lines) {
+                    line
+                        .attr("d", d3.line()
+                            .x(function(d) { return sx(d.step) })
+                            .y(function(d) { return sy(d.value) })
+                        );
+                }
+            }
+
+            /**
+             * Refreshes the Plot display using the updated
+             * data value. Usually, the data Object will be
+             * altered externally from some other activity,
+             * and refresh() will update the Plot to match.
+             */
+            refresh() {
+                // Rebuild the axes
+                const extentY = extentOf(this.data, this.key, undefined, "value");
+                const extentX = d3.extent([...extentOf(this.data, this.key, undefined, "step"), 0]);
+                this.scaleX
+                    .domain(extentX);
+                this.scaleY
+                    .domain(extentY);
+                this.axisX
+                    .call(d3.axisBottom(this.scaleX));
+                this.axisY
+                    .call(d3.axisLeft(this.scaleY));
+                // Rebuild the lines
+                this.#rebuildLines();
+
+                this.clearMMIs();
+                this.addAllMMIs(this.data, this.onClickMMI, true);
             }
 
             updateExtentX(otherExtentOrValues) {
@@ -86,6 +137,40 @@ const vizUtils = (
             }
             updateExtentY(otherExtentOrValues) {
                 this.extentY = d3.extent([...otherExtentOrValues, ...this.extentY]);
+            }
+
+            addBrushX(onbrush) {
+                const width = plotWidth;
+                const height = plotHeight;
+                // this.brushX = d3.brushX()
+                //     .extent([[0,0], [width, height]])
+                //     .on("end", onbrush);
+                this.brushX = d3.brushX()
+                    .extent([[margin.left,margin.bottom], [width, height-margin.bottom]])
+                    .on("end", this.updatePlot.bind(this));
+                this.svg.call(
+                    this.brushX
+                );
+                // this.brushX = d3.brushX()
+                //     .extent([[0,0], [width, height]])
+                //     .on("end", this.updatePlot);
+
+                this.svg.on("dblclick", this.refresh.bind(this));
+            }
+            updatePlot(event) {
+                const extent = event.selection;
+                if (!extent) { return; }
+                this.scaleX.domain([this.scaleX.invert(extent[0]), this.scaleX.invert(extent[1])]);
+                this.axisX.call(d3.axisBottom(this.scaleX));
+                this.#rebuildLines();
+                this.clearMMIs();
+                this.addAllMMIs(this.data, this.onClickMMI, true);
+
+                // line.select(".brush").call(brush.move, null)
+                // d3.brush().clear();
+                this.svg.call(
+                    this.brushX.move, null
+                );
             }
 
             #addMMIRect() {
@@ -140,7 +225,16 @@ const vizUtils = (
                     this.onClickMMI(mmi);
                 }
             }
-
+            clearMMIs() {
+                d3.selectAll(".mmi-marker").remove();
+                this.selectedMMI = undefined;
+                if (this.mmiExtentRect) {
+                    this.mmiExtentRect
+                        .attr("x", 0)
+                        .attr("width", 0);
+                }
+                this.createdMMIs.length = 0;
+            }
             addAllMMIs(allData, onclick, condense=true) {
                 const mediaKeys = new Set();
                 for (const simID in allData) {
@@ -182,9 +276,11 @@ const vizUtils = (
                             closestMMIIdx < createdMMIs.length &&
                             Math.abs(xScale(createdMMIs[closestMMIIdx].step) - xScale(point.step)) < (mmiSideLength+mmiGap)
                         ) {
+                            // Update existing MMI with new information
                             createdMMIs[closestMMIIdx].selection.data()[0].addData(allData[simID], key, point.step);
                         }
                         else {
+                            // Create new MMI with new information
                             const markerPoints = getMMIPoints([xScale(point.step), height-margin.bottom]);
                             const mmiData = new MMIData();
                             mmiData.addData(allData[simID], key, point.step);
@@ -284,6 +380,14 @@ const vizUtils = (
             const width = plotWidth;
             const height = plotHeight;
 
+            var clip = svg.append("defs").append("svg:clipPath")
+                .attr("id", "clip")
+                .append("svg:rect")
+                .attr("width", width-margin.left-margin.right )
+                .attr("height", height-margin.top-margin.bottom )
+                .attr("x", margin.left)
+                .attr("y", margin.bottom);
+
             const xScale = d3
                 .scaleLinear()
                 .domain(extentX)
@@ -303,25 +407,32 @@ const vizUtils = (
                 .attr("transform", `translate(${margin.left}, 0)`)
                 .call(d3.axisLeft(yScale));
 
+            const lines = [];
             for (const simID in allData) {
                 const data = allData[simID].getScalar(key);
-                const pline = svg
+                lines.push(svg
                     .append("path")
                     .datum(data)
+                    .attr("clip-path", "url(#clip)")
                     .attr("fill", "none")
                     .attr("stroke", "steelblue")
                     .attr("stroke-width", 1.5)
                     .attr("d", d3.line()
                         .x(d => xScale(d.step))
                         .y(d => yScale(d.value))
-                    );
+                    ));
             }
             return new Plot(
                 svg,
+                allData,
+                key,
                 extentX, 
                 extentY,
                 xScale,
-                yScale
+                yScale,
+                xAxis,
+                yAxis,
+                lines
             );
             // return svg;
         }
@@ -338,6 +449,7 @@ const vizUtils = (
             if (svg === undefined) { return undefined; }
             const markerPointsString = markerPoints.map(pt => `${pt[0]},${pt[1]}`).join(" ");
             return svg.append("polygon")
+                .attr("class", "mmi-marker")
                 .attr("points", markerPointsString)
                 .attr("stroke", "yellow")
                 .attr("stroke-width", 1)

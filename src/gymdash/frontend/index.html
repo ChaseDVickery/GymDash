@@ -51,7 +51,7 @@
                     <span class="radial-progress-completion fail">X</span>
                 </div>
             </div>
-            <input type="checkbox" id="sim-selection-box-test" class="sim-selection-checkbox">
+            <input type="checkbox" id="sim-selection-box-test" class="sim-selection-checkbox checkbox">
         </div>
     </div>
     <!-- KWARGS AND KWARG PANELS -->
@@ -114,15 +114,15 @@
     </div>
     <!-- FILTER -->
     <!-- "Discrete" Filter Settings (when you want to filter on a discrete set of options) -->
-    <div class="prefab discrete-filter-setting filter-setting" data-filter-value="filterValue">
-        <input type="checkbox" id="" name="" value="" class="discrete-filter-checkbox" checked>
+    <div class="prefab discrete-filter-setting filter-setting contrast-box" data-filter-value="filterValue">
+        <input type="checkbox" id="" name="" value="" class="discrete-filter-checkbox checkbox" checked>
         <label for="">Filter Option</label>
     </div>
     <!-- "Between" Filter Setting (when you want to filter for values between two given values) -->
-    <div class="prefab between-filter-setting filter-setting" data-filter-value="filterValue">
+    <div class="prefab between-filter-setting filter-setting contrast-box" data-filter-value="filterValue">
         <label>Between</label>
-        <input type="number" value="0" min="0" id="" name="" class="between-filter-begin">
-        <input type="number" value="0" min="0" id="" name="" class="between-filter-end">
+        <input type="number" value="0" min="0" id="" name="" class="between-filter-begin contrast-box hoverable entry">
+        <input type="number" value="0" min="0" id="" name="" class="between-filter-end contrast-box hoverable entry">
     </div>
     <!-- OTHER -->
     <!-- Resize Bar -->
@@ -314,7 +314,7 @@
                             <div class="filter-options-panel">
                                 <!-- Key -->
                                 <div class="filter-setting">
-                                    <input type="checkbox" id="mm-filter-key" name="mm-filter-key" value="Key" class="filter-checkbox">
+                                    <input type="checkbox" id="mm-filter-key" name="mm-filter-key" value="Key" class="filter-checkbox checkbox">
                                     <label for="mm-filter-key">Keys</label>
                                 </div>
                                 <div class="discrete-filter-area" id="mm-filter-key-area">
@@ -322,7 +322,7 @@
                                 </div>
                                 <!-- Simulation -->
                                 <div class="filter-setting">
-                                    <input type="checkbox" id="mm-filter-sim" name="mm-filter-sim" value="Sim" class="filter-checkbox">
+                                    <input type="checkbox" id="mm-filter-sim" name="mm-filter-sim" value="Sim" class="filter-checkbox checkbox">
                                     <label for="mm-filter-sim">Sims</label>
                                 </div>
                                 <div class="discrete-filter-area" id="mm-filter-sim-area">
@@ -330,7 +330,7 @@
                                 </div>
                                 <!-- Step -->
                                 <div class="filter-setting">
-                                    <input type="checkbox" id="mm-filter-step" name="mm-filter-step" value="Step" class="filter-checkbox">
+                                    <input type="checkbox" id="mm-filter-step" name="mm-filter-step" value="Step" class="filter-checkbox checkbox">
                                     <label for="mm-filter-step">Step</label>
                                 </div>
                                 <div class="between-filter-area" id="mm-filter-step-area">

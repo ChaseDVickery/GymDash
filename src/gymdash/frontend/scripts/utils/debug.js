@@ -1,6 +1,6 @@
 const shouldDebug = true;
 
-function debug(message) {
+function debug(message, doTrace=true) {
     if (shouldDebug) {
         console.log(message);
     }

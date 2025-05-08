@@ -73,3 +73,31 @@ input[type="text"] {
     text-align: center;
     border-radius: var(--panel-br);
 }
+
+.checkbox {
+    accent-color: var(--main-contrast-color);
+    aspect-ratio: 1 / 1;
+}
+
+
+.filter-options-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--extra-gap);
+}
+.discrete-filter-area {
+    display: grid;
+    grid-template-rows: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+    margin-bottom: var(--mega-gap);
+}
+.discrete-filter-setting {
+
+}
+
+.between-filter-area {
+    margin-bottom: var(--mega-gap);
+}
+.between-filter-setting {
+    
+}
