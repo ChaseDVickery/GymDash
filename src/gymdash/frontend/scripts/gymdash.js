@@ -1344,9 +1344,31 @@ function createPlots() {
     const condense = true;
     const selectedData = getSelectedData();
 
-    let plot = vizUtils.createLinePlotForKey(key, selectedData);
+    const plot = vizUtils.createLinePlotForKey(key, selectedData);
+    const detailsPlot = vizUtils.createLinePlotForKey(key, selectedData);
+
     plot.addAllMMIs(selectedData, onClickMMI, condense);
-    plot.addBrushX();
+    detailsPlot.addAllMMIs(selectedData, onClickMMI, condense);
+    plot.addBrushX(function(event) {
+        // plot.refresh();
+        detailsPlot.updatePlot(event, plot);
+    }, "brush");
+    // plot.addBrushX(plot.clearBrush.bind(plot), "end");
+
+    // const width = vizUtils.plotWidth;
+    // const height = vizUtils.plotHeight;
+    // plot.brushX = d3.brushX()
+    //     .extent([60, 30], [width, height-30])
+    //     .on("end", function(e) {console.log(e); detailsPlot.updatePlot(e)});
+    // plot.svg.call(
+    //     plot.brushX
+    // );
+
+    // plot.addBrushX(
+    //     function(e) {
+    //         detailsPlot.updatePlot(e);
+    //     }
+    // );
 
     // let detailsPlot = vizUtils.createLinePlotForKey(key, selectedData);
     // plot.addBrushX(function() {
@@ -1355,7 +1377,7 @@ function createPlots() {
     // })
     
     d3.select("#plots-area").append(() => plot.svg.node());
-    // d3.select("#plots-area").append(() => detailsPlot.svg.node());
+    d3.select("#plots-area").append(() => detailsPlot.svg.node());
 }
 
 

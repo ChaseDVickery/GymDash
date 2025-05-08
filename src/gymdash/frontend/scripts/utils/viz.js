@@ -95,6 +95,7 @@ const vizUtils = (
                 this.createdMMIs = [];
             }
 
+            rebuildLines() { this.#rebuildLines(); }
             #rebuildLines() {
                 const sx = this.scaleX;
                 const sy = this.scaleY;
@@ -139,38 +140,50 @@ const vizUtils = (
                 this.extentY = d3.extent([...otherExtentOrValues, ...this.extentY]);
             }
 
-            addBrushX(onbrush) {
+            clearBrush() {
+                this.svg.select(".brush").call(
+                    this.brushX.move, null
+                );
+            }
+
+            addBrushX(onbrush, eventType="end") {
                 const width = plotWidth;
                 const height = plotHeight;
-                // this.brushX = d3.brushX()
-                //     .extent([[0,0], [width, height]])
-                //     .on("end", onbrush);
+
+                // if (!this.brushX) {
+                //     this.brushX = d3.brushX()
+                //         .extent([[margin.left, margin.bottom], [width, height-margin.bottom]])
+                //     this.svg.on("dblclick", this.refresh.bind(this));
+                //     this.svg.append("g").attr("class", "brush").call(
+                //         this.brushX
+                //     );
+                // }
+                // this.brushX = this.brushX
+                //     .on(eventType, onbrush);
+
                 this.brushX = d3.brushX()
-                    .extent([[margin.left,margin.bottom], [width, height-margin.bottom]])
-                    .on("end", this.updatePlot.bind(this));
-                this.svg.call(
+                    .extent([[margin.left, margin.bottom], [width, height-margin.bottom]])
+                    .on(eventType, onbrush);
+                this.svg.append("g").attr("class", "brush").call(
                     this.brushX
                 );
-                // this.brushX = d3.brushX()
-                //     .extent([[0,0], [width, height]])
-                //     .on("end", this.updatePlot);
-
                 this.svg.on("dblclick", this.refresh.bind(this));
+                
             }
-            updatePlot(event) {
+            updatePlot(event, otherPlot) {
+                if (!event) { return; }
                 const extent = event.selection;
+                const scaleX = otherPlot.scaleX;
+                const scaleY = otherPlot.scaleY;
+                // debug("extent");
+                // debug(extent);
+                // debug([this.scaleX.invert(extent[0]), this.scaleX.invert(extent[1])]);
                 if (!extent) { return; }
-                this.scaleX.domain([this.scaleX.invert(extent[0]), this.scaleX.invert(extent[1])]);
-                this.axisX.call(d3.axisBottom(this.scaleX));
+                this.scaleX.domain([scaleX.invert(extent[0]), scaleX.invert(extent[1])]);
+                this.axisX.call(d3.axisBottom(scaleX));
                 this.#rebuildLines();
                 this.clearMMIs();
                 this.addAllMMIs(this.data, this.onClickMMI, true);
-
-                // line.select(".brush").call(brush.move, null)
-                // d3.brush().clear();
-                this.svg.call(
-                    this.brushX.move, null
-                );
             }
 
             #addMMIRect() {
