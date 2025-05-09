@@ -6,7 +6,7 @@ const vizUtils = (
         const plotWidth = 700;
         const plotHeight = 500;
         const margin = {top: 30, right: 30, bottom: 30, left: 60};
-        const mmiExtentMargin = 30;
+        const mmiExtentMarginPercent = 0.05;
         // MMIs
         const mmiDefaultColor = "rgba(0,255,0,0.2)";
         const mmiHoverColor = "rgba(0,255,0,1)";
@@ -319,7 +319,7 @@ const vizUtils = (
                         if (!this.lastHoveredMMI) { return; }
                         const extent = d3.select(this.lastHoveredMMI).data()[0].getStepExtent();
                         // const m = this.scaleX(mmiExtentMargin);
-                        const m = Math.max(1, Math.floor(0.05*(extent[1] - extent[0])));
+                        const m = Math.max(1, Math.floor(mmiExtentMarginPercent*(extent[1] - extent[0])));
                         // const m = 1;
                         this.updatePlotX([extent[0]-m, extent[1]+m]);
                     }.bind(this))
@@ -397,58 +397,89 @@ const vizUtils = (
                 debug("mediaKeys");
                 debug(mediaKeys);
                 const createdMMIs = this.createdMMIs;
+                // Sort all the media datapoints globally
+                // This prevents the step ranges of each
+                // MMI from overlapping. I.e. if we insert
+                // all MMIs in order, that prevents new data
+                // from being put in an MMI that is ahead of that data.
+                const sortedDatapoints = [];
                 for (const key of mediaKeys) {
-                    this.addMMIs(key, allData, onclick, condense, createdMMIs);
+                    for (const simID in allData) {
+                        const data = allData[simID].getData(key);
+                        for (const datum of data) {
+                            sortedDatapoints.push({
+                                key: key,
+                                id: simID,
+                                datum: datum
+                            });
+                        }
+                    }
                 }
+                sortedDatapoints.sort((a, b) => a.datum.step - b.datum.step);
+                for (const o of sortedDatapoints) {
+                    this.addMMI(o.datum, o.id, o.key, allData, onclick, condense, createdMMIs);
+                }
+                // for (const key of mediaKeys) {
+                //     this.addMMIs(key, allData, onclick, condense, createdMMIs);
+                // }
             }
             addMMIs(key, allData, onclick, condense=true, createdMMIs=[]) {
-                const width = plotWidth;
-                const height = plotHeight;
-    
-                const extentX = this.extentX;
-                const xScale = this.scaleX;
-    
                 for (const simID in allData) {
                     const data = allData[simID].getData(key);
                     if (data === undefined) { continue; }
                     for (const point of data) {
-                        // Check if this point would be too close to an existing
-                        // MMI. If so, then get that MMI's MMIData and add this
-                        // point's data to it.
-                        const closestMMIIdx = d3.bisectCenter(createdMMIs.map(d => d.step), point.step);
-                        // Check the difference in step value and convert to actual length.
-                        // Compare against the width of MMI markers
-                        if (closestMMIIdx >= 0 && closestMMIIdx < createdMMIs.length) {
-                            debug("step difference: " + Math.abs(createdMMIs[closestMMIIdx].step - point.step) + ". scale difference: " + Math.abs(xScale(createdMMIs[closestMMIIdx].step) - xScale(point.step)));
-                        }
-                        if (
-                            condense &&
-                            closestMMIIdx >= 0 &&
-                            closestMMIIdx < createdMMIs.length &&
-                            Math.abs(xScale(createdMMIs[closestMMIIdx].step) - xScale(point.step)) < (mmiSideLength+mmiGap)
-                        ) {
-                            // Update existing MMI with new information
-                            createdMMIs[closestMMIIdx].selection.data()[0].addData(allData[simID], key, point.step);
-                        }
-                        else {
-                            // Create new MMI with new information
-                            const markerPoints = getMMIPoints([xScale(point.step), height-margin.bottom]);
-                            const mmiData = new MMIData();
-                            mmiData.addData(allData[simID], key, point.step);
-                            this.onClickMMI = onclick;
-                            const mmi = createMMI(this.svg, markerPoints)
-                                .data([mmiData])
-                                .on("mouseover", this.mouseoverMMI.bind(this))
-                                .on("mousemove", this.mousemoveMMI.bind(this))
-                                .on("mouseleave", this.mouseleaveMMI.bind(this))
-                                .on("click", this.clickMMI.bind(this));
-                            const created = {step: point.step, selection: mmi};
-                            const insertIdx = sortedIndex(createdMMIs, created, (x) => x.step);
-                            createdMMIs.splice(insertIdx, 0, created);
-                        }
+                        this.addMMI(
+                            point,
+                            simID,
+                            key,
+                            allData,
+                            onclick,
+                            condense,
+                            createdMMIs
+                        );
                     }
                 }
                 return createdMMIs;
+            }
+            addMMI(datum, simID, key, allData, onclick, condense=true, createdMMIs=[]) {
+                const width = plotWidth;
+                const height = plotHeight;
+                const xScale = this.scaleX;
+                if (!datum) { return; }
+                // Check if this point would be too close to an existing
+                // MMI. If so, then get that MMI's MMIData and add this
+                // point's data to it.
+                const closestMMIIdx = d3.bisectCenter(createdMMIs.map(d => d.step), datum.step);
+                // Check the difference in step value and convert to actual length.
+                // Compare against the width of MMI markers
+                if (closestMMIIdx >= 0 && closestMMIIdx < createdMMIs.length) {
+                    debug("step difference: " + Math.abs(createdMMIs[closestMMIIdx].step - datum.step) + ". scale difference: " + Math.abs(xScale(createdMMIs[closestMMIIdx].step) - xScale(datum.step)));
+                }
+                if (
+                    condense &&
+                    closestMMIIdx >= 0 &&
+                    closestMMIIdx < createdMMIs.length &&
+                    Math.abs(xScale(createdMMIs[closestMMIIdx].step) - xScale(datum.step)) < (mmiSideLength+mmiGap)
+                ) {
+                    // Update existing MMI with new information
+                    createdMMIs[closestMMIIdx].selection.data()[0].addData(allData[simID], key, datum.step);
+                }
+                else {
+                    // Create new MMI with new information
+                    const markerPoints = getMMIPoints([xScale(datum.step), height-margin.bottom]);
+                    const mmiData = new MMIData();
+                    mmiData.addData(allData[simID], key, datum.step);
+                    this.onClickMMI = onclick;
+                    const mmi = createMMI(this.svg, markerPoints)
+                        .data([mmiData])
+                        .on("mouseover", this.mouseoverMMI.bind(this))
+                        .on("mousemove", this.mousemoveMMI.bind(this))
+                        .on("mouseleave", this.mouseleaveMMI.bind(this))
+                        .on("click", this.clickMMI.bind(this));
+                    const created = {step: datum.step, selection: mmi};
+                    const insertIdx = sortedIndex(createdMMIs, created, (x) => x.step);
+                    createdMMIs.splice(insertIdx, 0, created);
+                }
             }
         }
 

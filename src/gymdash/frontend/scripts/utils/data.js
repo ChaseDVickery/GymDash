@@ -131,10 +131,6 @@ const dataUtils = (
                 this.#addData(key, data, meta, this.video_keys);
             }
             addDataOfType(key, data, meta=null, dataType) {
-                console.log(key + " metafile:");
-                console.log(meta);
-                console.log(data);
-                console.log(dataType);
                 if (dataType === "scalar" || dataType === "scalars" || dataType === DataReport.SCALAR) {
                     this.addScalarData(key, data, meta);
                 }
