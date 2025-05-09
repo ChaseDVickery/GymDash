@@ -6,6 +6,7 @@ const vizUtils = (
         const plotWidth = 700;
         const plotHeight = 500;
         const margin = {top: 30, right: 30, bottom: 30, left: 60};
+        const mmiExtentMargin = 30;
         // MMIs
         const mmiDefaultColor = "rgba(0,255,0,0.2)";
         const mmiHoverColor = "rgba(0,255,0,1)";
@@ -37,7 +38,6 @@ const vizUtils = (
                 this.keys.push(key);
                 this.steps.push(step);
                 this.idxs.push(simDataReport.getData(key).findIndex(d => d.step == step));
-                debug(this);
                 this._dirtyExtent = true;
             }
 
@@ -77,6 +77,44 @@ const vizUtils = (
             }
         }
 
+        // Adapted from https://observablehq.com/@d3/learn-d3-interaction
+        class Tooltip {
+            constructor(svg) {
+                this.svg = svg;
+                
+                this.node = svg.append("g")
+                    .attr("pointer-events", "none")
+                    .attr("display", "none")
+                    .attr("font-family", "sans-serif")
+                    .attr("font-size", "0.5em")
+                    .attr("text-anchor", "middle");
+                this.node.append("rect")
+                    .attr("x", "-27")
+                    .attr("y", "-30")
+                    .attr("width", "54")
+                    .attr("height", "20")
+                    .attr("fill", "white");
+                this._date = this.node.append("text")
+                    .attr("y", "-22");
+                this._close = this.node.append("text")
+                    .attr("y", "-12");
+                this.node.append("circle")
+                    .attr("r", "2.5")
+                    .attr("fill", "orange");
+            }
+            show(d) {
+                this.node.attr("display", null);
+                this._date.text(d.step);
+                this._close.text(d.value.toFixed(2));
+            }
+            moveTo(newPoint) {
+                this.node.attr("transform", `translate(${newPoint[0]},${newPoint[1]})`);
+            }
+            hide() {
+                this.node.attr("display", "none");
+            }
+        }
+
         class Plot {
             constructor(svg, data, key, extentX, extentY, scaleX, scaleY, axisX, axisY, lines) {
                 this.svg        = svg;
@@ -90,12 +128,21 @@ const vizUtils = (
                 this.axisY      = axisY;
                 this.lines      = lines;
 
+                this.tooltip = new Tooltip(this.svg);
+
                 this.onClickMMI = undefined;
                 this.selectedMMI = undefined;
+                this.lastHoveredMMI = undefined;
                 this.createdMMIs = [];
+
+                this.init();
             }
 
-            rebuildLines() { this.#rebuildLines(); }
+            #svgSize() {
+                const box = this.svg.node().getBoundingClientRect();
+                return {width: box.width, height: box.height};
+            }
+
             #rebuildLines() {
                 const sx = this.scaleX;
                 const sy = this.scaleY;
@@ -106,6 +153,77 @@ const vizUtils = (
                             .y(function(d) { return sy(d.value) })
                         );
                 }
+            }
+
+            #onhover(event) {
+                const width = plotWidth;
+                const height = plotHeight;
+                
+                if (this.lines.length < 1) { return; }
+                // We have to scale the absolute pointer offset values by
+                // the size of the svg because it can change in size.
+                const offsetX = event.offsetX * (width/this.#svgSize().width);
+                const offsetY = event.offsetY * (height/this.#svgSize().height);
+                // Figure out which line has closest value to mouse position
+                const estStep = this.scaleX.invert(offsetX);
+                let finalLine;
+                let dataPoint;
+                let nearestDistance = Infinity;
+                const neighborhood = 10;
+                // Look for the nearest point on any lines.
+                for (const line of this.lines) {
+                    // First filter just by step value (only within certain number of steps).
+                    const lineData = line.data()[0];
+                    const idxStep = d3.bisectCenter(lineData.map(d => d.step), estStep);
+                    // Look on either side of point in neighborhood
+                    for (let i = -neighborhood; i <= neighborhood; i++) {
+                        const tempPoint = lineData[idxStep+i];
+                        if (!tempPoint) { continue; }
+                        // Calculate pixel distance to point.
+                        const xDistPixel = Math.abs(offsetX - this.scaleX(tempPoint.step));
+                        const yDistPixel = Math.abs(offsetY - this.scaleY(tempPoint.value));
+                        const dist = Math.sqrt(Math.pow(xDistPixel,2) + Math.pow(yDistPixel,2));
+                        // Track closest line/point so far
+                        if (dist < nearestDistance) {
+                            nearestDistance = dist;
+                            finalLine = line;
+                            dataPoint = tempPoint;
+                        }
+                    }
+                }
+                if (dataPoint) {
+                    this.tooltip.show(dataPoint);
+                    this.tooltip.moveTo([this.scaleX(dataPoint.step), this.scaleY(dataPoint.value)]);
+                }
+            }
+            #onleave(event) {
+                this.tooltip.hide();
+            }
+
+            init() {
+                const width = plotWidth;
+                const height = plotHeight;
+                console.log("INIT");
+                // https://developer.mozilla.org/en-US/docs/Web/API/Element#mouse_events
+                this.svg
+                    .on("mousemove", this.#onhover.bind(this));
+                this.svg
+                    .on("mouseleave", this.#onleave.bind(this));
+
+                // Brushing
+                this.brushX = d3.brushX()
+                    .extent([[margin.left, margin.bottom], [width, height-margin.bottom]]);
+                this.svg.append("g").attr("class", "brush").call(
+                    this.brushX
+                );
+
+                // Double click reset
+                this.svg.on("dblclick", this.refresh.bind(this));
+
+                // MMI highlight rectangle
+                this.#addMMIRect();
+
+                // this.svg.append(this.tooltip.node);
             }
 
             /**
@@ -161,26 +279,25 @@ const vizUtils = (
                 // this.brushX = this.brushX
                 //     .on(eventType, onbrush);
 
-                this.brushX = d3.brushX()
-                    .extent([[margin.left, margin.bottom], [width, height-margin.bottom]])
-                    .on(eventType, onbrush);
-                this.svg.append("g").attr("class", "brush").call(
-                    this.brushX
-                );
-                this.svg.on("dblclick", this.refresh.bind(this));
-                
+                // this.brushX = d3.brushX()
+                //     .extent([[margin.left, margin.bottom], [width, height-margin.bottom]])
+                this.brushX = this.brushX.on(eventType, onbrush);
             }
             updatePlot(event, otherPlot) {
                 if (!event) { return; }
                 const extent = event.selection;
                 const scaleX = otherPlot.scaleX;
-                const scaleY = otherPlot.scaleY;
-                // debug("extent");
-                // debug(extent);
-                // debug([this.scaleX.invert(extent[0]), this.scaleX.invert(extent[1])]);
                 if (!extent) { return; }
-                this.scaleX.domain([scaleX.invert(extent[0]), scaleX.invert(extent[1])]);
-                this.axisX.call(d3.axisBottom(scaleX));
+                this.updatePlotX([scaleX.invert(extent[0]), scaleX.invert(extent[1])]);
+                // this.scaleX.domain([scaleX.invert(extent[0]), scaleX.invert(extent[1])]);
+                // this.axisX.call(d3.axisBottom(this.scaleX));
+                // this.#rebuildLines();
+                // this.clearMMIs();
+                // this.addAllMMIs(this.data, this.onClickMMI, true);
+            }
+            updatePlotX(extentX) {
+                this.scaleX.domain(extentX);
+                this.axisX.call(d3.axisBottom(this.scaleX));
                 this.#rebuildLines();
                 this.clearMMIs();
                 this.addAllMMIs(this.data, this.onClickMMI, true);
@@ -194,8 +311,28 @@ const vizUtils = (
                     .attr("width", minMMIRectWidth)
                     .attr("y", margin.top)
                     .attr("height", height - margin.top - margin.bottom)
+                    // .attr("pointer-events", "none")
                     .style("fill", "darkorange")
-                    .style("opacity", 0.4);
+                    .style("opacity", 0.4)
+                    .on("click", function(event) {
+                        console.log("click mmi rect");
+                        if (!this.lastHoveredMMI) { return; }
+                        const extent = d3.select(this.lastHoveredMMI).data()[0].getStepExtent();
+                        // const m = this.scaleX(mmiExtentMargin);
+                        const m = Math.max(1, Math.floor(0.05*(extent[1] - extent[0])));
+                        // const m = 1;
+                        this.updatePlotX([extent[0]-m, extent[1]+m]);
+                    }.bind(this))
+                    .on("mouseover", function(event) {
+                        this.mmiExtentRect
+                            .style("opacity", 0.7)
+                            .style("outline", "1px rgba(255,255,255,0.5) solid");
+                    }.bind(this))
+                    .on("mouseleave", function(event) {
+                        this.mmiExtentRect
+                            .style("opacity", 0.4)
+                            .style("outline", null);
+                    }.bind(this));
             }
 
             mousemoveMMI(mmi) {
@@ -213,6 +350,8 @@ const vizUtils = (
                         .attr("x", this.scaleX(extent[0]))
                         .attr("width", rectWidth);
                 }
+                // Change last hovered
+                this.lastHoveredMMI = mmi.target;
                 // Maybe change the MMI color
                 if (this.selectedMMI === mmi.target) { return; }
                 if (!mmiData) { return; }
@@ -239,7 +378,9 @@ const vizUtils = (
                 }
             }
             clearMMIs() {
-                d3.selectAll(".mmi-marker").remove();
+                console.log("clearMMIs");
+                console.trace();
+                this.svg.selectAll(".mmi-marker").remove();
                 this.selectedMMI = undefined;
                 if (this.mmiExtentRect) {
                     this.mmiExtentRect
@@ -259,8 +400,6 @@ const vizUtils = (
                 for (const key of mediaKeys) {
                     this.addMMIs(key, allData, onclick, condense, createdMMIs);
                 }
-
-                this.#addMMIRect();
             }
             addMMIs(key, allData, onclick, condense=true, createdMMIs=[]) {
                 const width = plotWidth;
@@ -277,7 +416,6 @@ const vizUtils = (
                         // MMI. If so, then get that MMI's MMIData and add this
                         // point's data to it.
                         const closestMMIIdx = d3.bisectCenter(createdMMIs.map(d => d.step), point.step);
-                        debug(closestMMIIdx);
                         // Check the difference in step value and convert to actual length.
                         // Compare against the width of MMI markers
                         if (closestMMIIdx >= 0 && closestMMIIdx < createdMMIs.length) {
@@ -404,12 +542,16 @@ const vizUtils = (
             const xScale = d3
                 .scaleLinear()
                 .domain(extentX)
+                // .range([margin.left, width - margin.right - margin.left]);
                 .range([margin.left, width - margin.right]);
+                // .range([0, width - margin.right]);
             const yScale = d3
                 .scaleLinear()
                 .domain(extentY)
                 .nice()
+                // .range([height - margin.bottom - margin.top, margin.top]);
                 .range([height - margin.bottom, margin.top]);
+                // .range([height - margin.bottom, 0]);
 
             const xAxis = svg
                 .append("g")
