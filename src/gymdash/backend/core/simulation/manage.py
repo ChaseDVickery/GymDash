@@ -368,7 +368,7 @@ class SimulationTracker:
                 # Also set from_disk so we cannot accidentally run it again.
                 revived_sim: Simulation = sim_type(sim_info.config)
                 revived_sim.fill_from_stored_info(sim_info)
-                revived_sim.set_project_info(ProjectManager.sims_folder(), revived_sim._project_sim_id)
+                revived_sim.set_project_info(ProjectManager.sims_folder(), ProjectManager.resources_folder(), revived_sim._project_sim_id)
                 revived_sim.create_streamers(sim_info.config, sim_info.start_kwargs)
                 print(f"SimulationTracker adding old simulation at: {sim_id}")
                 self.done_sim_map[sim_id] = revived_sim
@@ -528,7 +528,7 @@ class SimulationTracker:
         if simulation is None:
             logger.warning(f"Could not create valid simulation.")
             return (SimulationTracker.no_id, None)
-        simulation.set_project_info(ProjectManager.sims_folder(), new_id)
+        simulation.set_project_info(ProjectManager.sims_folder(), ProjectManager.resources_folder(), new_id)
         ProjectManager.add_or_update_simulation(new_id, simulation)
         return (new_id, simulation)
 

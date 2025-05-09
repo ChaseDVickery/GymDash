@@ -66,6 +66,7 @@ class ProjectManager:
     TB_FOLDER       = "tb"
     SIMS_FOLDER     = "sims"
     DB_FOLDER       = "db"
+    RES_FOLDER      = "resources"
     DB_NAME         = "simulations.db"
 
     _execution_mutex = Lock()
@@ -138,6 +139,9 @@ class ProjectManager:
     @staticmethod
     def db_folder():
         return os.path.join(ProjectManager.project_folder(), ProjectManager.DB_FOLDER)
+    @staticmethod
+    def resources_folder():
+        return os.path.join(ProjectManager.project_folder(), ProjectManager.RES_FOLDER)
     @staticmethod
     def db_path():
         return os.path.join(ProjectManager.db_folder(), ProjectManager.DB_NAME)

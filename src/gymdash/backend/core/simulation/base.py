@@ -524,7 +524,13 @@ class Simulation():
     def _create_streamers(self, kwargs: Dict[str, Any]):
         pass
 
-    def set_project_info(self, project_sim_base_path: str, sim_id: UUID):
+    def _to_every_x_trigger(self, value):
+        if isinstance(value, int):
+            return lambda x: x%value==0
+        else:
+            return value
+
+    def set_project_info(self, project_sim_base_path: str, project_resources_path: str, sim_id: UUID):
         """
         Sets specific information that is only accessible from outside
         a Simulation.
@@ -537,6 +543,7 @@ class Simulation():
         self._project_info_set      = True
         self._project_sim_id        = sim_id
         self._project_sim_base_path = project_sim_base_path
+        self._project_resources_path= project_resources_path
     
     def set_cancelled(self) -> None:
         with self._meta_mutex:

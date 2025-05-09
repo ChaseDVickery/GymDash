@@ -34,6 +34,11 @@ class FileEvent:
     src_name: str
 
 class MediaLinkStreamableStat(StreamableStat):
+
+    @staticmethod
+    def final_split_step_extractor(fname: str, split_char="_", extension: str=".png"):
+        return int(fname.split(split_char)[-1][:-len(extension)])
+
     """
     Class represents an easily appendable stat.
     This specializes in appending new information and

@@ -1,8 +1,11 @@
 import logging
 import os
 import time
+import pathlib
+import functools
 
 from torch.utils.tensorboard import SummaryWriter
+import gymdash.backend.constants as constants
 
 try:
     import gymnasium as gym
@@ -27,23 +30,32 @@ try:
     _has_np = True
 except ImportError:
     _has_np = False
+try:
+    import torch
+    import torch.nn as nn
+    _has_torch = True
+except ImportError:
+    _has_torch = False
 from typing import Any, Dict
 
 import gymdash.backend.core.api.config.stat_tags as stat_tags
 from gymdash.backend.core.api.models import SimulationStartConfig
 from gymdash.backend.core.simulation.base import Simulation
 from gymdash.backend.core.simulation.manage import SimulationRegistry
-from gymdash.backend.gymnasium.wrappers.RecordVideoToTensorboard import \
-    RecordVideoToTensorboard
-from gymdash.backend.gymnasium.wrappers.RecordVideoCustom import \
-    RecordVideoCustom
 from gymdash.backend.gymnasium.wrappers.MediaFileStatLinker import \
     MediaFileStatLinker
+from gymdash.backend.gymnasium.wrappers.RecordVideoCustom import \
+    RecordVideoCustom
+from gymdash.backend.gymnasium.wrappers.RecordVideoToTensorboard import \
+    RecordVideoToTensorboard
 from gymdash.backend.gymnasium.wrappers.TensorboardStreamWrapper import (
     TensorboardStreamer, TensorboardStreamWrapper)
 from gymdash.backend.stable_baselines.callbacks import \
     SimulationInteractionCallback
-from gymdash.backend.tensorboard.MediaLinkStreamableStat import MediaLinkStreamableStat
+from gymdash.backend.tensorboard.MediaLinkStreamableStat import \
+    MediaLinkStreamableStat
+from gymdash.backend.torch.examples import (ClassifierMNIST,
+                                            train_mnist_classifier)
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +84,6 @@ class StableBaselinesSimulation(Simulation):
     def _to_alg_initializer(self, alg_key: str):
         return self.algs.get(alg_key, self.algs["ppo"])
 
-    def _to_every_x_trigger(self, value):
-        if isinstance(value, int):
-            return lambda x: x%value==0
-        else:
-            return value
-        
     def _create_streamers(self, kwargs: Dict[str, Any]):
         experiment_name = f"{kwargs['env']}_{kwargs['algorithm']}"
         tb_path = os.path.join("tb", experiment_name, "train")
@@ -374,8 +380,168 @@ class CustomControlSimulation(Simulation):
         logger.debug(f"total time taken: {et-st}")
         writer.close()
 
+class MLSimulation(Simulation):
+    def __init__(self, config: SimulationStartConfig) -> None:
+        if not _has_torch:
+            raise ImportError(f"Install pytorch to use example simulation {type(self)}.")
+
+        super().__init__(config)
+
+        self.tb_tag_key_map = {
+            stat_tags.TB_SCALARS: ["loss"],
+            # stat_tags.TB_IMAGES: ["episode_video"]
+        }
+
+    # def train_loop(
+    #     self,
+    #     model: nn.Module,
+    #     data_folder: str,
+    #     **kwargs
+    # ):
+    #     # Setup folders
+    #     train_path = os.path.join(data_folder, "train")
+    #     test_path = os.path.join(data_folder, "test")
+    #     pathlib.Path(train_path).mkdir(parents=True, exist_ok=True)
+    #     pathlib.Path(test_path).mkdir(parents=True, exist_ok=True)
+    #     # Get the dataset
+    #     train_data = datasets.MNIST(
+    #         root=train_path,
+    #         train=True,
+    #         download=True,
+    #         transform=ToTensor(),
+    #     )
+    #     # Train the model
+    #     log_step = kwargs.get("log_step", 100)
+    #     batch_size = kwargs.get("batch_size", 64)
+    #     shuffle = kwargs.get("shuffle", False)
+    #     loss_fn = nn.CrossEntropyLoss()
+    #     optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
+    #     train_dataloader = DataLoader(train_data, batch_size, shuffle)
+    #     size = len(train_dataloader.dataset)
+    #     model.train()
+    #     for batch, (x, y) in enumerate(train_dataloader):
+    #         x, y = x.to(device), y.to(device)
+
+    #         pred = model(x)
+    #         loss = loss_fn(pred, y)
+
+    #         loss.backward()
+    #         optimizer.step()
+    #         optimizer.zero_grad()
+
+    #         if batch%log_step == 0:
+    #             loss, 
+        
+    def _create_streamers(self, kwargs: Dict[str, Any]):
+        experiment_name = f"{kwargs['env']}_{kwargs['algorithm']}"
+        tb_path = os.path.join("tb", experiment_name, "train")
+        video_path = os.path.join(self.sim_path, "media", "episode_video")
+        if self._project_info_set:
+            tb_path = os.path.join(self.sim_path, tb_path)
+        self.streamer.get_or_register(TensorboardStreamer(
+            tb_path,
+            self.tb_tag_key_map
+        ))
+        self.streamer.get_or_register(MediaFileStatLinker(
+            "media_" + tb_path,
+            [
+                MediaLinkStreamableStat(
+                    "episode_video",
+                    stat_tags.VIDEOS,
+                    video_path,
+                    r"rl-video-(episode|step)-[0-9]+_[0-9]+\.mp4",
+                    lambda fname: int(fname.split("_")[-1][:-4])
+                )
+            ]
+        ))
+
+    def create_kwarg_defaults(self):
+        return {
+            "train": True,
+            "val": False,
+            "test": False,
+            "inference": False,
+            "train_kwargs": {},
+            "val_kwargs": {},
+            "test_kwargs": {},
+            "inference_kwargs": {},
+        }
+    # Policy use custom policy dict or existing policy network:
+    # https://stable-baselines3.readthedocs.io/en/sde/guide/custom_policy.html
+
+    def _setup(self, **kwargs):
+        kwargs = self._overwrite_new_kwargs(self.kwarg_defaults, self.config.kwargs, kwargs)
+
+    def _run(self, **kwargs):
+        kwargs = self._overwrite_new_kwargs(self.kwarg_defaults, self.config.kwargs, kwargs)
+        do_train = kwargs.get("train", True)
+        do_val = kwargs.get("val", False)
+        do_test = kwargs.get("test", False)
+        do_inference = kwargs.get("inference", False)
+        train_kwargs = kwargs.get("train_kwargs", {})
+        val_kwargs = kwargs.get("val_kwargs", {})
+        test_kwargs = kwargs.get("test_kwargs", {})
+        inference_kwargs = kwargs.get("inference_kwargs", {})
+        
+        if (do_train):
+            pass
+            if (do_val):
+                pass
+        if (do_test):
+            pass
+
+        if (do_inference):
+            # Begin inference loop, waiting for inference inputs and returning
+            # processed values.
+            pass
+
+        experiment_name = f"mnist"
+        tb_path = os.path.join("tb", experiment_name, "train")
+        if self._project_info_set:
+            tb_path = os.path.join(self.sim_path, tb_path)
+        image_path = os.path.join(self.sim_path, "media", "example_outputs")
+
+        # Use StreamerRegistry to see if there is an existing Streamer with
+        # the same streamer_name. In this case, the streamer_name checked is
+        # just the tensorboard path (tb_path). This helps keep only one streamer
+        # in charge of one tb folder.
+        self.streamer.get_or_register(TensorboardStreamer(
+            tb_path,
+            self.tb_tag_key_map
+        ))
+        self.streamer.get_or_register(MediaFileStatLinker(
+            "media_" + tb_path,
+            [
+                MediaLinkStreamableStat(
+                    "example_outputs",
+                    stat_tags.IMAGES,
+                    image_path,
+                    r"output_[0-9]+\.png",
+                    functools.partial(
+                        MediaLinkStreamableStat.final_split_step_extractor,
+                        split_char="_",
+                        extension=".png"
+                    )
+                    # lambda fname: int(fname.split("_")[-1][:-4])
+                )
+            ]
+        ))
+
+        # Setup Model
+        self.model = ClassifierMNIST()
+
+        dataset_folder_path = os.path.join(self._project_resources_path, constants.DATASET_FOLDER)
+
+        try:
+            train_mnist_classifier(self.model, dataset_folder_path, **train_kwargs)
+        except Exception as e:
+            self._meta_failed = True
+            self.add_error_details(str(e))
+            del self.model
+            torch.cuda.empty_cache()
 
 
 def register_example_simulations():
     SimulationRegistry.register("stable_baselines", StableBaselinesSimulation)
     SimulationRegistry.register("custom_control", CustomControlSimulation)
+    SimulationRegistry.register("example_ml", MLSimulation)

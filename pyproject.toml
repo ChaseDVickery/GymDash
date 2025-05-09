@@ -35,7 +35,8 @@ full = [
   "tensorboard>=2",
   "gymnasium[classic-control]>=1.1.1",
   "moviepy==1.0.3",
-  "stable_baselines3[extra]>=2.6.0"
+  "stable_baselines3[extra]>=2.6.0",
+  "torchvision"
 ]
 
 [project.urls]
