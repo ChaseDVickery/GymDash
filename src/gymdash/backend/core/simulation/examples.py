@@ -1,11 +1,14 @@
+import functools
 import logging
 import os
-import time
 import pathlib
-import functools
+import time
+from abc import abstractmethod
 
 from torch.utils.tensorboard import SummaryWriter
+
 import gymdash.backend.constants as constants
+from gymdash.backend.torch.base import SimpleMLModel
 
 try:
     import gymnasium as gym
@@ -33,6 +36,9 @@ except ImportError:
 try:
     import torch
     import torch.nn as nn
+    from torch.utils.data import DataLoader
+    from torchvision import datasets
+    from torchvision.transforms import ToTensor
     _has_torch = True
 except ImportError:
     _has_torch = False
@@ -388,56 +394,25 @@ class MLSimulation(Simulation):
         super().__init__(config)
 
         self.tb_tag_key_map = {
-            stat_tags.TB_SCALARS: ["loss"],
-            # stat_tags.TB_IMAGES: ["episode_video"]
+            stat_tags.TB_SCALARS: ["loss/train", "loss/val", "acc/val",],
+            stat_tags.TB_IMAGES: ["example_outputs"]
         }
 
-    # def train_loop(
-    #     self,
-    #     model: nn.Module,
-    #     data_folder: str,
-    #     **kwargs
-    # ):
-    #     # Setup folders
-    #     train_path = os.path.join(data_folder, "train")
-    #     test_path = os.path.join(data_folder, "test")
-    #     pathlib.Path(train_path).mkdir(parents=True, exist_ok=True)
-    #     pathlib.Path(test_path).mkdir(parents=True, exist_ok=True)
-    #     # Get the dataset
-    #     train_data = datasets.MNIST(
-    #         root=train_path,
-    #         train=True,
-    #         download=True,
-    #         transform=ToTensor(),
-    #     )
-    #     # Train the model
-    #     log_step = kwargs.get("log_step", 100)
-    #     batch_size = kwargs.get("batch_size", 64)
-    #     shuffle = kwargs.get("shuffle", False)
-    #     loss_fn = nn.CrossEntropyLoss()
-    #     optimizer = torch.optim.SGD(model.parameters(), lr=1e-3)
-    #     train_dataloader = DataLoader(train_data, batch_size, shuffle)
-    #     size = len(train_dataloader.dataset)
-    #     model.train()
-    #     for batch, (x, y) in enumerate(train_dataloader):
-    #         x, y = x.to(device), y.to(device)
-
-    #         pred = model(x)
-    #         loss = loss_fn(pred, y)
-
-    #         loss.backward()
-    #         optimizer.step()
-    #         optimizer.zero_grad()
-
-    #         if batch%log_step == 0:
-    #             loss, 
+    @abstractmethod
+    def _create_model(**model_kwargs) -> nn.Module:
+        pass
         
     def _create_streamers(self, kwargs: Dict[str, Any]):
-        experiment_name = f"{kwargs['env']}_{kwargs['algorithm']}"
+        experiment_name = f"mnist"
         tb_path = os.path.join("tb", experiment_name, "train")
-        video_path = os.path.join(self.sim_path, "media", "episode_video")
         if self._project_info_set:
             tb_path = os.path.join(self.sim_path, tb_path)
+        image_path = os.path.join(self.sim_path, "media", "example_outputs")
+
+        # Use StreamerRegistry to see if there is an existing Streamer with
+        # the same streamer_name. In this case, the streamer_name checked is
+        # just the tensorboard path (tb_path). This helps keep only one streamer
+        # in charge of one tb folder.
         self.streamer.get_or_register(TensorboardStreamer(
             tb_path,
             self.tb_tag_key_map
@@ -446,11 +421,16 @@ class MLSimulation(Simulation):
             "media_" + tb_path,
             [
                 MediaLinkStreamableStat(
-                    "episode_video",
-                    stat_tags.VIDEOS,
-                    video_path,
-                    r"rl-video-(episode|step)-[0-9]+_[0-9]+\.mp4",
-                    lambda fname: int(fname.split("_")[-1][:-4])
+                    "example_outputs",
+                    stat_tags.IMAGES,
+                    image_path,
+                    r"output_[0-9]+\.png",
+                    functools.partial(
+                        MediaLinkStreamableStat.final_split_step_extractor,
+                        split_char="_",
+                        extension=".png"
+                    )
+                    # lambda fname: int(fname.split("_")[-1][:-4])
                 )
             ]
         ))
@@ -474,6 +454,10 @@ class MLSimulation(Simulation):
 
     def _run(self, **kwargs):
         kwargs = self._overwrite_new_kwargs(self.kwarg_defaults, self.config.kwargs, kwargs)
+        model_kwargs = kwargs.get("model_kwargs", {})
+
+        # self._create_model(**model_kwargs)
+
         do_train = kwargs.get("train", True)
         do_val = kwargs.get("val", False)
         do_test = kwargs.get("test", False)
@@ -528,17 +512,52 @@ class MLSimulation(Simulation):
         ))
 
         # Setup Model
-        self.model = ClassifierMNIST()
+        # self.model = ClassifierMNIST()
+        self.model = SimpleMLModel(ClassifierMNIST())
 
+        # Setup Dataset/DataLoader
         dataset_folder_path = os.path.join(self._project_resources_path, constants.DATASET_FOLDER)
+        train_path = os.path.join(dataset_folder_path, "train")
+        test_path = os.path.join(dataset_folder_path, "test")
+        pathlib.Path(train_path).mkdir(parents=True, exist_ok=True)
+        pathlib.Path(test_path).mkdir(parents=True, exist_ok=True)
+        # Get the dataset
+        train_data = datasets.MNIST(
+            root=train_path,
+            train=True,
+            download=True,
+            transform=ToTensor(),
+        )
+        test_data = datasets.MNIST(
+            root=train_path,
+            train=False,
+            download=True,
+            transform=ToTensor(),
+        )
+        # train_loader = DataLoader(torch.utils.data.Subset(train_data, torch.arange(0,1000)), 32)
+        train_loader = DataLoader(train_data, 32)
+        test_loader = DataLoader(test_data, 32)
 
         try:
-            train_mnist_classifier(self.model, dataset_folder_path, **train_kwargs)
+            self.model.train(
+                dataloader=train_loader,
+                epochs=5,
+                tb_logger=tb_path,
+                log_step=5,
+                do_val=True,
+                val_per_epoch=1,
+                val_kwargs={
+                    "dataloader": test_loader
+                }
+            )
+            # train_mnist_classifier(self.model, dataset_folder_path, **train_kwargs)
         except Exception as e:
+            logger.error(e)
             self._meta_failed = True
             self.add_error_details(str(e))
             del self.model
             torch.cuda.empty_cache()
+            raise e
 
 
 def register_example_simulations():
