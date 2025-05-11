@@ -1,17 +1,21 @@
 import os
 import pathlib
 from abc import abstractmethod
-from typing import Union, Dict, Any
 from collections import OrderedDict
+from typing import Any, Dict, Union
 
 from torch.nn.modules import Module
+
+from gymdash.backend.core.simulation.callbacks import (BaseCustomCallback,
+                                                       EmptyCallback)
+
 try:
-    from torch.utils.tensorboard.writer import SummaryWriter
     import torch
     import torch.nn as nn
     from torch.nn.modules.loss import _Loss
     from torch.optim import Optimizer
     from torch.utils.data import DataLoader
+    from torch.utils.tensorboard.writer import SummaryWriter
     from torchvision import datasets
     from torchvision.transforms import ToTensor
     _has_torch = True
@@ -20,6 +24,11 @@ except ImportError:
 
 if not _has_torch:
     raise ImportError("Install pytorch to use base gymdash-pytorch utilities.")
+
+class StopSimException(Exception):
+    def __init__(self, message, errors=None) -> None:
+        super().__init__(message, errors)
+        self.errors = errors
 
 class SimulationMLModel():
     def __init__(self, model: nn.Module) -> None:
@@ -90,9 +99,15 @@ class SimpleMLModel(SimulationMLModel):
         val_per_steps:  int                         = -1,
         val_per_epoch:  int                         = -1,
         val_kwargs:     Dict[str, Any]              = {},
+        step_callback: BaseCustomCallback           = EmptyCallback(),
+        epoch_callback: BaseCustomCallback          = EmptyCallback(),
         device                                      = None,
         **kwargs
     ):
+        step_callback.on_process_start(locals(), globals())
+        epoch_callback.on_process_start(locals(), globals())
+        step_callback.push_state("train")
+        epoch_callback.push_state("train")
         # Get device
         if device is None:
             device = torch.accelerator.current_accelerator().type if \
@@ -105,6 +120,7 @@ class SimpleMLModel(SimulationMLModel):
         model               = self.model
         train_dataloader    = dataloader
         size                = len(train_dataloader.dataset)
+        total_steps         = epochs * len(train_dataloader)
         loss_fn             = loss_fn \
             if loss_fn is not None \
             else nn.CrossEntropyLoss()
@@ -150,6 +166,10 @@ class SimpleMLModel(SimulationMLModel):
                             / val_results["total_samples"]
                         tb_logger.add_scalar("loss/val", val_loss, curr_samples)
                         tb_logger.add_scalar("acc/val", accuracy, curr_samples)
+                # Perform callback
+                step_callback.update_locals(locals())
+                if not step_callback.on_invoke():
+                    raise StopSimException(f"Invocation of step_callback at state '{step_callback.state}' terminated training.")
             # Validate every val_per_epoch epochs
             if do_val and val_per_epoch > 0 and (epoch % val_per_epoch == 0):
                 val_results = self.validate(
@@ -166,6 +186,14 @@ class SimpleMLModel(SimulationMLModel):
                     print(f"LOGGING acc/val: {accuracy}")
                     tb_logger.add_scalar("loss/val", val_loss, curr_samples)
                     tb_logger.add_scalar("acc/val", accuracy, curr_samples)
+            # Perform callback
+            epoch_callback.update_locals(locals())
+            if not epoch_callback.on_invoke():
+                raise StopSimException(f"Invocation of epoch_callback at state '{epoch_callback.state}' terminated training.")
+        # Pop callback states
+        step_callback.pop_state()
+        epoch_callback.pop_state()
+        
 
     def _validate(
         self,

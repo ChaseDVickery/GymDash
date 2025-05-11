@@ -33,13 +33,13 @@ class SimulationInteractionCallback(BaseCallback):
     def __init__(self, simulation: Simulation, verbose: int = 0):
         super().__init__(verbose)
         self.simulation = simulation
-        self.interactor = simulation.interactor
         
         self.curr_timesteps = 0
         self.total_timesteps = 0
 
-    # def consume_interactors(self) -> None:
-    #     self.interactor.consume_triggers()
+    @property
+    def interactor(self):
+        return self.simulation.interactor
 
     def _on_training_start(self) -> None:
         # From the ProgressBarCallback

@@ -1337,8 +1337,8 @@ function onClickMMI(d) {
 }
 function createPlots() {
     // const key = "rollout/ep_rew_mean";
-    // const key = "loss/train";
-    const key = "acc/val";
+    const key = "loss/train";
+    // const key = "acc/val";
     // const key = "my_number";
 
     clearMainPlot();

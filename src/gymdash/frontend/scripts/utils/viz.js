@@ -378,8 +378,7 @@ const vizUtils = (
                 }
             }
             clearMMIs() {
-                console.log("clearMMIs");
-                console.trace();
+                debug("clearMMIs");
                 this.svg.selectAll(".mmi-marker").remove();
                 this.selectedMMI = undefined;
                 if (this.mmiExtentRect) {
@@ -394,8 +393,6 @@ const vizUtils = (
                 for (const simID in allData) {
                     allData[simID].getMediaKeys().forEach(mediaKeys.add, mediaKeys);
                 }
-                debug("mediaKeys");
-                debug(mediaKeys);
                 const createdMMIs = this.createdMMIs;
                 // Sort all the media datapoints globally
                 // This prevents the step ranges of each

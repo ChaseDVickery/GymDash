@@ -9,6 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 import gymdash.backend.constants as constants
 from gymdash.backend.torch.base import SimpleMLModel
+from gymdash.backend.core.simulation.callbacks import BaseCustomCallback
 
 try:
     import gymnasium as gym
@@ -386,6 +387,26 @@ class CustomControlSimulation(Simulation):
         logger.debug(f"total time taken: {et-st}")
         writer.close()
 
+class MLSimulationUpdateCallback(BaseCustomCallback):
+    def __init__(self, simulation: Simulation):
+        self.simulation = simulation
+        super().__init__()
+    @property
+    def interactor(self):
+        return self.simulation.interactor
+    def _on_invoke(self):
+        if self.state == "train":
+            curr_steps = self.locals.get("curr_steps", 0)
+            total_steps = self.locals.get("total_steps", 1)
+            # HANDLE OUTGOING INFORMATION
+            self.interactor.set_out_if_in("progress", (curr_steps, total_steps))
+            # HANDLE INCOMING INFORMATION
+            if self.interactor.set_out_if_in("stop_simulation", True):
+                self.simulation.set_cancelled()
+                return False
+            return True
+        return True
+
 class MLSimulation(Simulation):
     def __init__(self, config: SimulationStartConfig) -> None:
         if not _has_torch:
@@ -466,6 +487,9 @@ class MLSimulation(Simulation):
         val_kwargs = kwargs.get("val_kwargs", {})
         test_kwargs = kwargs.get("test_kwargs", {})
         inference_kwargs = kwargs.get("inference_kwargs", {})
+
+        # Train kwargs
+        epochs = train_kwargs.get("epochs", 1)
         
         if (do_train):
             pass
@@ -534,21 +558,24 @@ class MLSimulation(Simulation):
             download=True,
             transform=ToTensor(),
         )
-        # train_loader = DataLoader(torch.utils.data.Subset(train_data, torch.arange(0,1000)), 32)
+        # train_loader = DataLoader(torch.utils.data.Subset(train_data, torch.arange(0,3000)), 32)
         train_loader = DataLoader(train_data, 32)
         test_loader = DataLoader(test_data, 32)
+
+        step_callback = MLSimulationUpdateCallback(self)
 
         try:
             self.model.train(
                 dataloader=train_loader,
-                epochs=5,
+                epochs=epochs,
                 tb_logger=tb_path,
                 log_step=5,
                 do_val=True,
                 val_per_epoch=1,
                 val_kwargs={
                     "dataloader": test_loader
-                }
+                },
+                step_callback=step_callback,
             )
             # train_mnist_classifier(self.model, dataset_folder_path, **train_kwargs)
         except Exception as e:
