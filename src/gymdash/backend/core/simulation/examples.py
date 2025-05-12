@@ -3,13 +3,19 @@ import logging
 import os
 import pathlib
 import time
+import math
+from typing import Union
 from abc import abstractmethod
 
+import matplotlib.pyplot as plt
+from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 
 import gymdash.backend.constants as constants
-from gymdash.backend.torch.base import SimpleMLModel
-from gymdash.backend.core.simulation.callbacks import BaseCustomCallback
+from gymdash.backend.core.simulation.callbacks import BaseCustomCallback, CallbackCustomList
+from gymdash.backend.torch.base import (InferenceModel,
+                                        SimpleClassifierMLModel,
+                                        SimulationMLModel)
 
 try:
     import gymnasium as gym
@@ -387,25 +393,127 @@ class CustomControlSimulation(Simulation):
         logger.debug(f"total time taken: {et-st}")
         writer.close()
 
-class MLSimulationUpdateCallback(BaseCustomCallback):
+class MLSimulationCallback(BaseCustomCallback):
     def __init__(self, simulation: Simulation):
         self.simulation = simulation
         super().__init__()
     @property
     def interactor(self):
         return self.simulation.interactor
+
+class MLSimulationUpdateCallback(MLSimulationCallback):
+    def __init__(self, simulation: Simulation):
+        super().__init__(simulation)
     def _on_invoke(self):
+        should_continue = True
         if self.state == "train":
             curr_steps = self.locals.get("curr_steps", 0)
             total_steps = self.locals.get("total_steps", 1)
             # HANDLE OUTGOING INFORMATION
             self.interactor.set_out_if_in("progress", (curr_steps, total_steps))
-            # HANDLE INCOMING INFORMATION
-            if self.interactor.set_out_if_in("stop_simulation", True):
-                self.simulation.set_cancelled()
-                return False
+            should_continue &= True
+        # Always check for stop flag
+        if self.interactor.set_out_if_in("stop_simulation", True):
+            self.simulation.set_cancelled()
+            should_continue &= False
+        return should_continue
+    
+class MLSimulationSampleRecordCallback(MLSimulationCallback):
+    def __init__(
+        self,
+        simulation: Simulation,
+        sim_model: InferenceModel,
+        inputs: Union[None,torch.Tensor,torch.utils.data.Dataset],
+        media_path: str,
+        step_trigger = 1,
+        random_samples: int = -1,
+    ):
+        super().__init__(simulation)
+        self.sim_model = sim_model
+        self.inference_data = inputs
+        self.random_samples = random_samples
+        self.media_path = os.path.abspath(media_path)
+        self.step_trigger = step_trigger
+        # Setup output path
+        if os.path.isdir(self.media_path):
+            logger.warn(
+                f"Overwriting existing videos at {self.media_path} folder "
+                f"(try specifying a different `media_path` for the `MLSimulationSampleRecordCallback` callback if this is not desired)"
+            )
+        os.makedirs(self.media_path, exist_ok=True)
+
+    @property
+    def model(self):
+        return self.sim_model.model
+    def _generate_outputs(self):
+        if self.model is None or self.inference_data is None:
+            return (None, None)
+        if self.random_samples <= 0:
+            outputs = self.sim_model.produce(self.inference_data)
+            return (self.inference_data, outputs)
+        else:
+            # self.inference_data should be an N-by-any tensor where each of
+            # N is an individual sample
+            # https://discuss.pytorch.org/t/torch-equivalent-of-numpy-random-choice/16146/2
+            num_samples = min(self.random_samples, len(self.inference_data))
+            idxs = torch.multinomial(torch.ones((num_samples,)))
+            if isinstance(self.inference_data, torch.Tensor):
+                inputs = self.inference_data[idxs]
+            elif isinstance(self.inference_data, torch.utils.data.Dataset):
+                inputs = torch.utils.data.Subset(self.inference_data[idxs], idxs)
+            outputs = self.sim_model.produce(inputs)
+            return (inputs, outputs)
+        
+    @abstractmethod
+    def create_media_savable(self, inputs, outputs):
+        pass
+
+    @abstractmethod
+    def save_media_to_folder(self, media_savable, step):
+        pass
+        
+    def _on_invoke(self):
+        curr_samples = self.locals.get("curr_samples", 0)
+        if self.model is None:
             return True
+        if  (self.step_trigger > 0 and \
+            curr_samples > 0 and \
+            curr_samples %self.step_trigger == 0):
+        # Generate outputs upon trigger activation
+            inputs, outputs = self._generate_outputs()
+            media = self.create_media_savable(inputs, outputs)
+            self.save_media_to_folder(media, curr_samples)
+            
+            self.sim_model.produce(self.inference_data)
         return True
+    
+class MLClassifierRecordCallback(MLSimulationSampleRecordCallback):
+    def __init__(self, simulation: Simulation, sim_model: InferenceModel, inputs: Union[None, Tensor], media_path: str, step_trigger=1, random_samples: int = -1):
+        super().__init__(simulation, sim_model, inputs, media_path, step_trigger, random_samples)
+
+    def create_media_savable(self, inputs:Union[torch.Tensor, torch.utils.data.Dataset], outputs):
+        num_plots = len(inputs)
+        ncols = math.ceil(math.sqrt(num_plots))
+        nrows = math.ceil(num_plots / ncols)
+        fig, axs = plt.subplots(nrows, ncols)
+        for p in range(num_plots):
+            idx = p
+            r = idx // ncols
+            c = idx % ncols
+            target = ""
+            if isinstance(inputs, torch.Tensor):
+                img_tensor = inputs[idx]
+            elif isinstance(inputs, torch.utils.data.Dataset):
+                img_tensor = inputs[idx][0]
+                target = str(inputs[idx][1])
+            axs[r,c].set_axis_off()
+            axs[r,c].set_title(f"pred: {outputs[idx].item()}")
+            axs[r,c].imshow(torch.permute(img_tensor, (1, 2, 0)).cpu().numpy())
+        return fig
+    def save_media_to_folder(self, media_savable:plt.Figure, step):
+        fname = os.path.join(self.media_path, f"sample_{step}.png")
+        media_savable.savefig(fname)
+        plt.close(media_savable)
 
 class MLSimulation(Simulation):
     def __init__(self, config: SimulationStartConfig) -> None:
@@ -445,13 +553,12 @@ class MLSimulation(Simulation):
                     "example_outputs",
                     stat_tags.IMAGES,
                     image_path,
-                    r"output_[0-9]+\.png",
+                    r"sample_[0-9]+\.png",
                     functools.partial(
                         MediaLinkStreamableStat.final_split_step_extractor,
                         split_char="_",
                         extension=".png"
                     )
-                    # lambda fname: int(fname.split("_")[-1][:-4])
                 )
             ]
         ))
@@ -524,20 +631,19 @@ class MLSimulation(Simulation):
                     "example_outputs",
                     stat_tags.IMAGES,
                     image_path,
-                    r"output_[0-9]+\.png",
+                    r"sample_[0-9]+\.png",
                     functools.partial(
                         MediaLinkStreamableStat.final_split_step_extractor,
                         split_char="_",
                         extension=".png"
                     )
-                    # lambda fname: int(fname.split("_")[-1][:-4])
                 )
             ]
         ))
 
         # Setup Model
         # self.model = ClassifierMNIST()
-        self.model = SimpleMLModel(ClassifierMNIST())
+        self.model = SimpleClassifierMLModel(ClassifierMNIST())
 
         # Setup Dataset/DataLoader
         dataset_folder_path = os.path.join(self._project_resources_path, constants.DATASET_FOLDER)
@@ -562,7 +668,17 @@ class MLSimulation(Simulation):
         train_loader = DataLoader(train_data, 32)
         test_loader = DataLoader(test_data, 32)
 
-        step_callback = MLSimulationUpdateCallback(self)
+        
+        step_callback = CallbackCustomList([
+            MLSimulationUpdateCallback(self),
+            MLClassifierRecordCallback(
+                self,
+                self.model,
+                torch.utils.data.Subset(train_data, torch.arange(0,10)),
+                image_path,
+                100,
+            )
+        ])
 
         try:
             self.model.train(

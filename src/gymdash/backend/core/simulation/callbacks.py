@@ -14,6 +14,8 @@ try:
 except ImportError:
     _has_torch = False
 
+from contextlib import contextmanager
+
 
 class BaseCustomCallback(ABC):
     """
@@ -35,6 +37,14 @@ class BaseCustomCallback(ABC):
         # Sometimes, for event callback, it is useful
         # to have access to the parent object
         self.parent = None  # type: Optional[BaseCustomCallback]
+
+    @contextmanager
+    def context(self, *temp_states):
+        for temp_state in temp_states:
+            self.push_state(temp_state)
+        yield
+        for _ in temp_states:
+            self.pop_state()
 
     # Type hint as string to avoid circular import
     def init_callback(self) -> None:
@@ -121,8 +131,10 @@ class CallbackCustomList(BaseCustomCallback):
             callback.on_process_start(self.locals, self.globals)
 
     def _on_invoke(self):
+        continue_process = True
         for callback in self.callbacks:
-            callback.on_invoke()
+            continue_process &= callback.on_invoke()
+        return continue_process
 
     def update_child_locals(self, locals_: dict[str, Any]) -> None:
         """
@@ -142,7 +154,7 @@ class CallbackCustomList(BaseCustomCallback):
         for callback in self.callbacks:
             callback.push_state(state)
     def pop_state(self):
-        super.pop_state()
+        super().pop_state()
         for callback in self.callbacks:
             callback.pop_state()
 

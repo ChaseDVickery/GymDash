@@ -1,6 +1,6 @@
 import os
 import pathlib
-from abc import abstractmethod
+from abc import abstractmethod, ABC
 from collections import OrderedDict
 from typing import Any, Dict, Union
 
@@ -29,6 +29,11 @@ class StopSimException(Exception):
     def __init__(self, message, errors=None) -> None:
         super().__init__(message, errors)
         self.errors = errors
+
+class InferenceModel(ABC):
+    @abstractmethod
+    def produce(self, inputs):
+        pass
 
 class SimulationMLModel():
     def __init__(self, model: nn.Module) -> None:
@@ -84,9 +89,34 @@ class SimulationMLModel():
         pass
     
 
-class SimpleMLModel(SimulationMLModel):
+class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
     def __init__(self, model: Module) -> None:
         super().__init__(model)
+
+    def produce(self, inputs: Union[torch.Tensor, torch.utils.data.Dataset]) -> torch.Tensor:
+        device = torch.accelerator.current_accelerator().type if \
+            torch.accelerator.is_available() else \
+            "cpu"
+        # Setup
+        model               = self.model
+        # Train
+        model.eval()
+        if isinstance(inputs, torch.Tensor):
+            with torch.no_grad():
+                inputs = inputs.to(device)
+                pred = model(inputs)
+                predictions = pred.argmax(1)
+                return predictions
+        elif isinstance(inputs, torch.utils.data.Dataset):
+            tensors = []
+            dl = DataLoader(inputs, batch_size=1, shuffle=False)
+            with torch.no_grad():
+                for (x,y) in dl:
+                    x = x.to(device)
+                    pred = model(x)
+                    predictions = pred.argmax(1)
+                    tensors.append(predictions)
+            return torch.cat(tensors)
 
     def _train(self,
         dataloader: DataLoader,
@@ -133,7 +163,6 @@ class SimpleMLModel(SimulationMLModel):
         curr_steps = 0
         curr_samples = 0
         for epoch in range(1, epochs+1):
-            print(f"BEGIN EPOCH: {epoch}")
             for batch, (x, y) in enumerate(train_dataloader):
                 x, y = x.to(device), y.to(device)
 
@@ -182,8 +211,6 @@ class SimpleMLModel(SimulationMLModel):
                     val_loss = val_results["loss"]
                     accuracy = val_results["correct_samples"] \
                         / val_results["total_samples"]
-                    print(f"LOGGING loss/val: {val_loss}")
-                    print(f"LOGGING acc/val: {accuracy}")
                     tb_logger.add_scalar("loss/val", val_loss, curr_samples)
                     tb_logger.add_scalar("acc/val", accuracy, curr_samples)
             # Perform callback
