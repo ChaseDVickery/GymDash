@@ -506,9 +506,11 @@ class MLClassifierRecordCallback(MLSimulationSampleRecordCallback):
             elif isinstance(inputs, torch.utils.data.Dataset):
                 img_tensor = inputs[idx][0]
                 target = str(inputs[idx][1])
-            axs[r,c].set_axis_off()
             axs[r,c].set_title(f"pred: {outputs[idx].item()}")
             axs[r,c].imshow(torch.permute(img_tensor, (1, 2, 0)).cpu().numpy())
+        for r in range(nrows):
+            for c in range(ncols):
+                axs[r,c].set_axis_off()
         return fig
     def save_media_to_folder(self, media_savable:plt.Figure, step):
         fname = os.path.join(self.media_path, f"sample_{step}.png")
@@ -591,6 +593,7 @@ class MLSimulation(Simulation):
         do_test = kwargs.get("test", False)
         do_inference = kwargs.get("inference", False)
         train_kwargs = kwargs.get("train_kwargs", {})
+
         val_kwargs = kwargs.get("val_kwargs", {})
         test_kwargs = kwargs.get("test_kwargs", {})
         inference_kwargs = kwargs.get("inference_kwargs", {})
@@ -676,7 +679,7 @@ class MLSimulation(Simulation):
                 self.model,
                 torch.utils.data.Subset(train_data, torch.arange(0,10)),
                 image_path,
-                100,
+                500,
             )
         ])
 

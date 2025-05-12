@@ -64,6 +64,8 @@ const queueSimBtn               = startPanel.querySelector("#queue-sim-btn");
 const sendControlBtn            = document.querySelector("#send-control-btn");
 const sendQueryBtn              = document.querySelector("#send-query-btn");
 
+// General
+const tooltip                   = document.querySelector(".tooltip")
 // Plots
 const plotArea                  = document.querySelector("#plots-area");
 // Multimedia Filter
@@ -704,6 +706,8 @@ function updateSimSelectionProgress(simID, simSelection) {
             }
             if (Object.hasOwn(info, "progress")) {
                 if (info.progress[1] === 0) { return info; }
+                outer.style.setProperty("--prog-num", `${info.progress[0]}`);
+                outer.style.setProperty("--prog-den", `${info.progress[1]}`);
                 outer.style.setProperty("--prog", `${100*info.progress[0]/info.progress[1]}%`);
             }
         })
@@ -778,6 +782,26 @@ function sendQuery() {
         })
 }
 
+function repositionTooltip(tt, element, direction="right") {
+    const rect = element.getBoundingClientRect();
+    const ttrect = tt.getBoundingClientRect();
+    if (direction === "right") {
+        tt.style.left = `${rect.right}px`;
+        tt.style.top = `${rect.top + ((rect.height-ttrect.height)/2)}px`;
+    }
+    else if (direction === "left") {
+        tt.style.left = `${rect.left-ttrect.width}px`;
+        tt.style.top = `${rect.top + ((rect.height-ttrect.height)/2)}px`;
+    }
+    else if (direction === "top") {
+        tt.style.left = `${rect.left + ((rect.width-ttrect.width)/2)}px`;
+        tt.style.top = `${rect.top - ttrect.height}px`;
+    }
+    else if (direction === "bottom") {
+        tt.style.left = `${rect.left + ((rect.width-ttrect.width)/2)}px`;
+        tt.style.top = `${rect.bottom}px`;
+    }
+}
 
 // Turns the entry into a SimulationStartConfig data layout
 function entryToConfig() {
@@ -810,6 +834,20 @@ function createSimSelection(config, simID, startChecked=true) {
     // Set up cancel button
     const cancelButton = newSelection.querySelector(".cancel-sim-button");
     cancelButton.addEventListener("click", stopSimulationFromSelection.bind(null, newSelection));
+    // Set up tooltip hover
+    newSelection.addEventListener("mouseover", function(e) {
+        tooltip.style.visibility = "visible";
+        const progressMeter = newSelection.querySelector(".radial-meter .outer");
+        const progNum = progressMeter.style.getPropertyValue("--prog-num");
+        const progDen = progressMeter.style.getPropertyValue("--prog-den");
+        const progPer = progressMeter.style.getPropertyValue("--prog");
+        tooltip.textContent = `${progNum}/${progDen} (${progPer})`;
+        repositionTooltip(tooltip, newSelection, "right");
+    });
+    newSelection.addEventListener("mouseout", function(e) {
+        tooltip.style.visibility = null;
+        tooltip.textContent = "";
+    });
     // Return selection box
     return newSelection;
 }

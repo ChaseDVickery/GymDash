@@ -179,3 +179,15 @@ h1 {
     padding: 5px;
     border-radius: var(--panel-br);
 }
+
+.tooltip {
+    visibility: hidden;
+    width: 120px;
+    text-align: center;
+    padding: 5px 0;
+    border-radius: 6px;
+
+    /* Position the tooltip text - see examples below! */
+    position: fixed;
+    z-index: 1;
+}
