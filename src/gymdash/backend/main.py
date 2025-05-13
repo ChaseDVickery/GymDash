@@ -1,14 +1,10 @@
 import asyncio
-import importlib.util
 import logging
-import os
-import pickle
-import sys
-import traceback
 from contextlib import asynccontextmanager
 from random import randint
 from threading import Thread
 from typing import Union
+from gymdash.backend.core.utils.thread_utils import execute_queued
 
 import numpy as np
 from fastapi import FastAPI, HTTPException
@@ -58,11 +54,16 @@ finished_sim_info = ProjectManager.get_filtered_simulations(
 )
 simulation_tracker.load_old_simulations_from_info(finished_sim_info)
 
+async def side_loop():
+    while True:
+        execute_queued()
+        await asyncio.sleep(2)
+
 # App main
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Executed right before we handle requests
-    # asyncio.create_task(manage_simulation_loop())
+    asyncio.create_task(side_loop())
     yield
     # Executed right before app shutdown
     # Clearing the simulation tracker also

@@ -43,6 +43,7 @@ let sim_selections = {};
 let allData = {};
 const mainPlots = [];
 const allPlots = [];
+let hoveredSimSelection;
 
 // Sidebar
 const simSidebar = document.querySelector(".sim-selection-sidebar");
@@ -691,7 +692,9 @@ function getKwargs(elementWithKwargPanel) {
     console.log(kwargs);
     return kwargs;
 }
-
+function isSimHovered(simSelection) {
+    return hoveredSimSelection && hoveredSimSelection === simSelection;
+}
 function updateAllSimSelectionProgress() {
     // Iterates all incomplete sim selections and queries their progress
     for (const [simID, simSelection] of Object.entries(sim_selections)) {
@@ -721,6 +724,9 @@ function updateSimSelectionProgress(simID, simSelection) {
                 outer.style.setProperty("--prog-num", `${info.progress[0]}`);
                 outer.style.setProperty("--prog-den", `${info.progress[1]}`);
                 outer.style.setProperty("--prog", `${100*info.progress[0]/info.progress[1]}%`);
+                if (isSimHovered(simSelection)) {
+                    tooltipUpdateToSimSelection(simSelection);
+                }
             }
         })
         .catch((error) => {
@@ -815,6 +821,24 @@ function repositionTooltip(tt, element, direction="right") {
     }
 }
 
+function tooltipUpdateToSimSelection(selection) {
+    const meter = selection.querySelector(".radial-meter")
+    if (meter.classList.contains("fail")) {
+        tooltip.textContent = `Failed`;
+    }
+    else if (meter.classList.contains("success")) {
+        tooltip.textContent = `Success`;
+    }
+    else {
+        const progressMeter = selection.querySelector(".radial-meter .outer");
+        const progNum = progressMeter.style.getPropertyValue("--prog-num");
+        const progDen = progressMeter.style.getPropertyValue("--prog-den");
+        const progPer = progressMeter.style.getPropertyValue("--prog");
+        const progPerValue = Number(progPer.substring(0, progPer.length-1)).toFixed(2);
+        tooltip.textContent = `${progNum}/${progDen} (${progPerValue}%)`;
+    }
+}
+
 // Turns the entry into a SimulationStartConfig data layout
 function entryToConfig() {
     const name = configNameEntry.value;
@@ -848,15 +872,13 @@ function createSimSelection(config, simID, startChecked=true) {
     cancelButton.addEventListener("click", stopSimulationFromSelection.bind(null, newSelection));
     // Set up tooltip hover
     newSelection.addEventListener("mouseover", function(e) {
+        hoveredSimSelection = newSelection;
         tooltip.style.visibility = "visible";
-        const progressMeter = newSelection.querySelector(".radial-meter .outer");
-        const progNum = progressMeter.style.getPropertyValue("--prog-num");
-        const progDen = progressMeter.style.getPropertyValue("--prog-den");
-        const progPer = progressMeter.style.getPropertyValue("--prog");
-        tooltip.textContent = `${progNum}/${progDen} (${progPer})`;
+        tooltipUpdateToSimSelection(newSelection);
         repositionTooltip(tooltip, newSelection, "right");
     });
     newSelection.addEventListener("mouseout", function(e) {
+        hoveredSimSelection = undefined;
         tooltip.style.visibility = null;
         tooltip.textContent = "";
     });

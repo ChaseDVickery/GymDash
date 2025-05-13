@@ -6,6 +6,7 @@ import time
 import math
 from typing import Union
 from abc import abstractmethod
+from gymdash.backend.core.utils.thread_utils import run_on_main_thread
 
 import matplotlib.pyplot as plt
 from torch import Tensor
@@ -471,6 +472,10 @@ class MLSimulationSampleRecordCallback(MLSimulationCallback):
     @abstractmethod
     def save_media_to_folder(self, media_savable, step):
         pass
+
+    def media_on_main_thread(self, inputs, outputs, curr_samples):
+        media = self.create_media_savable(inputs, outputs)
+        self.save_media_to_folder(media, curr_samples)
         
     def _on_invoke(self):
         curr_samples = self.locals.get("curr_samples", 0)
@@ -481,10 +486,9 @@ class MLSimulationSampleRecordCallback(MLSimulationCallback):
             curr_samples %self.step_trigger == 0):
         # Generate outputs upon trigger activation
             inputs, outputs = self._generate_outputs()
-            media = self.create_media_savable(inputs, outputs)
-            self.save_media_to_folder(media, curr_samples)
-            
-            self.sim_model.produce(self.inference_data)
+            run_on_main_thread(self.media_on_main_thread, inputs, outputs, curr_samples)
+            # media = self.create_media_savable(inputs, outputs)
+            # self.save_media_to_folder(media, curr_samples)
         return True
     
 class MLClassifierRecordCallback(MLSimulationSampleRecordCallback):
