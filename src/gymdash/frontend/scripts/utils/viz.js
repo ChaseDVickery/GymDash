@@ -138,6 +138,7 @@ const vizUtils = (
                 this.onClickMMI = undefined;
                 this.selectedMMI = undefined;
                 this.lastHoveredMMI = undefined;
+                this.hoveredLine = undefined;
                 this.createdMMIs = [];
 
                 // Default settings
@@ -206,9 +207,23 @@ const vizUtils = (
                     this.tooltip.show(dataPoint);
                     this.tooltip.moveTo([this.scaleX(dataPoint.step), this.scaleY(dataPoint.value)]);
                 }
+                this.#hoverLine(finalLine);
             }
             #onleave(event) {
                 this.tooltip.hide();
+                this.#hoverLine(undefined);
+            }
+            #hoverLine(line) {
+                if (this.hoveredLine) {
+                    this.hoveredLine
+                        .classed("hovered-line", false);
+                }
+                this.hoveredLine = line;
+                if (this.hoveredLine) {
+                    this.hoveredLine
+                        .classed("hovered-line", true);
+                }
+                this.#reorderElements();
             }
 
             init() {
@@ -235,6 +250,9 @@ const vizUtils = (
             }
 
             #reorderElements() {
+                if (this.hoveredLine) {
+                    this.hoveredLine.raise();
+                }
                 if (this.mmiExtentRect) {
                     this.mmiExtentRect.raise();
                 }
@@ -380,10 +398,11 @@ const vizUtils = (
                         this.smoothed.push(this.svg
                             .append("path")
                             .datum(finalData)
-                            .attr("class", "line-smooth")
+                            .classed("line-smooth", true)
+                            .classed("plot-line", true)
                             .attr("clip-path", "url(#clip)")
                             .attr("fill", "none")
-                            .attr("stroke", "steelblue")
+                            .attr("stroke", line.attr("stroke"))
                             .attr("stroke-width", 1.5)
                             .attr("d", d3.line()
                                 .x(d => this.scaleX(d.step))
@@ -410,16 +429,13 @@ const vizUtils = (
                     .attr("width", minMMIRectWidth)
                     .attr("y", margin.top)
                     .attr("height", height - margin.top - margin.bottom)
-                    // .attr("pointer-events", "none")
                     .style("fill", "darkorange")
                     .style("opacity", 0.4)
                     .on("click", function(event) {
                         console.log("click mmi rect");
                         if (!this.lastHoveredMMI) { return; }
                         const extent = d3.select(this.lastHoveredMMI).data()[0].getStepExtent();
-                        // const m = this.scaleX(mmiExtentMargin);
                         const m = Math.max(1, Math.floor(mmiExtentMarginPercent*(extent[1] - extent[0])));
-                        // const m = 1;
                         this.updatePlotX([extent[0]-m, extent[1]+m]);
                     }.bind(this))
                     .on("mouseover", function(event) {
@@ -515,9 +531,6 @@ const vizUtils = (
                 for (const o of sortedDatapoints) {
                     this.addMMI(o.datum, o.id, o.key, allData, onclick, condense, createdMMIs);
                 }
-                // for (const key of mediaKeys) {
-                //     this.addMMIs(key, allData, onclick, condense, createdMMIs);
-                // }
             }
             addMMIs(key, allData, onclick, condense=true, createdMMIs=[]) {
                 for (const simID in allData) {
@@ -686,20 +699,30 @@ const vizUtils = (
                 .attr("transform", `translate(${margin.left}, 0)`)
                 .call(d3.axisLeft(yScale));
 
+            // var color = d3.scaleOrdinal()
+            //     .domain(res)
+            //     .range(['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#ffff33','#a65628','#f781bf','#999999'])
+            const color = d3.scaleSequential(d3.interpolateSinebow)
+
+            let colorT = 0;
+            const colorTStep = 0.17;
             const lines = [];
             for (const simID in allData) {
                 const data = allData[simID].getScalar(key);
                 lines.push(svg
                     .append("path")
                     .datum(data)
+                    .classed("plot-line", true)
                     .attr("clip-path", "url(#clip)")
                     .attr("fill", "none")
-                    .attr("stroke", "steelblue")
+                    .attr("stroke", color(colorT))
                     .attr("stroke-width", 1.5)
                     .attr("d", d3.line()
                         .x(d => xScale(d.step))
                         .y(d => yScale(d.value))
                     ));
+                colorT = colorT + colorTStep;
+                if (colorT > 1) { colorT -= 1; }
             }
             return new Plot(
                 svg,

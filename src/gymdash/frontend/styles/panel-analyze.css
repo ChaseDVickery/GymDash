@@ -90,3 +90,11 @@
 #media-filter-sort-panel > .filter-sort-label:hover {
     cursor: pointer;
 }
+
+.plot-line {
+    filter: saturate(80%);
+}
+.plot-line.hovered-line {
+    filter: saturate(120%);
+    stroke-width: 2px;
+}
