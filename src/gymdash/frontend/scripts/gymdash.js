@@ -71,7 +71,10 @@ const settingBarTitle           = document.querySelector("#setting-bar-title");
 const settingBarContent         = document.querySelector("#setting-bar-content");
 const plotSmoothSlider_Setting  = document.querySelector("#plot-smoothing-slider");
 const plotSmoothLabel_Setting   = document.querySelector("label[for=plot-smoothing-slider]");
+const rescaleDetailsY_Setting   = document.querySelector("#rescale-details-axis");
+
 let plotSmoothValue             = 0;
+let rescaleDetailsAxisY         = false;
 
 // General
 const tooltip                   = document.querySelector(".tooltip")
@@ -1166,6 +1169,9 @@ plotSmoothSlider_Setting.addEventListener("input", (e) => {
     plotSmoothValue = Number(e.target.value);
     plotSmoothLabel_Setting.textContent = `Smoothing: (${plotSmoothValue.toFixed(2)})`;
 });
+rescaleDetailsY_Setting.addEventListener("change", (e) => {
+    changeSetting_RescaleDetailsAxisY(rescaleDetailsY_Setting.checked);
+})
 settingBarTitle.addEventListener("click", toggleDisplay.bind(null, settingBarContent))
 toggleDisplay(settingBarContent);
 
@@ -1180,12 +1186,16 @@ openTab(null, "tab-analyze");
 function changeSetting_PlotSmooth(newSmooth) {
     // Clamp smoothing value
     plotSmoothValue = 0.5 * Math.min(1, Math.max(0, newSmooth));
-
+    // Apply smoothing to all plots
     for (const plot of allPlots) {
         plot.smoothLines(plotSmoothValue);
     }
-
-    // createPlots();
+}
+function changeSetting_RescaleDetailsAxisY(shouldRescale) {
+    for (const plot of allPlots) {
+        plot.setSetting_RescaleY(shouldRescale);
+        plot.updatePlot(plot.scaleX.domain(), shouldRescale);
+    }
 }
 
 
@@ -1436,7 +1446,7 @@ function createPlots() {
     plot.addAllMMIs(selectedData, onClickMMI, condense);
     detailsPlot.addAllMMIs(selectedData, onClickMMI, condense);
     plot.addBrushX(function(event) {
-        detailsPlot.updatePlot(event, plot);
+        detailsPlot.updatePlotEvent(event, plot);
     }, "brush");
     
     d3.select("#plots-area").append(() => plot.svg.node());

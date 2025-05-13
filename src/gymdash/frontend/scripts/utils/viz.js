@@ -140,6 +140,9 @@ const vizUtils = (
                 this.lastHoveredMMI = undefined;
                 this.createdMMIs = [];
 
+                // Default settings
+                this.rescaleY = true;
+
                 this.init();
             }
 
@@ -227,6 +230,10 @@ const vizUtils = (
                 // this.svg.append(this.tooltip.node);
             }
 
+            setSetting_RescaleY(newRescaleY) {
+                this.rescaleY = newRescaleY;
+            }
+
             #reorderElements() {
                 if (this.mmiExtentRect) {
                     this.mmiExtentRect.raise();
@@ -255,16 +262,8 @@ const vizUtils = (
              */
             refresh() {
                 // Rebuild the axes
-                const extentY = extentOf(this.data, this.key, undefined, "value");
-                const extentX = d3.extent([...extentOf(this.data, this.key, undefined, "step"), 0]);
-                this.scaleX
-                    .domain(extentX);
-                this.scaleY
-                    .domain(extentY);
-                this.axisX
-                    .call(d3.axisBottom(this.scaleX));
-                this.axisY
-                    .call(d3.axisLeft(this.scaleY));
+                this.resetX();
+                this.resetY();
                 // Rebuild the lines
                 this.#rebuildLines();
 
@@ -289,32 +288,57 @@ const vizUtils = (
                 this.#tryInitBrushes();
                 this.brushX = this.brushX.on(eventType, onbrush);
             }
-            updatePlot(event, otherPlot) {
+            updatePlotEvent(event, otherPlot) {
                 if (!event) { return; }
                 const extent = event.selection;
                 const scaleX = otherPlot.scaleX;
                 if (!extent) { return; }
                 const startStep = scaleX.invert(extent[0]);
                 const endStep = scaleX.invert(extent[1]);
-                let extentY = [];
-                // Calculate the Y extent in that same region
-                for (const line of this.lines) {
-                    // Retrieve range of data based on step extent
-                    const data = line.datum();
-                    const steps = data.map(d => d.step);
-                    const startIdx = d3.bisect(steps, startStep);
-                    const endIdx = d3.bisect(steps, endStep);
-                    const dataSlice = data.slice(startIdx, endIdx);
-                    // Calculate the new y-extent across all lines
-                    const tempExtent = d3.extent(dataSlice.map(d => d.value));
-                    extentY = d3.extent([...extentY, ...tempExtent]);
-                }
+                this.updatePlot([startStep, endStep], this.rescaleY);
+            }
+            updatePlot(extentX, rescaleY=true) {
                 // Update scales and rebuild markers and such
-                this.updatePlotX([startStep, endStep], false);
-                this.updatePlotY(extentY, false);
+                this.updatePlotX(extentX, false);
+                // Optionally scale Y axis based on region's extent
+                if (rescaleY) {
+                    const startStep = extentX[0];
+                    const endStep   = extentX[1];
+                    let extentY = [];
+                    // Calculate the Y extent in that same region
+                    for (const line of this.lines) {
+                        // Retrieve range of data based on step extent
+                        const data = line.datum();
+                        const steps = data.map(d => d.step);
+                        const startIdx = d3.bisect(steps, startStep);
+                        const endIdx = d3.bisect(steps, endStep);
+                        const dataSlice = data.slice(startIdx, endIdx);
+                        // Calculate the new y-extent across all lines
+                        const tempExtent = d3.extent(dataSlice.map(d => d.value));
+                        extentY = d3.extent([...extentY, ...tempExtent]);
+                    }
+                    this.updatePlotY(extentY, false);
+                } else {
+                    this.resetY();
+                }
                 this.#rebuildLines();
                 this.clearMMIs();
                 this.addAllMMIs(this.data, this.onClickMMI, true);
+            }
+            resetX() {
+                const extentX = d3.extent([...extentOf(this.data, this.key, undefined, "step"), 0]);
+                this.scaleX
+                    .domain(extentX);
+                this.axisX
+                    .call(d3.axisBottom(this.scaleX));
+                
+            }
+            resetY() {
+                const extentY = extentOf(this.data, this.key, undefined, "value");
+                this.scaleY
+                    .domain(extentY);
+                this.axisY
+                    .call(d3.axisLeft(this.scaleY));
             }
             updatePlotX(extentX, rebuild=true) {
                 this.scaleX.domain(extentX);
