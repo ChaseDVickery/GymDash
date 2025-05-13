@@ -1,3 +1,4 @@
+import { dataUtils } from "./data.js";
 
 const vizUtils = (
     function() {
@@ -127,6 +128,10 @@ const vizUtils = (
                 this.axisX      = axisX;
                 this.axisY      = axisY;
                 this.lines      = lines;
+                
+                // Smoothed lines
+                this.lastSmooth = 0;
+                this.smoothed   = [];
 
                 this.tooltip = new Tooltip(this.svg);
 
@@ -148,11 +153,13 @@ const vizUtils = (
                 const sy = this.scaleY;
                 for (const line of this.lines) {
                     line
+                        .style("opacity", 1)
                         .attr("d", d3.line()
                             .x(function(d) { return sx(d.step) })
                             .y(function(d) { return sy(d.value) })
                         );
                 }
+                this.smoothLines(this.lastSmooth);
             }
 
             #onhover(event) {
@@ -171,7 +178,8 @@ const vizUtils = (
                 let nearestDistance = Infinity;
                 const neighborhood = 10;
                 // Look for the nearest point on any lines.
-                for (const line of this.lines) {
+                const usedLines = this.smoothed.length > 0 ? this.smoothed : this.lines;
+                for (const line of usedLines) {
                     // First filter just by step value (only within certain number of steps).
                     const lineData = line.data()[0];
                     const idxStep = d3.bisectCenter(lineData.map(d => d.step), estStep);
@@ -201,8 +209,6 @@ const vizUtils = (
             }
 
             init() {
-                const width = plotWidth;
-                const height = plotHeight;
                 console.log("INIT");
                 // https://developer.mozilla.org/en-US/docs/Web/API/Element#mouse_events
                 this.svg
@@ -210,20 +216,35 @@ const vizUtils = (
                 this.svg
                     .on("mouseleave", this.#onleave.bind(this));
 
-                // Brushing
-                this.brushX = d3.brushX()
-                    .extent([[margin.left, margin.bottom], [width, height-margin.bottom]]);
-                this.svg.append("g").attr("class", "brush").call(
-                    this.brushX
-                );
-
                 // Double click reset
                 this.svg.on("dblclick", this.refresh.bind(this));
 
                 // MMI highlight rectangle
                 this.#addMMIRect();
 
+                this.#reorderElements();
+
                 // this.svg.append(this.tooltip.node);
+            }
+
+            #reorderElements() {
+                if (this.mmiExtentRect) {
+                    this.mmiExtentRect.raise();
+                }
+            }
+
+            #tryInitBrushes() {
+                const width = plotWidth;
+                const height = plotHeight;
+                // Brushing
+                if (!this.brushX) {
+                    this.brushX = d3.brushX()
+                        .extent([[margin.left, margin.bottom], [width, height-margin.bottom]]);
+                    this.svg.append("g").attr("class", "brush").call(
+                        this.brushX
+                    );
+                }
+                this.#reorderElements();
             }
 
             /**
@@ -265,22 +286,7 @@ const vizUtils = (
             }
 
             addBrushX(onbrush, eventType="end") {
-                const width = plotWidth;
-                const height = plotHeight;
-
-                // if (!this.brushX) {
-                //     this.brushX = d3.brushX()
-                //         .extent([[margin.left, margin.bottom], [width, height-margin.bottom]])
-                //     this.svg.on("dblclick", this.refresh.bind(this));
-                //     this.svg.append("g").attr("class", "brush").call(
-                //         this.brushX
-                //     );
-                // }
-                // this.brushX = this.brushX
-                //     .on(eventType, onbrush);
-
-                // this.brushX = d3.brushX()
-                //     .extent([[margin.left, margin.bottom], [width, height-margin.bottom]])
+                this.#tryInitBrushes();
                 this.brushX = this.brushX.on(eventType, onbrush);
             }
             updatePlot(event, otherPlot) {
@@ -288,19 +294,88 @@ const vizUtils = (
                 const extent = event.selection;
                 const scaleX = otherPlot.scaleX;
                 if (!extent) { return; }
-                this.updatePlotX([scaleX.invert(extent[0]), scaleX.invert(extent[1])]);
-                // this.scaleX.domain([scaleX.invert(extent[0]), scaleX.invert(extent[1])]);
-                // this.axisX.call(d3.axisBottom(this.scaleX));
-                // this.#rebuildLines();
-                // this.clearMMIs();
-                // this.addAllMMIs(this.data, this.onClickMMI, true);
-            }
-            updatePlotX(extentX) {
-                this.scaleX.domain(extentX);
-                this.axisX.call(d3.axisBottom(this.scaleX));
+                const startStep = scaleX.invert(extent[0]);
+                const endStep = scaleX.invert(extent[1]);
+                let extentY = [];
+                // Calculate the Y extent in that same region
+                for (const line of this.lines) {
+                    // Retrieve range of data based on step extent
+                    const data = line.datum();
+                    const steps = data.map(d => d.step);
+                    const startIdx = d3.bisect(steps, startStep);
+                    const endIdx = d3.bisect(steps, endStep);
+                    const dataSlice = data.slice(startIdx, endIdx);
+                    // Calculate the new y-extent across all lines
+                    const tempExtent = d3.extent(dataSlice.map(d => d.value));
+                    extentY = d3.extent([...extentY, ...tempExtent]);
+                }
+                // Update scales and rebuild markers and such
+                this.updatePlotX([startStep, endStep], false);
+                this.updatePlotY(extentY, false);
                 this.#rebuildLines();
                 this.clearMMIs();
                 this.addAllMMIs(this.data, this.onClickMMI, true);
+            }
+            updatePlotX(extentX, rebuild=true) {
+                this.scaleX.domain(extentX);
+                this.axisX.call(d3.axisBottom(this.scaleX));
+                if (rebuild) {
+                    this.#rebuildLines();
+                    this.clearMMIs();
+                    this.addAllMMIs(this.data, this.onClickMMI, true);
+                }
+            }
+            updatePlotY(extentY, rebuild=true) {
+                this.scaleY.domain(extentY);
+                this.axisY.call(d3.axisLeft(this.scaleY));
+                if (rebuild) {
+                    this.#rebuildLines();
+                    this.clearMMIs();
+                    this.addAllMMIs(this.data, this.onClickMMI, true);
+                }
+            }
+
+            smoothLines(smoothing) {
+                this.lastSmooth = smoothing;
+                // Remove prior smoothed lines
+                this.svg.selectAll(".line-smooth").remove();
+                this.smoothed.splice(0, this.smoothed.length);
+                // Add them back if we are doing any smoothing
+                if (smoothing > 0) {
+                    for (const line of this.lines) {
+                        // Get data from orig line
+                        const data = line.datum();
+                        // Get smoothed version of data
+                        const smoothedData = dataUtils.smoothData(data.map(d => d.value), smoothing);
+                        const finalData = [];
+                        for (let i = 0; i < smoothedData.length; i++) {
+                            finalData.push({...(data[i])});
+                            finalData[i].value = smoothedData[i];
+                        }
+                        // Append newly smoothed line
+                        this.smoothed.push(this.svg
+                            .append("path")
+                            .datum(finalData)
+                            .attr("class", "line-smooth")
+                            .attr("clip-path", "url(#clip)")
+                            .attr("fill", "none")
+                            .attr("stroke", "steelblue")
+                            .attr("stroke-width", 1.5)
+                            .attr("d", d3.line()
+                                .x(d => this.scaleX(d.step))
+                                .y(d => this.scaleY(d.value))
+                            ));
+                        // Lower opacity of orig line.
+                        line
+                            .style("opacity", 0.3);
+                    }
+                } else {
+                    for (const line of this.lines) {
+                        // Return orig line opacity
+                        line
+                            .style("opacity", 1);
+                    }
+                }
             }
 
             #addMMIRect() {
@@ -449,9 +524,6 @@ const vizUtils = (
                 const closestMMIIdx = d3.bisectCenter(createdMMIs.map(d => d.step), datum.step);
                 // Check the difference in step value and convert to actual length.
                 // Compare against the width of MMI markers
-                if (closestMMIIdx >= 0 && closestMMIIdx < createdMMIs.length) {
-                    debug("step difference: " + Math.abs(createdMMIs[closestMMIIdx].step - datum.step) + ". scale difference: " + Math.abs(xScale(createdMMIs[closestMMIIdx].step) - xScale(datum.step)));
-                }
                 if (
                     condense &&
                     closestMMIIdx >= 0 &&
@@ -636,6 +708,7 @@ const vizUtils = (
                 .attr("points", markerPointsString)
                 .attr("stroke", "yellow")
                 .attr("stroke-width", 1)
+                .attr("stroke-opacity", 0.2)
                 .attr("fill", mmiDefaultColor);
         }
 

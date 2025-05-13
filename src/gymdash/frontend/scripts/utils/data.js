@@ -411,39 +411,21 @@ const dataUtils = (
                     const filePromises_videos = [];
                     // Gather all promises and metadata for each info type
                     for (const filename in index.metadata[DataReport.SCALAR]) {
-                        console.log(index.metadata[DataReport.SCALAR][filename]);
                         fileMetadata_scalars.push(index.metadata[DataReport.SCALAR][filename]);
                         filePromises_scalars.push(zip.file(filename).async("string"));
                     }
                     for (const filename in index.metadata[DataReport.IMAGE]) {
-                        console.log(index.metadata[DataReport.IMAGE][filename]);
                         fileMetadata_images.push(index.metadata[DataReport.IMAGE][filename]);
                         filePromises_images.push(zip.file(filename).async("arraybuffer"));
                     }
                     for (const filename in index.metadata[DataReport.AUDIO]) {
-                        console.log(index.metadata[DataReport.AUDIO][filename]);
                         fileMetadata_audio.push(index.metadata[DataReport.AUDIO][filename]);
                         filePromises_audio.push(zip.file(filename).async("arraybuffer"));
                     }
                     for (const filename in index.metadata[DataReport.VIDEO]) {
-                        console.log(index.metadata[DataReport.VIDEO][filename]);
                         fileMetadata_videos.push(index.metadata[DataReport.VIDEO][filename]);
                         filePromises_videos.push(zip.file(filename).async("arraybuffer"));
                     }
-                    // // Pre-make arrays for media types so when we process each file
-                    // // we can use an existing array
-                    // for (const meta of fileMetadata_images) {
-                    //     console.log(meta);
-                    //     if (!Object.hasOwn(mediaReport.media["images"], meta.key)) {
-                    //         mediaReport.media["images"][meta.key] = [];
-                    //     }
-                    // }
-                    // for (const meta of fileMetadata_audio) {
-                    //     console.log(meta);
-                    //     if (!Object.hasOwn(mediaReport.media["audio"], meta.key)) {
-                    //         mediaReport.media["audio"][meta.key] = [];
-                    //     }
-                    // }
                     // Just place the scalar data into the proper scalar key
                     const scalarPromise = Promise.all(filePromises_scalars)
                         .then((files) => {
@@ -525,6 +507,51 @@ const dataUtils = (
                 })
         }
 
+        /**
+         * Returns a new data array where values have been smoothed
+         * using a sliding average window around each original data point.
+         * The sliding window size is based on the length of data and the
+         * smoothFactor.
+         * 
+         * @param {Array} data 
+         * @param {Number} smoothFactor 
+         * @returns 
+         */
+        const smoothData = function(data, smoothFactor=0.1) {
+            const dataLen = data.length;
+            const halfWindow = Math.floor((smoothFactor*dataLen)/2)-1;
+            const window = (2*halfWindow) + 1;
+            if (halfWindow <= 0)    { return data; }
+            // Pad the front and back of data with repeats of the
+            // first data value and last value respectively.
+            const tempData = [
+                ...(new Array(halfWindow).fill(data[0])),
+                ...data,
+                ...(new Array(halfWindow).fill(data[dataLen-1])),
+            ];
+            const smoothed      = new Array(dataLen);
+            const windowValues  = tempData.slice(0, window);
+            let windowIdx = 0;
+            let windowSum = windowValues.reduce((sum, current) => sum+=current, 0);
+            let dataIdx = window;
+            for (let idx = 0; idx < dataLen; idx++) {
+                // Get average of window values
+                smoothed[idx] = windowSum / window;
+                // Replace oldest window value with newest window value by
+                // changing the current window sum, and then altering the
+                // window element's value to an updated value.
+                const replacementValue = tempData[dataIdx];
+                windowSum -= windowValues[windowIdx];
+                windowSum += replacementValue;
+                windowValues[windowIdx] = replacementValue;
+                // Update indices for accessing the next window element
+                // and the next data element.
+                windowIdx = (windowIdx + 1) % window;
+                dataIdx += 1;
+            }
+            return smoothed;
+        }
+
         return {
             getAllNewScalars,
             getAllNewImages,
@@ -532,8 +559,8 @@ const dataUtils = (
             getRecent,
             getAll,
             createEmptyDataReport,
+            smoothData,
             DataReport,
-            // dataReportUnion,
         };
     }
 )();

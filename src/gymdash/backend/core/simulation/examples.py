@@ -679,7 +679,7 @@ class MLSimulation(Simulation):
                 self.model,
                 torch.utils.data.Subset(train_data, torch.arange(0,10)),
                 image_path,
-                500,
+                100,
             )
         ])
 
@@ -690,7 +690,8 @@ class MLSimulation(Simulation):
                 tb_logger=tb_path,
                 log_step=5,
                 do_val=True,
-                val_per_epoch=1,
+                # val_per_epoch=1,
+                val_per_steps=500,
                 val_kwargs={
                     "dataloader": test_loader
                 },

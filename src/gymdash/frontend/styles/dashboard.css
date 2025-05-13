@@ -45,6 +45,59 @@ h1 {
     display: none;
 }
 
+.settings {
+    display: grid;
+    grid-auto-rows: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    .setting {
+        /* max-width: 300px; */
+        display: flex;
+        justify-content: space-between;
+        border: var(--main-contrast-color) solid 1px;
+        border-radius: var(--panel-br);
+        padding: 2px;
+        label {
+            min-width: 200px;
+            flex: 1 1 auto;
+        }
+        input[type="range"] {
+            /* min-width: 40px; */
+            width: 100%;
+        }
+    }
+}
+
+/* https://www.smashingmagazine.com/2021/12/create-custom-range-input-consistent-browsers/ */
+input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background: transparent;
+    cursor: pointer;
+    /* width: 15rem; */
+}
+/***** Chrome, Safari, Opera, and Edge Chromium *****/
+input[type="range"]::-webkit-slider-runnable-track {
+    background: var(--main-bg-color);
+    margin-top: -12px;
+    border: var(--main-contrast-color) 1px solid;
+    height: 0.5rem;
+}
+/******** Firefox ********/
+input[type="range"]::-moz-range-track {
+    background: var(--main-bg-color);
+    border: var(--main-contrast-color) 1px solid;
+    height: 0.5rem;
+}
+input[type=range]::-ms-fill-lower {
+    background: #2a6495;
+    border: 0.2px solid #010101;
+    border-radius: 2.6px;
+    box-shadow: 1px 1px 1px #000000, 0px 0px 1px #0d0d0d;
+}
+input[type=range]::-moz-range-progress {
+    background: var(--main-contrast-color);
+}
+
 .resource-preview {
     position: relative;
     z-index: 1;
@@ -190,4 +243,14 @@ h1 {
     /* Position the tooltip text - see examples below! */
     position: fixed;
     z-index: 1;
+}
+
+.setting-bar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    border-radius: var(--panel-br);
+}
+#setting-bar-title:hover {
+    cursor: pointer;
 }

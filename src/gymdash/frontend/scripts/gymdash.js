@@ -41,6 +41,8 @@ let sim_selections = {};
 //          "audio" -> {stat_key1_a -> [], ...}
 //      }
 let allData = {};
+const mainPlots = [];
+const allPlots = [];
 
 // Sidebar
 const simSidebar = document.querySelector(".sim-selection-sidebar");
@@ -63,6 +65,13 @@ const startSimBtn               = startPanel.querySelector("#start-sim-btn");
 const queueSimBtn               = startPanel.querySelector("#queue-sim-btn");
 const sendControlBtn            = document.querySelector("#send-control-btn");
 const sendQueryBtn              = document.querySelector("#send-query-btn");
+
+// Settings
+const settingBarTitle           = document.querySelector("#setting-bar-title");
+const settingBarContent         = document.querySelector("#setting-bar-content");
+const plotSmoothSlider_Setting  = document.querySelector("#plot-smoothing-slider");
+const plotSmoothLabel_Setting   = document.querySelector("label[for=plot-smoothing-slider]");
+let plotSmoothValue             = 0;
 
 // General
 const tooltip                   = document.querySelector(".tooltip")
@@ -1151,7 +1160,14 @@ toggleDisplay(mmFilterAreaKey);
 toggleDisplay(mmFilterAreaSim);
 toggleDisplay(mmFilterAreaStep);
 
-
+// Settings
+plotSmoothSlider_Setting.addEventListener("input", (e) => {
+    changeSetting_PlotSmooth(Number(e.target.value));
+    plotSmoothValue = Number(e.target.value);
+    plotSmoothLabel_Setting.textContent = `Smoothing: (${plotSmoothValue.toFixed(2)})`;
+});
+settingBarTitle.addEventListener("click", toggleDisplay.bind(null, settingBarContent))
+toggleDisplay(settingBarContent);
 
 // Setup intervals
 setInterval(updateAllSimSelectionProgress, defaultSimProgressUpdateInterval);
@@ -1159,6 +1175,18 @@ setInterval(updateAllSimSelectionProgress, defaultSimProgressUpdateInterval);
 
 refreshSimulationSidebar();
 openTab(null, "tab-analyze");
+
+
+function changeSetting_PlotSmooth(newSmooth) {
+    // Clamp smoothing value
+    plotSmoothValue = 0.5 * Math.min(1, Math.max(0, newSmooth));
+
+    for (const plot of allPlots) {
+        plot.smoothLines(plotSmoothValue);
+    }
+
+    // createPlots();
+}
 
 
 function toggleDisplay(element) {
@@ -1376,16 +1404,34 @@ function onClickMMI(d) {
 function createPlots() {
     // const key = "rollout/ep_rew_mean";
     const key = "loss/train";
-    // const key = "acc/val";
+    // const key = "loss/val";
+    // const key = "acc/val";  
     // const key = "my_number";
 
+    mainPlots.splice(0, mainPlots.length);
+    allPlots.splice(0, allPlots.length);
     clearMainPlot();
 
     const condense = true;
     const selectedData = getSelectedData();
 
+    const allScalarKeys = new Set();
+    for (const simID in selectedData) {
+        const report = selectedData[simID];
+        report.scalar_keys.forEach(k => allScalarKeys.add(k));
+    }
+
+    if (Object.keys(selectedData).length <= 0) { return; }
+
     const plot = vizUtils.createLinePlotForKey(key, selectedData);
     const detailsPlot = vizUtils.createLinePlotForKey(key, selectedData);
+    mainPlots.push(plot);
+    mainPlots.push(detailsPlot);
+    allPlots.push(plot);
+    allPlots.push(detailsPlot);
+
+    plot.smoothLines(plotSmoothValue);
+    detailsPlot.smoothLines(plotSmoothValue);
 
     plot.addAllMMIs(selectedData, onClickMMI, condense);
     detailsPlot.addAllMMIs(selectedData, onClickMMI, condense);
@@ -1395,6 +1441,13 @@ function createPlots() {
     
     d3.select("#plots-area").append(() => plot.svg.node());
     d3.select("#plots-area").append(() => detailsPlot.svg.node());
+
+    for (const k of allScalarKeys) {
+        const p = vizUtils.createLinePlotForKey(k, selectedData);
+        allPlots.push(p);
+        p.smoothLines(plotSmoothValue);
+        d3.select("#plots-area").append(() => p.svg.node());
+    }
 }
 
 
