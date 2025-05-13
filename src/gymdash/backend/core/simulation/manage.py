@@ -207,6 +207,10 @@ class SimulationTracker:
     
     def stop(self):
         self._is_stopping = True
+
+    def update_simulation_db(self, sim_id: UUID, sim: Simulation):
+        logger.info(f"Updating simulation DB entry: {str(sim_id)}")
+        ProjectManager.add_or_update_simulation(sim_id, sim)
     
     async def stop_simulation_call(self, sim_id) -> SimulationInteractionModel:
         sim_id = self._to_key(sim_id)
@@ -223,7 +227,7 @@ class SimulationTracker:
                     popped = self.queued_sims.pop(i)
                     popped[0].set_cancelled()
                     # self.update_sim_dbs([sim_id])
-                    ProjectManager.add_or_update_simulation(sim_id, popped[0])
+                    self.update_simulation_db(sim_id, popped[0])
                     self._set_sim_done(sim_id, popped[0])
                     return SimulationInteractionModel(
                         id=str(sim_id),
@@ -529,7 +533,7 @@ class SimulationTracker:
             logger.warning(f"Could not create valid simulation.")
             return (SimulationTracker.no_id, None)
         simulation.set_project_info(ProjectManager.sims_folder(), ProjectManager.resources_folder(), new_id)
-        ProjectManager.add_or_update_simulation(new_id, simulation)
+        self.update_simulation_db(new_id, simulation)
         return (new_id, simulation)
 
 
@@ -658,7 +662,7 @@ class SimulationTracker:
             key = self._to_key(sim_key)
             exists, sim = self.try_get_sim(key)
             if exists:
-                ProjectManager.add_or_update_simulation(key, sim)
+                self.update_simulation_db(key, sim)
 
     def remove_sims(self, to_remove: Iterable[Union[str, UUID]]) -> None:
         for sim_key in to_remove:

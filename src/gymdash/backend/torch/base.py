@@ -8,6 +8,7 @@ from torch.nn.modules import Module
 
 from gymdash.backend.core.simulation.callbacks import (BaseCustomCallback,
                                                        EmptyCallback)
+from gymdash.backend.core.simulation.base import StopSimException
 
 try:
     import torch
@@ -24,11 +25,6 @@ except ImportError:
 
 if not _has_torch:
     raise ImportError("Install pytorch to use base gymdash-pytorch utilities.")
-
-class StopSimException(Exception):
-    def __init__(self, message, errors=None) -> None:
-        super().__init__(message, errors)
-        self.errors = errors
 
 class InferenceModel(ABC):
     @abstractmethod

@@ -1,6 +1,7 @@
-import logging
 import copy
+import logging
 import os
+import traceback
 from abc import abstractmethod
 from collections import defaultdict
 from datetime import datetime
@@ -11,12 +12,18 @@ from uuid import UUID, uuid4
 
 from typing_extensions import Self
 
-from gymdash.backend.core.api.models import (SimulationStartConfig,
-                                             StoredSimulationInfo,
-                                             ControlRequestDetails)
+from gymdash.backend.core.api.models import (ControlRequestDetails, SimStatus,
+                                             SimulationStartConfig,
+                                             StoredSimulationInfo)
 from gymdash.backend.core.utils.kwarg_utils import overwrite_new_kwargs
+from gymdash.backend.enums import SimStatusCode, SimStatusSubcode
 
 logger = logging.getLogger(__name__)
+
+class StopSimException(Exception):
+    def __init__(self, message, errors=None) -> None:
+        super().__init__(message, errors)
+        self.errors = errors
 
 class InteractorFlag:
     def __init__(self, default_status: bool=False, default_value: Any=None) -> None:
@@ -478,7 +485,8 @@ class Simulation():
         self._meta_mutex: Lock                  = Lock()
         self._meta_cancelled: bool              = False
         self._meta_failed: bool                 = False
-        self._meta_error_details: List[str]     = []
+        self._meta_statuses: List[SimStatus]    = []
+        self._meta_num_saved_statuses: int      = 0
 
         self._meta_create_time                  = datetime.now()
         self._meta_start_time                   = None
@@ -545,12 +553,28 @@ class Simulation():
         self._project_sim_base_path = project_sim_base_path
         self._project_resources_path= project_resources_path
     
+    def was_cancelled(self):
+        with self._meta_mutex:
+            return self._meta_cancelled
     def set_cancelled(self) -> None:
         with self._meta_mutex:
             self._meta_cancelled = True
     def add_error_details(self, new_error: str) -> None:
+        self.add_status(SimStatus(
+            code=SimStatusCode.FAIL,
+            subcode=SimStatusSubcode.ERROR,
+            details=new_error,
+            error_trace=traceback.format_exc()
+        ))
+    def add_status(self, status: SimStatus):
+        status.time = datetime.now()
         with self._meta_mutex:
-            self._meta_error_details.append(new_error)
+            self._meta_statuses.append(status)
+    def retrieve_new_statuses(self) -> List[SimStatus]:
+        with self._meta_mutex:
+            new_statuses = self._meta_statuses[self._meta_num_saved_statuses:]
+            self._meta_num_saved_statuses = len(self._meta_statuses)
+            return new_statuses
 
     def create_kwarg_defaults(self) -> Dict[str, Any]:
         return {}
@@ -617,7 +641,8 @@ class Simulation():
         channel_values["is_done"]       = self.is_done
         channel_values["cancelled"]     = self._meta_cancelled
         channel_values["failed"]        = self._meta_failed
-        channel_values["error_details"] = self._meta_error_details
+        # channel_values["error_details"] = self._meta_error_details
+        channel_values["error_details"] = self._meta_statuses
         return channel_values
 
     # def trigger_as_query(self, incoming_interactions: SimulationInteractionModel) -> Dict[str, Any]:

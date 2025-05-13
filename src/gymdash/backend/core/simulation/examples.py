@@ -14,9 +14,12 @@ from torch.utils.tensorboard import SummaryWriter
 
 import gymdash.backend.constants as constants
 from gymdash.backend.core.simulation.callbacks import BaseCustomCallback, CallbackCustomList
+from gymdash.backend.core.simulation.base import StopSimException
 from gymdash.backend.torch.base import (InferenceModel,
                                         SimpleClassifierMLModel,
                                         SimulationMLModel)
+from gymdash.backend.enums import SimStatusCode, SimStatusSubcode
+from gymdash.backend.core.api.models import SimStatus
 
 try:
     import gymnasium as gym
@@ -233,10 +236,29 @@ class StableBaselinesSimulation(Simulation):
             self.model.learn(total_timesteps=num_steps, progress_bar=False, callback=sim_interact_callback)
             # self.model.learn(total_timesteps=num_steps, progress_bar=True, callback=sim_interact_callback)
             self.model.save("ppo_aapl")
+            was_cancelled = self.was_cancelled()
+            if was_cancelled:
+                self.add_status(SimStatus(
+                    code=SimStatusCode.FAIL,
+                    subcode=SimStatusSubcode.STOPPED,
+                    details="Simulation stopped."
+                ))
+            else:
+                self.add_status(SimStatus(
+                    code=SimStatusCode.SUCCESS,
+                    details="Simulation successfully run."
+                ))
+        except StopSimException as se:
+            self._meta_failed = True
+            self.add_status(SimStatus(
+                code=SimStatusCode.FAIL,
+                subcode=SimStatusSubcode.STOPPED,
+                details="Simulation stopped."
+            ))
         except Exception as e:
             self._meta_failed = True
             self.add_error_details(str(e))
-            pass
+            
         env.close()
 
 
@@ -386,6 +408,18 @@ class CustomControlSimulation(Simulation):
                 sleep_time = max(poll_period - time_taken, 0)
                 time.sleep(sleep_time)
                 timer += max(time_taken, poll_period)
+            
+            self.add_status(SimStatus(
+                code=SimStatusCode.SUCCESS,
+                details="Simulation successfully run."
+            ))
+        except StopSimException as se:
+            self._meta_failed = True
+            self.add_status(SimStatus(
+                code=SimStatusCode.FAIL,
+                subcode=SimStatusSubcode.STOPPED,
+                details="Simulation stopped"
+            ))
         except Exception as e:
             self._meta_failed = True
             self.add_error_details(str(e))
@@ -702,14 +736,25 @@ class MLSimulation(Simulation):
                 step_callback=step_callback,
             )
             # train_mnist_classifier(self.model, dataset_folder_path, **train_kwargs)
+            self.add_status(SimStatus(
+                code=SimStatusCode.SUCCESS,
+                details="Model successfully trained."
+            ))
+        except StopSimException as se:
+            self.add_status(SimStatus(
+                code=SimStatusCode.FAIL,
+                subcode=SimStatusSubcode.STOPPED,
+                details="Model training stopped."
+            ))
+            self._meta_failed = True
+            del self.model
+            torch.cuda.empty_cache()
         except Exception as e:
             logger.error(e)
             self._meta_failed = True
             self.add_error_details(str(e))
             del self.model
             torch.cuda.empty_cache()
-            raise e
-
 
 def register_example_simulations():
     SimulationRegistry.register("stable_baselines", StableBaselinesSimulation)

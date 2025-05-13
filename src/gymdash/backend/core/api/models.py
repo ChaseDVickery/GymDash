@@ -3,7 +3,7 @@ from datetime import datetime
 from uuid import UUID
 from typing import Any, Dict, Iterable, List, Tuple, Union
 import json
-
+from gymdash.backend.enums import SimStatusCode
 from pydantic import BaseModel
 
 
@@ -39,6 +39,13 @@ class SimulationStartConfig(BaseModel):
         else:
             return obj
         
+class SimStatus(BaseModel):
+    code:       SimStatusCode
+    time:       Union[datetime,None] = None
+    subcode:    int             = 0 # subcode is a subspecifier for what happened. 0 is nothing.
+    details:    str             = ""
+    error_trace:str             = ""
+
 class SimulationIDModel(BaseModel):
     id:         UUID
 class SimulationIDsModel(BaseModel):

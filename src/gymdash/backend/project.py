@@ -18,6 +18,7 @@ from typing_extensions import Self
 from gymdash.backend.core.api.models import (SimulationStartConfig,
                                              StoredSimulationInfo)
 from gymdash.backend.core.simulation.base import Simulation
+from gymdash.backend.enums import SimStatusCode
 
 logger = logging.getLogger(__name__)
 
@@ -79,8 +80,8 @@ class ProjectManager:
     @staticmethod
     def setup_from_args(args):
         ProjectManager.args = args
-        ProjectManager.dbcon = None
-        ProjectManager.dbcur = None
+        ProjectManager.dbcon: sqlite3.Connection = None
+        ProjectManager.dbcur: sqlite3.Cursor = None
         ProjectManager._setup_project_structure()
         ProjectManager._setup_database()
         ProjectManager._setup_loop()
@@ -163,28 +164,58 @@ class ProjectManager:
     @staticmethod
     def _setup_database():
         ProjectManager.dbcon = sqlite3.connect(ProjectManager.db_path(), detect_types=sqlite3.PARSE_DECLTYPES)
+        ProjectManager.dbcon.execute("PRAGMA foreign_keys = ON;")
         ProjectManager.dbcur = ProjectManager.dbcon.cursor()
         ProjectManager._create_simulations_table()
+        ProjectManager._create_status_table()
+        ProjectManager._create_api_call_table()
 
     @staticmethod
     def _create_simulations_table():
         con, cur = ProjectManager.get_con()
         cur = ProjectManager.dbcur
         cur.execute("""CREATE TABLE IF NOT EXISTS simulations (
+                        sim_id UUID PRIMARY KEY,
+                        name TEXT,
+                        created TIMESTAMP,
+                        started TIMESTAMP,
+                        ended TIMESTAMP,
+                        is_done BOOL,
+                        cancelled BOOL,
+                        failed BOOL,
+                        force_stopped BOOL,
+                        config SIMULATIONCONFIG,
+                        start_kwargs KWARGS,
+                        sim_type_name TEXT,
+                        sim_module_name TEXT
+                        )""")
+        con.commit()
+    @staticmethod
+    def _create_status_table():
+        con, cur = ProjectManager.get_con()
+        cur = ProjectManager.dbcur
+        cur.execute("""CREATE TABLE IF NOT EXISTS sim_status (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    sim_id UUID,
-                    name TEXT,
-                    created TIMESTAMP,
-                    started TIMESTAMP,
-                    ended TIMESTAMP,
-                    is_done BOOL,
-                    cancelled BOOL,
-                    failed BOOL,
-                    force_stopped BOOL,
-                    config SIMULATIONCONFIG,
-                    start_kwargs KWARGS,
-                    sim_type_name TEXT,
-                    sim_module_name TEXT
+                    sim_id INTEGER NOT NULL,
+                    time TIMESTAMP,
+                    code INTEGER,
+                    subcode INTEGER,
+                    details TEXT,
+                    error_trace TEXT,
+                    FOREIGN KEY (sim_id)
+                        REFERENCES simulations (sim_id)
+                    )""")
+        con.commit()
+    @staticmethod
+    def _create_api_call_table():
+        con, cur = ProjectManager.get_con()
+        cur = ProjectManager.dbcur
+        cur.execute("""CREATE TABLE IF NOT EXISTS api_calls (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT NOT NULL,
+                    time TIMESTAMP,
+                    code INTEGER,
+                    details TEXT
                     )""")
         con.commit()
 
@@ -222,7 +253,7 @@ class ProjectManager:
         if sim is None: return
         con, cur = ProjectManager.get_con()
 
-        check_text = "SELECT COUNT(id) FROM simulations WHERE sim_id=?"
+        check_text = "SELECT COUNT(sim_id) FROM simulations WHERE sim_id=?"
         existing = cur.execute(check_text, (sim_id,)).fetchone()
         
         if (existing[0] < 1):
@@ -293,14 +324,53 @@ class ProjectManager:
                 type(sim).__module__,
                 sim_id
             )
-
         cur.execute(sim_update_text, params)
+        # Also add any statuses that it contains to the status table
+        ProjectManager._add_simulation_statuses(sim_id, sim)
 
     @staticmethod
     def add_or_update_simulation(sim_id: uuid.UUID, sim: Simulation):
         ProjectManager._cached_executions.append(
             functools.partial(ProjectManager._add_or_update_simulation, sim_id=sim_id, sim=sim)
         )
+    @staticmethod
+    @immediate
+    def add_or_update_simulation_immediate(sim_id: uuid.UUID, sim: Simulation):
+        ProjectManager._add_or_update_simulation(sim_id, sim)
+
+    @staticmethod
+    def add_simulation_statuses(sim_id: uuid.UUID, sim: Simulation):
+        ProjectManager._cached_executions.append(
+            functools.partial(ProjectManager._add_simulation_statuses, sim_id=sim_id, sim=sim)
+        )
+    @staticmethod
+    def _add_simulation_statuses(sim_id: uuid.UUID, sim: Simulation):
+        if sim is None: return
+        con, cur = ProjectManager.get_con()
+        params = []
+        update_text = """
+            INSERT INTO sim_status
+            (
+                sim_id,
+                time,
+                code,
+                subcode,
+                details,
+                error_trace
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            """
+        for status in sim.retrieve_new_statuses():
+            params.append((
+                sim_id,
+                status.time,
+                int(status.code),
+                status.subcode,
+                status.details,
+                status.error_trace
+            ))
+        cur.executemany(update_text, params)
+        
 
     @staticmethod
     def retrieval_to_stored_info(info):
@@ -413,9 +483,12 @@ class ProjectManager:
         # Clear simulation table
         con, cur = ProjectManager.get_con()
         cur.execute("DROP TABLE simulations")
+        cur.execute("DROP TABLE sim_status")
         ProjectManager._create_simulations_table()
+        ProjectManager._create_status_table()
         con.commit()
         logger.info("Cleared table 'simulations'")
+        logger.info("Cleared table 'sim_status'")
         # Delete all simulation subfolders if possible
         shutil.rmtree(ProjectManager.sims_folder(), ignore_errors=True)
         ProjectManager._setup_project_structure()
@@ -436,8 +509,19 @@ class ProjectManager:
         con, cur = ProjectManager.get_con()
         print(sim_ids)
         ids = set(sim_ids)
-
         sim_selection_text = " OR ".join(["sim_id=?" for _ in sim_ids])
+
+        # Delete all statuses for each simulation first
+        status_delete_text = f"""
+        DELETE FROM
+            sim_status
+        WHERE
+            {sim_selection_text}
+        """
+        cur.execute(status_delete_text, sim_ids)
+        logger.info(f"Cleared simulation status from sim_status table")
+
+        # Then delete the simulation information itself
         query_text = f"""
         DELETE FROM
             simulations
