@@ -16,7 +16,8 @@ from typing import Any, List, Tuple, Dict, Union, Literal, Iterable
 from typing_extensions import Self
 
 from gymdash.backend.core.api.models import (SimulationStartConfig,
-                                             StoredSimulationInfo)
+                                             StoredSimulationInfo,
+                                             SimStatus)
 from gymdash.backend.core.simulation.base import Simulation
 from gymdash.backend.enums import SimStatusCode
 
@@ -370,10 +371,25 @@ class ProjectManager:
                 status.error_trace
             ))
         cur.executemany(update_text, params)
-        
 
     @staticmethod
-    def retrieval_to_stored_info(info):
+    def retrieval_to_sim_status(info) -> SimStatus:
+        return SimStatus(
+            time            = info[1],
+            code            = info[2],
+            subcode         = info[3],
+            details         = info[4],
+            error_trace     = info[5]
+        )
+    #     class SimStatus(BaseModel):
+    # code:       SimStatusCode
+    # time:       Union[datetime,None] = None
+    # subcode:    int             = 0 # subcode is a subspecifier for what happened. 0 is nothing.
+    # details:    str             = ""
+    # error_trace:str             = ""
+
+    @staticmethod
+    def retrieval_to_stored_info(info) -> StoredSimulationInfo:
         return StoredSimulationInfo(
             sim_id      = info[0],
             name        = info[1],
@@ -412,7 +428,42 @@ class ProjectManager:
             results.append(
                 ProjectManager.retrieval_to_stored_info(info)
             )
-        logger.error(f"Got {len(results)} db results")
+        logger.debug(f"Got {len(results)} db results")
+        return results
+    
+    @staticmethod
+    def get_latest_statuses(sim_ids: Iterable[Union[str, uuid.UUID]]):
+        statuses = ProjectManager.get_all_latest_statuses()
+        filtered_statuses = {}
+        for simID in sim_ids:
+            if str(simID) in statuses:
+                filtered_statuses[str(simID)] = statuses[str(simID)]
+            else:
+                filtered_statuses[str(simID)] = None
+        return filtered_statuses
+    
+    def get_all_latest_statuses() -> Dict[str, SimStatus]:
+        con, cur = ProjectManager.get_con()
+        query_text = f"""
+        SELECT
+            sim_id,
+            MAX(time),
+            code,
+            subcode,
+            details,
+            error_trace
+        FROM
+            sim_status
+        GROUP BY
+            sim_id
+        """
+        cur.execute(query_text)
+        res = cur.fetchall()
+        results = {}
+        for info in res:
+            simID = str(info[0])
+            results[simID] = ProjectManager.retrieval_to_sim_status(info)
+        logger.debug(f"Got {len(results)} db results")
         return results
 
     @staticmethod

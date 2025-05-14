@@ -243,6 +243,13 @@ async def get_delete_simulations(sim_ids: SimulationIDsModel):
     ProjectManager.delete_specific_simulations_immediate(sim_ids.ids)
     # ProjectManager.delete_all_simulations_immediate()
     return responses
+
+@app.post("/get-sim-status")
+async def get_simulation_status(sim_ids: SimulationIDsModel):
+    if simulation_tracker.is_clearing:
+        return []
+    return ProjectManager.get_latest_statuses(sim_ids.ids)
+
     
 @app.get("/all-recent-scalars")
 async def get_all_recent_scalars():

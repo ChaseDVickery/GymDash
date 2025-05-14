@@ -26,6 +26,7 @@ const deleteSelectedSimsTestBtn = document.querySelector("#delete-selected-sims-
 
 
 // Constants
+const defaultMaxSimStatusUpdatePeriod = 5000;   // (ms)
 const defaultSimProgressUpdateInterval = 5000;  // (ms)
 const defaultTimeout = 2.5; // (s)
 const noID = "00000000-0000-0000-0000-000000000000"; // (str(UUID))
@@ -41,9 +42,11 @@ let sim_selections = {};
 //          "audio" -> {stat_key1_a -> [], ...}
 //      }
 let allData = {};
+let allRecentStatus = {};
 const mainPlots = [];
 const allPlots = [];
 let hoveredSimSelection;
+let canQuerySimStatus = true;
 
 // Sidebar
 const simSidebar = document.querySelector(".sim-selection-sidebar");
@@ -306,6 +309,9 @@ function getSelectedSelections() {
         {}
     )
     return mapping;
+}
+function getSelectionFor(simID) {
+    return getAllSelections()[simID];
 }
 function getSelectedData() {
     const selectedSelections = getSelectedSelections();
@@ -615,6 +621,27 @@ function query(queryBody) {
         body: JSON.stringify(queryBody),
     }).then((response) => { return response.json(); });
 }
+function querySimulationStatus(simIDs) {
+    if (!canQuerySimStatus) {
+        const existingStatuses = {};
+        for (const simID of simIDs) {
+            if (Object.hasOwn(allRecentStatus, simID)) {
+                existingStatuses[simID] = allRecentStatus[simID];
+            } else {
+                existingStatuses[simID] = null;
+            }
+        }
+        return Promise.resolve(existingStatuses);
+    }
+    canQuerySimStatus = false;
+    return fetch(apiURL("get-sim-status"), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ ids: simIDs }),
+    }).then((response) => { return response.json(); });
+}
 
 
 // Utils
@@ -725,12 +752,39 @@ function updateSimSelectionProgress(simID, simSelection) {
                 outer.style.setProperty("--prog-den", `${info.progress[1]}`);
                 outer.style.setProperty("--prog", `${100*info.progress[0]/info.progress[1]}%`);
                 if (isSimHovered(simSelection)) {
-                    tooltipUpdateToSimSelection(simSelection);
+                    tooltipUpdateToSimSelection(simID);
                 }
             }
         })
         .catch((error) => {
             console.error(`Update sim selection progress error: ${error}`)
+        });
+}
+function updateAllSimSelectionStatus() {
+    const simIDs = Object.keys(getAllSelections());
+    return querySimulationStatus(simIDs)
+        .then((info) => {
+            // Dict: simID -> SimStatus
+            for (const simID in info) {
+                const statusInfo = info[simID];
+                allRecentStatus[simID] = statusInfo;
+                if (isSimHovered(sim_selections[simID])) {
+                    tooltipUpdateToSimSelection(simID);
+                }
+            }
+        });
+}
+function updateSimSelectionStatus(simID) {
+    return querySimulationStatus([simID])
+        .then((info) => {
+            // Dict: simID -> SimStatus
+            for (const simID in info) {
+                const statusInfo = info[simID];
+                allRecentStatus[simID] = statusInfo;
+                if (isSimHovered(sim_selections[simID])) {
+                    tooltipUpdateToSimSelection(simID);
+                }
+            }
         });
 }
 
@@ -821,13 +875,23 @@ function repositionTooltip(tt, element, direction="right") {
     }
 }
 
-function tooltipUpdateToSimSelection(selection) {
+function tooltipUpdateToSimSelection(simID) {
+    const selection = getSelectionFor(simID);
+    if (!selection) { return; }
     const meter = selection.querySelector(".radial-meter")
     if (meter.classList.contains("fail")) {
-        tooltip.textContent = `Failed`;
+        let newText = "Failed";
+        if (Object.hasOwn(allRecentStatus, simID) && allRecentStatus[simID]) {
+            newText += `: ${allRecentStatus[simID].details}`;
+        }
+        tooltip.textContent = newText;
     }
     else if (meter.classList.contains("success")) {
-        tooltip.textContent = `Success`;
+        let newText = "Success";
+        if (Object.hasOwn(allRecentStatus, simID) && allRecentStatus[simID]) {
+            newText += `: ${allRecentStatus[simID].details}`;
+        }
+        tooltip.textContent = newText;
     }
     else {
         const progressMeter = selection.querySelector(".radial-meter .outer");
@@ -874,8 +938,11 @@ function createSimSelection(config, simID, startChecked=true) {
     newSelection.addEventListener("mouseover", function(e) {
         hoveredSimSelection = newSelection;
         tooltip.style.visibility = "visible";
-        tooltipUpdateToSimSelection(newSelection);
-        repositionTooltip(tooltip, newSelection, "right");
+        // updateSimSelectionStatus(simID);
+        updateAllSimSelectionStatus().then((p) => {
+            tooltipUpdateToSimSelection(simID);
+            repositionTooltip(tooltip, newSelection, "right");
+        })
     });
     newSelection.addEventListener("mouseout", function(e) {
         hoveredSimSelection = undefined;
@@ -957,6 +1024,9 @@ function stopSimulationFromSelection(simSelection) {
                     // Put back in simSelection and stop cancellation visual
                     sim_selections[simID] = simSelection;
                     meter.classList.remove("cancelling");
+                    if (isSimHovered(sim_selections[simID])) {
+                        tooltipUpdateToSimSelection(simID);
+                    }
                 })
         })
         .catch((error) => {
@@ -1198,7 +1268,11 @@ settingBarTitle.addEventListener("click", toggleDisplay.bind(null, settingBarCon
 toggleDisplay(settingBarContent);
 
 // Setup intervals
+// Update progress periodically
 setInterval(updateAllSimSelectionProgress, defaultSimProgressUpdateInterval);
+// Allow simulation status queries periodically
+setInterval(function() { canQuerySimStatus = true; }, defaultMaxSimStatusUpdatePeriod);
+// setInterval(updateAllSimSelectionStatus, defaultSimProgressUpdateInterval);
 
 
 refreshSimulationSidebar();
