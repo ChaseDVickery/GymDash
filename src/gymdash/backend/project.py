@@ -533,8 +533,10 @@ class ProjectManager:
     def _delete_all_simulations():
         # Clear simulation table
         con, cur = ProjectManager.get_con()
-        cur.execute("DROP TABLE simulations")
+        # Must drop sim_status first because it has FKs
+        # that refer to simulation table entries.
         cur.execute("DROP TABLE sim_status")
+        cur.execute("DROP TABLE simulations")
         ProjectManager._create_simulations_table()
         ProjectManager._create_status_table()
         con.commit()
@@ -558,7 +560,8 @@ class ProjectManager:
     def _delete_specific_simulations(sim_ids: Iterable[str]):
         # Clear simulation table
         con, cur = ProjectManager.get_con()
-        print(sim_ids)
+        if (len(sim_ids) < 1):
+            return
         ids = set(sim_ids)
         sim_selection_text = " OR ".join(["sim_id=?" for _ in sim_ids])
 

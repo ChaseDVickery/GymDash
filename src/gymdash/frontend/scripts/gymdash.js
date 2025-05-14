@@ -33,20 +33,17 @@ const noID = "00000000-0000-0000-0000-000000000000"; // (str(UUID))
 
 // Structures
 // sim_selections store information
-let sim_selections = {};
-// allData stores all the data retrieved from the backend
-// Maps in the following way:
-//      simID -> {
-//          "scalars" -> {stat_key1_s -> [], ...},
-//          "images" -> {stat_key1_i -> [], ...},
-//          "audio" -> {stat_key1_a -> [], ...}
-//      }
-let allData = {};
-let allRecentStatus = {};
+// let sim_selections = {};
+// let allData = {};
+// let allRecentStatus = {};
 const mainPlots = [];
 const allPlots = [];
-let hoveredSimSelection;
+// let hoveredSimSelection;
 let canQuerySimStatus = true;
+
+// By the end, sim_selections, allData, and allRecentStatus should not be used.
+// Also hoveredSimSelection?
+
 
 // Sidebar
 const simSidebar = document.querySelector(".sim-selection-sidebar");
@@ -125,6 +122,280 @@ prefabcontrolRequestBox.remove();
 prefabFilterDiscrete.remove();
 prefabFilterBetween.remove();
 
+class SimSelection {
+    constructor(element, config, simID, startChecked=false) {
+        // Elements
+        this.id = simID;
+        this.element = element;
+        this.label = element.querySelector("label");
+        this.input = element.querySelector(".sim-selection-checkbox");
+        this.cancelButton = element.querySelector(".cancel-sim-button");
+        this.meter = element.querySelector(".radial-meter");
+        this.outer = this.meter.querySelector(".outer")
+
+        // Setup
+        this.element.classList.remove("prefab");
+
+        // Set up new selection box
+        this.selectionID = `${simID}`;
+        this.input.id            = this.selectionID;
+        this.input.checked       = startChecked;
+        this.label.htmlFor       = this.selectionID;
+        this.label.textContent   = config.name;
+    }
+
+    checked() { return this.input.checked; }
+    isDone() { return this.meter.classList.contains("complete"); }    
+    removeElement() { if (this.element) { this.element.remove(); } }
+
+    completeProgress(failOrSuccess=null) {
+        this.meter.classList.add("complete");
+        this.meter.classList.remove("incomplete");
+        if (failOrSuccess === "fail" || failOrSuccess === "success") {
+            this.meter.classList.add(failOrSuccess);
+        }
+    }
+    updateProgress() {
+        const meter = this.meter;
+        const is_done = this.isDone();
+        if (is_done) { return Promise.resolve(); }
+        const outer = this.outer;
+        return queryProgress(this.id, is_done)
+            .then((info) => {
+                if (!info) { return Promise.resolve(info); }
+                if (!validID(info.id)) { return Promise.resolve(info); }
+                debug(info);
+                if (info.is_done) {
+                    if (info.cancelled || info.failed) {
+                        this.completeProgress("fail");
+                    } else {
+                        this.completeProgress("success");
+                    }
+                }
+                if (Object.hasOwn(info, "progress")) {
+                    if (info.progress[1] === 0) { return info; }
+                    outer.style.setProperty("--prog-num", `${info.progress[0]}`);
+                    outer.style.setProperty("--prog-den", `${info.progress[1]}`);
+                    outer.style.setProperty("--prog", `${100*info.progress[0]/info.progress[1]}%`);
+                    if (simulations.isSimHovered(this.id)) {
+                        tooltipUpdateToSimSelection(this.id);
+                    }
+                }
+            })
+            .catch((error) => {
+                console.error(`Update sim selection progress error: ${error}`)
+            });
+    }
+}
+
+class Simulation {
+    constructor(simID) {
+        // id: The simID
+        // active: whether it is active
+        // selection: the associated SimSelection
+        // data: DataReport holding all the data
+        // status: SimStatus object
+        // meta: meta information associated with sim
+        this.id         = simID;
+        this.active     = false;
+        this.selection  = null;
+        this.data       = new dataUtils.DataReport(simID);
+        this.status     = null;
+        this.meta       = null;
+    }
+
+    checked() {
+        return  this.selection && 
+                this.selection.checked();
+    }
+
+    deleteSelection() {
+        if (!this.selection) { return; }
+        this.selection.removeElement();
+    }
+
+    /**
+     * @param {SimSelection} newSelection
+     */
+    setSelection(newSelection) {
+        this.selection = newSelection;
+    }
+    /**
+     * @param {Boolean} newActive 
+     */
+    setActive(newActive) {
+        this.active = newActive;
+    }
+    setStatus(newStatus) {
+        this.status = newStatus;
+        if (simulations.isSimHovered(this.id)) {
+            tooltipUpdateToSimSelection(this.id);
+        }
+    }
+    /**
+     * Creates and returns a new Simulation with the
+     * given SimSelection.
+     * 
+     * @param {String} simID
+     * @param {SimSelection} newSelection 
+     * @returns Simulation
+     */
+    static fromSelection(simID, newSelection) {
+        const newSimulation = new Simulation(simID);
+        newSimulation.setSelection(newSelection);
+        return newSimulation;
+    }
+}
+
+class SimulationMap {
+    constructor() {
+        this.simulations = {}
+        this.hoveredSimSelection;
+    }
+
+    isSimHovered(simID) {
+        return  Object.hasOwn(this.simulations, simID) &&
+                this.hoveredSimSelection &&
+                this.hoveredSimSelection === this.simulations[simID].selection;
+    }
+
+    /**
+     * Invokes a callback function for each simulation
+     * stored in the map. Callback arguments are:
+     *  simID: ID of the simulation
+     *  simulation: The sim itself
+     * 
+     * @param {Function} callbackFn 
+     */
+    forEach(callbackFn) {
+        for (const simID in this.simulations) {
+            callbackFn(simID, this.simulations[simID]);
+        }
+    }
+
+    /**
+     * Returns object mapping from simID to SimSelection
+     * for ALL tracked Simulations.
+     * @returns {Object}
+     */
+    selections() {
+        const mapping = {};
+        for (const simID in this.simulations) {
+            mapping[simID] = this.simulations[simID].selection;
+        }
+        return mapping;
+    }
+    /**
+     * Returns object mapping from simID to SimSelection
+     * for ALL tracked Simulations whose SimSelections are checked.
+     * @returns Object
+     */
+    selected() {
+        const mapping = {};
+        for (const simID in this.simulations) {
+            if (this.simulations[simID].checked()) {
+                mapping[simID] = this.simulations[simID].selection;
+            }
+        }
+        return mapping;
+    }
+
+    /**
+     * Returns the simulation at simID.
+     * 
+     * @param {String} simID 
+     * @returns {Simulation}
+     */
+    get(simID) {
+        return this.simulations[simID];
+    }
+
+    /**
+     * Adds a simulation to the map. If a simulation with the same
+     * ID already exists, replace it.
+     * 
+     * @param {Simulation} simulation 
+     */
+    add(simulation) {
+        this.simulations[simulation.id] = simulation;
+    }
+    /**
+     * Removes a property from the simulations Object corresponding
+     * to the simulation ID. In other words, it removes a Simulation
+     * from the map.
+     * 
+     * @param {String} simID 
+     */
+    remove(simID) {
+        delete this.simulations[simID];
+    }
+    clear() {
+        this.simulations = {};
+    }
+
+    combineData(dataReport) {
+        const simID = dataReport.simID;
+        const simulation = this.get(simID);
+        if (!simulation) {
+            console.error("Trying to combine data report for ${simID} but this simulation does not exist in SimulationMap.");
+            return;
+        }
+        simulation.data.addDataReport(dataReport);
+    }
+
+    /**
+     * Deletes and recreates all the SimSelections for all known
+     * Simulations. Retrieves simulation history from backend to
+     * create new Simulations if they don't exist in the map yet.
+     */
+    refreshSimulations() {
+        // First gather all those that are selected/checked
+        const tempSelected = this.selected();
+        // Delete all SimSelections
+        this.forEach((_, sim) => sim.deleteSelection() )
+        // Retrieve all simulation history data from backend
+        fetch(apiURL("get-sims-history"))
+        .then((response) => response.json())
+        .then((infos) => {
+            // Should be list of StartedSimulationInfo
+            debug(infos);
+            // Iterate StartedSimulationInfos, create new selection for each
+            infos.forEach(info => {
+                const simID = info.sim_id;
+                const config = info.config;
+                if (!validID(simID)) {
+                    return info;
+                }
+                // Create new Simulation if it doesn't exist yet
+                if (!Object.hasOwn(this.simulations, simID)) {
+                    this.simulations[simID] = new Simulation(simID);
+                }
+                const simulation = this.simulations[simID];
+                // Create new SimSelection and add to corresponding Simulation
+                const startChecked = Object.hasOwn(tempSelected, simID);
+                const newSelection = createSimSelection(config, simID, startChecked);
+                simulation.setSelection(newSelection);
+                // Note: Check to see whether to set the Simulation to active or not.
+                if (info.is_done) {
+                    simulation.setActive(true);
+                    if (info.cancelled || info.failed) {
+                        newSelection.completeProgress("fail");
+                    } else {
+                        newSelection.completeProgress("success");
+                    }
+                } else {
+                    simulation.setActive(true);
+                }
+                debug(info);
+            });
+            return infos;
+        })
+        .catch((error) => {
+            console.error("Error: " + error);
+        });
+    }
+}
+
 // https://stackoverflow.com/questions/44447847/enums-in-javascript-with-es6
 const FilterType = Object.freeze({
     NONE:       Symbol("none"),
@@ -189,11 +460,6 @@ class Filter {
             // Get the desired filter value from the element
             const filterValue = this.element.dataset.filterValue;
             return data.filter((datum) => accessFunction(datum) === filterValue);
-            // if (useKey) {
-            //     return data.filter((datum) => datum[this.key] === filterValue)
-            // } else {
-            //     return data.filter((datum) => datum === filterValue)
-            // }
         }
         else if (this.filterType === FilterType.BETWEEN) {
             const startValue = this.inputs[0].value;
@@ -249,6 +515,7 @@ class Filter {
 
 
 // Variables
+const simulations = new SimulationMap();
 let selectedControlRequest;
 let selectedMMIData;
 
@@ -263,9 +530,6 @@ function call_random() {
     // return fetch(apiURL("big-data1000000");
 }
 
-function getActiveSelections() {
-
-}
 function getSimName(simIDorSelection) {
     if (typeof simIDorSelection === "string") {
         const selections = getAllSelections();
@@ -314,10 +578,11 @@ function getSelectionFor(simID) {
     return getAllSelections()[simID];
 }
 function getSelectedData() {
-    const selectedSelections = getSelectedSelections();
+    // const selectedSelections = getSelectedSelections();
+    const selectedSelections = simulations.selected();
     const selectedData = {};
     for (const id in selectedSelections) {
-        selectedData[id] = allData[id];
+        selectedData[id] = simulations.get(id).data;
     }
     return selectedData;
 }
@@ -440,16 +705,10 @@ function displayVideoTest() {
 
 
 function updateData() {
-    // const selectionOptions = document.querySelectorAll(".sim-selection-checkbox");
-    // const randomSelection = selectionOptions[Math.floor(Math.random()*selectionOptions.length)];
-    // const simID = randomSelection.id;
     const dataRetrievalPromises = [];
     const allDataReports = [];
-    // const selectionOptions = document.querySelectorAll(".sim-selection-checkbox");
-    const selectionOptions = getSelectedSelections();
-    // for (let i = 0; i < selectionOptions.length; i++) {
+    const selectionOptions = simulations.selected();
     for (const simID in selectionOptions){
-        // const simID = selectionOptions[i].id;
         debug(`Getting new data for sim: ${simID}`);
         dataRetrievalPromises.push(
             dataUtils.getAll(simID, [], [], true)
@@ -469,18 +728,16 @@ function updateData() {
     return Promise.all(dataRetrievalPromises)
         .then((allDataReports) => {
             // Add the data from each new report to the current
-            // allData report
+            // Simulation DataReports
             for (let j = 0; j < allDataReports.length; j++) {
-                const simID = allDataReports[j].simID;
-                if (!Object.hasOwn(allData, simID)) {
-                    // allData[simID] = dataUtils.createEmptyDataReport(simID);
-                    allData[simID] = new dataUtils.DataReport(simID);
-                }
-                // dataUtils.dataReportUnion(allData[simID], allDataReports[j]);
-                allData[simID].addDataReport(allDataReports[j]);
+                simulations.combineData(allDataReports[j]);
+                // const simID = allDataReports[j].simID;
+                // if (!Object.hasOwn(allData, simID)) {
+                //     allData[simID] = new dataUtils.DataReport(simID);
+                // }
+                // allData[simID].addDataReport(allDataReports[j]);
             }
-            console.log("ALL DATA");
-            console.log(allData);
+            debug("ALL DATA");
             return Promise.resolve(allDataReports);
         })
         .catch((error) => {
@@ -625,11 +882,7 @@ function querySimulationStatus(simIDs) {
     if (!canQuerySimStatus) {
         const existingStatuses = {};
         for (const simID of simIDs) {
-            if (Object.hasOwn(allRecentStatus, simID)) {
-                existingStatuses[simID] = allRecentStatus[simID];
-            } else {
-                existingStatuses[simID] = null;
-            }
+            existingStatuses[simID] = simulations.get(simID).status;
         }
         return Promise.resolve(existingStatuses);
     }
@@ -723,54 +976,67 @@ function isSimHovered(simSelection) {
     return hoveredSimSelection && hoveredSimSelection === simSelection;
 }
 function updateAllSimSelectionProgress() {
-    // Iterates all incomplete sim selections and queries their progress
-    for (const [simID, simSelection] of Object.entries(sim_selections)) {
-        updateSimSelectionProgress(simID, simSelection);
+    // We only want to update progress for simulations that are active.
+    // Otherwise, we don't care about showing progress for inactive sims.
+    for (const [simID, sim] of Object.entries(simulations.simulations)) {
+        if (sim.active) {
+            sim.selection.updateProgress();
+            // updateSimSelectionProgress(simID, sim.selection);
+        }
     }
 }
-function updateSimSelectionProgress(simID, simSelection) {
-    const meter = simSelection.querySelector(".radial-meter")
-    // if (meter.classList.contains("complete")) { return; }
-    const is_done = meter.classList.contains("complete");
-    if (is_done) { return Promise.resolve(); }
-    const outer = meter.querySelector(".outer")
-    return queryProgress(simID, is_done)
-        .then((info) => {
-            console.log(info);
-            if (info.is_done) {
-                meter.classList.add("complete");
-                meter.classList.remove("incomplete");
-                if (info.cancelled || info.failed) {
-                    meter.classList.add("fail");
-                } else {
-                    meter.classList.add("success");
-                }
-            }
-            if (Object.hasOwn(info, "progress")) {
-                if (info.progress[1] === 0) { return info; }
-                outer.style.setProperty("--prog-num", `${info.progress[0]}`);
-                outer.style.setProperty("--prog-den", `${info.progress[1]}`);
-                outer.style.setProperty("--prog", `${100*info.progress[0]/info.progress[1]}%`);
-                if (isSimHovered(simSelection)) {
-                    tooltipUpdateToSimSelection(simID);
-                }
-            }
-        })
-        .catch((error) => {
-            console.error(`Update sim selection progress error: ${error}`)
-        });
-}
+// /**
+//  * 
+//  * @param {String} simID 
+//  * @param {SimSelection} simSelection 
+//  * @returns 
+//  */
+// function updateSimSelectionProgress(simID, simSelection) {
+//     if (!simSelection) { return; }
+//     const meter = simSelection.meter;
+//     // if (meter.classList.contains("complete")) { return; }
+//     const is_done = simSelection.isDone();
+//     if (is_done) { return Promise.resolve(); }
+//     const outer = simSelection.outer;
+//     return queryProgress(simID, is_done)
+//         .then((info) => {
+//             console.log(info);
+//             if (info.is_done) {
+//                 meter.classList.add("complete");
+//                 meter.classList.remove("incomplete");
+//                 if (info.cancelled || info.failed) {
+//                     meter.classList.add("fail");
+//                 } else {
+//                     meter.classList.add("success");
+//                 }
+//             }
+//             if (Object.hasOwn(info, "progress")) {
+//                 if (info.progress[1] === 0) { return info; }
+//                 outer.style.setProperty("--prog-num", `${info.progress[0]}`);
+//                 outer.style.setProperty("--prog-den", `${info.progress[1]}`);
+//                 outer.style.setProperty("--prog", `${100*info.progress[0]/info.progress[1]}%`);
+//                 if (isSimHovered(simSelection)) {
+//                     tooltipUpdateToSimSelection(simID);
+//                 }
+//             }
+//         })
+//         .catch((error) => {
+//             console.error(`Update sim selection progress error: ${error}`)
+//         });
+// }
 function updateAllSimSelectionStatus() {
-    const simIDs = Object.keys(getAllSelections());
+    const simIDs = Object.keys(simulations.selections());
     return querySimulationStatus(simIDs)
         .then((info) => {
             // Dict: simID -> SimStatus
             for (const simID in info) {
                 const statusInfo = info[simID];
-                allRecentStatus[simID] = statusInfo;
-                if (isSimHovered(sim_selections[simID])) {
-                    tooltipUpdateToSimSelection(simID);
-                }
+                simulations.get(simID).setStatus(statusInfo);
+                // allRecentStatus[simID] = statusInfo;
+                // // if (isSimHovered(sim_selections[simID])) {
+                // if (simulations.isSimHovered(simID)) {
+                //     tooltipUpdateToSimSelection(simID);
+                // }
             }
         });
 }
@@ -780,57 +1046,18 @@ function updateSimSelectionStatus(simID) {
             // Dict: simID -> SimStatus
             for (const simID in info) {
                 const statusInfo = info[simID];
-                allRecentStatus[simID] = statusInfo;
-                if (isSimHovered(sim_selections[simID])) {
-                    tooltipUpdateToSimSelection(simID);
-                }
+                simulations.get(simID).setStatus(statusInfo);
+                // allRecentStatus[simID] = statusInfo;
+                // // if (isSimHovered(sim_selections[simID])) {
+                // if (simulations.isSimHovered(simID)) {
+                //     tooltipUpdateToSimSelection(simID);
+                // }
             }
         });
 }
 
 function refreshSimulationSidebar() {
-    // Clear all the current sim selections and remove from DOM
-    const selections = getAllSelections();
-    const selected = getSelectedSelections();
-    for (const id in selections) {
-        selections[id].remove();
-    }
-    sim_selections = {};
-    // Fetch sim history in backend DB
-    fetch(apiURL("get-sims-history"))
-    .then((response) => response.json())
-    .then((infos) => {
-        // Should be list of StartedSimulationInfo
-        console.log(infos);
-        infos.forEach(info => {
-            const simID = info.sim_id;
-            const config = info.config;
-            if (!validID(simID)) {
-                return info;
-            }
-            const startChecked = Object.hasOwn(selected, simID);
-            const newSelection = createSimSelection(config, simID, startChecked);
-            // Note: Check to store the simulation in sim_selections because
-            // we only want running simulations in sim_selections.
-            const meter = newSelection.querySelector(".radial-meter")
-            if (info.is_done) {
-                meter.classList.add("complete");
-                meter.classList.remove("incomplete");
-                if (info.cancelled || info.failed) {
-                    meter.classList.add("fail");
-                } else {
-                    meter.classList.add("success");
-                }
-            } else {
-                sim_selections[simID] = newSelection;
-            }
-            console.log(info);
-        });
-        return infos;
-    })
-    .catch((error) => {
-        console.error("Error: " + error);
-    });
+    simulations.refreshSimulations();
 }
 
 function sendSingleQuery(simID) {
@@ -876,25 +1103,27 @@ function repositionTooltip(tt, element, direction="right") {
 }
 
 function tooltipUpdateToSimSelection(simID) {
-    const selection = getSelectionFor(simID);
+    // const selection = getSelectionFor(simID);
+    const selection = simulations.get(simID).selection;
     if (!selection) { return; }
-    const meter = selection.querySelector(".radial-meter")
+    const meter = selection.meter;
+    const status = simulations.get(simID).status;
     if (meter.classList.contains("fail")) {
         let newText = "Failed";
-        if (Object.hasOwn(allRecentStatus, simID) && allRecentStatus[simID]) {
-            newText += `: ${allRecentStatus[simID].details}`;
+        if (status) {
+            newText += `: ${status.details}`;
         }
         tooltip.textContent = newText;
     }
     else if (meter.classList.contains("success")) {
         let newText = "Success";
-        if (Object.hasOwn(allRecentStatus, simID) && allRecentStatus[simID]) {
-            newText += `: ${allRecentStatus[simID].details}`;
+        if (status) {
+            newText += `: ${status.details}`;
         }
         tooltip.textContent = newText;
     }
     else {
-        const progressMeter = selection.querySelector(".radial-meter .outer");
+        const progressMeter = selection.outer;
         const progNum = progressMeter.style.getPropertyValue("--prog-num");
         const progDen = progressMeter.style.getPropertyValue("--prog-den");
         const progPer = progressMeter.style.getPropertyValue("--prog");
@@ -920,35 +1149,35 @@ function entryToConfig() {
     return config;
 }
 function createSimSelection(config, simID, startChecked=true) {
-    const newSelection = prefabSimSelectBox.cloneNode(true);
-    // Set up new selection box
-    const selectionID = `${simID}`;
-    newSelection.classList.remove("prefab");
-    const label = newSelection.querySelector("label");
-    const input = newSelection.querySelector(".sim-selection-checkbox")
-    input.id            = selectionID;
-    input.checked       = startChecked;
-    label.htmlFor       = selectionID;
-    label.textContent   = config.name;
-    simSidebar.appendChild(newSelection);
+    const newSelectionElement = prefabSimSelectBox.cloneNode(true);
+    const newSelection = new SimSelection(newSelectionElement, config, simID, startChecked);
+    simSidebar.appendChild(newSelection.element);
     // Set up cancel button
-    const cancelButton = newSelection.querySelector(".cancel-sim-button");
-    cancelButton.addEventListener("click", stopSimulationFromSelection.bind(null, newSelection));
+    newSelection.cancelButton.addEventListener(
+        "click",
+        stopSimulationFromSelection.bind(null, newSelection)
+    );
     // Set up tooltip hover
-    newSelection.addEventListener("mouseover", function(e) {
-        hoveredSimSelection = newSelection;
-        tooltip.style.visibility = "visible";
-        // updateSimSelectionStatus(simID);
-        updateAllSimSelectionStatus().then((p) => {
-            tooltipUpdateToSimSelection(simID);
-            repositionTooltip(tooltip, newSelection, "right");
-        })
-    });
-    newSelection.addEventListener("mouseout", function(e) {
-        hoveredSimSelection = undefined;
-        tooltip.style.visibility = null;
-        tooltip.textContent = "";
-    });
+    newSelection.element.addEventListener(
+        "mouseover",
+        function(e) {
+            simulations.hoveredSimSelection = newSelection;
+            tooltip.style.visibility = "visible";
+            // updateSimSelectionStatus(simID);
+            updateAllSimSelectionStatus().then((p) => {
+                tooltipUpdateToSimSelection(simID);
+                repositionTooltip(tooltip, newSelection.element, "right");
+            })
+        }
+    );
+    newSelection.element.addEventListener(
+        "mouseout",
+        function(e) {
+            simulations.hoveredSimSelection = undefined;
+            tooltip.style.visibility = null;
+            tooltip.textContent = "";
+        }
+    );
     // Return selection box
     return newSelection;
 }
@@ -971,9 +1200,10 @@ function queueSimulation() {
             return info;
         }
         const newSelection = createSimSelection(config, simID);
+        const simulation = Simulation.fromSelection(simID, newSelection);
+        simulation.setActive(true);
         // Store new simulation in tracker
-        sim_selections[simID] = newSelection;
-        console.log(info);
+        simulations.add(simulation);
         return info;
     })
     .catch((error) => {
@@ -998,33 +1228,41 @@ function startSimulation() {
             return info;
         }
         const newSelection = createSimSelection(config, simID);
+        const simulation = Simulation.fromSelection(simID, newSelection);
+        simulation.setActive(true);
         // Store new simulation in tracker
-        sim_selections[simID] = newSelection;
-        console.log(info);
+        simulations.add(simulation);
         return info;
     })
     .catch((error) => {
         console.error("Error: " + error);
     });
 }
+/**
+ * 
+ * @param {SimSelection} simSelection
+ */
 function stopSimulationFromSelection(simSelection) {
-    
-    const input = simSelection.querySelector(".sim-selection-checkbox")
-    const meter = simSelection.querySelector(".radial-meter")
-    const simID = input.id;
+    if (!simSelection) { return; }
+    const input = simSelection.input;
+    const meter = simSelection.meter;
+    const simID = simSelection.id;
     // Set stopping visuals and remove from sim_selections
-    delete sim_selections[simID];
+    // delete sim_selections[simID];
+    console.log(simSelection);
+    debug(`Getting simulation with ID: ${simID}`);
+    simulations.get(simID).setActive(false);
     meter.classList.add("cancelling");
     stopSimulation(simID)
         .then((response) => {
             console.log(`Done calling stop simulation on ${simID}`);
-            
-            updateSimSelectionProgress(simID, simSelection)
+
+            simulations.get(simID).selection.updateProgress()
                 .then((response) => {
                     // Put back in simSelection and stop cancellation visual
-                    sim_selections[simID] = simSelection;
+                    simulations.get(simID).setActive(true);
                     meter.classList.remove("cancelling");
-                    if (isSimHovered(sim_selections[simID])) {
+                    if (simulations.isSimHovered(simID)) {
                         tooltipUpdateToSimSelection(simID);
                     }
                 })
@@ -1043,19 +1281,22 @@ function showDeleteAllSimulationsOption() {
 }
 function deleteAllSimulations() {
     // Visually indicate all running sims as cancelling
-    for (const [key, simSelection] of Object.entries(sim_selections)) {
-        const meter = simSelection.querySelector(".radial-meter")
+    // for (const [key, simSelection] of Object.entries(sim_selections)) {
+    for (const [key, simSelection] of Object.entries(simulations.selections())) {
+        const meter = simSelection.meter;
         const simID = key;
         // Set stopping visuals and remove from sim_selections
-        delete sim_selections[simID];
+        // delete sim_selections[simID];
+        simulations.get(simID).setActive(false);
         meter.classList.add("cancelling");
     }
     fetch(apiURL("delete-all-sims"))
         .then((response) => { return response.json(); })
         .then((info) => {
-            sim_selections = {};
-            allData = {};
+            // sim_selections = {};
+            // allData = {};
             refreshSimulationSidebar();
+            simulations.clear();
         })
         .catch((error) => { console.error(`Error while deleting all simulations: ${error}`)});
 }
@@ -1063,17 +1304,16 @@ function deleteSelectedSimulations() {
     console.log("deleteSelectedSimulations");
     // Visually indicate all running sims as cancelling
     const simIDs = [];
-    for (const [key, simSelection] of Object.entries(getAllSelections())) {
-        const checkbox = simSelection.querySelector(".sim-selection-checkbox");
-        const meter = simSelection.querySelector(".radial-meter")
+    // for (const [key, simSelection] of Object.entries(getAllSelections())) {
+    for (const [key, simSelection] of Object.entries(simulations.selected())) {
+        const meter = simSelection.meter;
         const simID = key;
-        if (checkbox.checked) {
-            simIDs.push(simID);
-            // Set stopping visuals and remove from sim_selections
-            delete sim_selections[simID];
-            meter.classList.add("cancelling");
-            console.log("deleting " + simID);
-        }
+        simIDs.push(simID);
+        // Set stopping visuals and remove from sim_selections
+        // delete sim_selections[simID];
+        simulations.get(simID).setActive(false);
+        meter.classList.add("cancelling");
+        console.log("deleting " + simID);
     }
     deleteSimulations(simIDs);
 }
@@ -1089,9 +1329,12 @@ function deleteSimulations(simIDs) {
     })
     .then((response) => { return response.json(); })
     .then((info) => {
-        sim_selections = {};
-        allData = {};
+        // sim_selections = {};
+        // allData = {};
         refreshSimulationSidebar();
+        for (const simID of simIDs) {
+            simulations.remove(simID);
+        }
     })
     .catch((error) => { console.error(`Error while deleting all simulations: ${error}`)});
 }
