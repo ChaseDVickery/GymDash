@@ -70,15 +70,27 @@ class SimulationMLModel():
     
     def train(self, **kwargs):
         self._is_training = True
-        self._train(**kwargs)
+        try:
+            self._train(**kwargs)
+        except Exception as e:
+            self._is_training = False
+            raise e
         self._is_training = False
     def test(self, **kwargs):
         self._is_testing = True
-        self._test(**kwargs)
+        try:
+            self._test(**kwargs)
+        except Exception as e:
+            self._is_testing = False
+            raise e
         self._is_testing = False
     def validate(self, **kwargs):
         self._is_validating = True
-        val_results = self._validate(**kwargs)
+        try:
+            val_results = self._validate(**kwargs)
+        except Exception as e:
+            self._is_validating = False
+            raise e
         self._is_validating = False
         return val_results
     def inference(self, **kwargs):

@@ -1,6 +1,7 @@
 import os
 import re
 import dataclasses
+import logging
 from pathlib import Path
 from gymdash.backend.core.api.stream import StreamableStat
 from typing import Union, Callable, Dict, Set
@@ -14,6 +15,8 @@ except ImportError:
 
 if not _has_tensorboard:
     raise ImportError("Install tensorboard to use MediaLinkStreamableStat.")
+
+logger = logging.getLogger(__name__)
 
 @dataclasses.dataclass(frozen=True)
 class FileEvent:
@@ -84,8 +87,8 @@ class MediaLinkStreamableStat(StreamableStat):
         return f"MediaLinkStreamableStat(last_read={self._last_read_index}, values={self.get_values()})"
     
     def _update_changed_files(self):
-        print(f"MediaLinkStreamableStat _update_changed_files")
-        print(f"MediaLinkStreamableStat folder: {os.path.abspath(self.folder)}")
+        logger.debug(f"MediaLinkStreamableStat _update_changed_files")
+        logger.debug(f"MediaLinkStreamableStat folder: {os.path.abspath(self.folder)}")
         if os.path.exists(os.path.abspath(self.folder)):
             for filename in os.listdir(self.folder):
                 match = self.pattern.search(filename)
@@ -112,7 +115,7 @@ class MediaLinkStreamableStat(StreamableStat):
     def get_recent(self):
         self._update_changed_files()
         # retrieve and use only those in the changed set
-        recent = sorted([self._detected[step] for step in self._detected], key= lambda e: e.step)
+        recent = sorted([self._detected[step] for step in self._changed], key= lambda e: e.step)
         self._changed.clear()
         return recent
     def _get_values(self):

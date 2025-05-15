@@ -657,6 +657,14 @@ class MLSimulation(Simulation):
             tb_path = os.path.join(self.sim_path, tb_path)
         image_path = os.path.join(self.sim_path, "media", "example_outputs")
 
+        # Setup Dataset/DataLoader
+        dataset_folder_path = os.path.join(self._project_resources_path, constants.DATASET_FOLDER)
+        train_path = os.path.join(dataset_folder_path, "train")
+        test_path = os.path.join(dataset_folder_path, "test")
+        pathlib.Path(train_path).mkdir(parents=True, exist_ok=True)
+        pathlib.Path(test_path).mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created folder: {train_path}")
+
         # Use StreamerRegistry to see if there is an existing Streamer with
         # the same streamer_name. In this case, the streamer_name checked is
         # just the tensorboard path (tb_path). This helps keep only one streamer
@@ -686,12 +694,6 @@ class MLSimulation(Simulation):
         # self.model = ClassifierMNIST()
         self.model = SimpleClassifierMLModel(ClassifierMNIST())
 
-        # Setup Dataset/DataLoader
-        dataset_folder_path = os.path.join(self._project_resources_path, constants.DATASET_FOLDER)
-        train_path = os.path.join(dataset_folder_path, "train")
-        test_path = os.path.join(dataset_folder_path, "test")
-        pathlib.Path(train_path).mkdir(parents=True, exist_ok=True)
-        pathlib.Path(test_path).mkdir(parents=True, exist_ok=True)
         # Get the dataset
         train_data = datasets.MNIST(
             root=train_path,

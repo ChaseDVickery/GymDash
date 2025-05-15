@@ -379,7 +379,7 @@ def pack_simulation_events_to_zip(sim: Simulation, key_event_map: Dict[str, List
                     elif isinstance(event, FileEvent):
                         zip_file.writestr(filename, event.encoded_string)
                         index[event.tag][filename] = MediaMetadata(key=key, mimetype=mime_type, step=event.step, wall_time=event.wall_time)
-                        logger.info(f"packing audio for key '{key}' at step '{event.step}' to file '{filename}'")
+                        logger.info(f"packing file for key '{key}' at step '{event.step}' to file '{filename}'")
         # Add the index file to the zip
         index_data = ZippedIndex(streamer_key="", sim_id=str(sim._project_sim_id), metadata=dict(index))
         zip_file.writestr("index.json", json.dumps(index_data, cls=DataclassJSONEncoder))
@@ -433,6 +433,8 @@ def get_recent_from_simulation(
     # a list of the key's new events
     # Maps [stat key -> List[tb event value]]
     streamer_responses: Dict[str, List[Any]] = {}
+    for s in sim.streamer.streamers():
+        s.Reload()
     for key in final_keys:
         streamer = sim.streamer.get_streamer_for_key(key)
         streamer_responses[key] = streamer.get_recent_from_key(key)

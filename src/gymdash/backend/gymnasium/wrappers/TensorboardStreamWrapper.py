@@ -167,6 +167,9 @@ class TensorboardStreamer:
             os.path.abspath(self.tb_log_path),
             size_guidance=CONFIG.tb_size_guidance
         )
+        # Check for existence of folder after EA, so that it
+        # has a chance to build
+        if (not os.path.exists(os.path.abspath(self.tb_log_path))): return False
         # Create new TensorboardStreamableStats for all keys under each tag
         for tag, keys in self.tag_key_map.items():
             self.streamed_tag_exclusive[tag] = set()
@@ -192,6 +195,7 @@ class TensorboardStreamer:
         if self.check_tb():
             # self._ea.Reload()
             return {stat.key: stat.get_values() for stat in self._valid_stats(tag)}
+        return {stat.key: [] for stat in self._valid_stats(tag)}
     
     def get_all_recent(self):
         if self.check_tb():
@@ -215,3 +219,4 @@ class TensorboardStreamer:
                 return self.streamed[key].get_recent()
             else:
                 return []
+        return []
