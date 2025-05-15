@@ -5,24 +5,9 @@ import { mediaUtils } from "./utils/media_utils.js";
 import { apiURL } from "./utils/api_link.js";
 // console.log(range);
 
-const tryBtn        = document.querySelector("#try-api-btn");
-const tryBtnOut     = document.querySelector("#try-api-out");
-const testBtn       = document.querySelector("#test-api-btn");
-const testBtnOut    = document.querySelector("#test-api-out");
-const resourceBtn       = document.querySelector("#resource-usage-btn");
 const resourceBtnOut    = document.querySelector("#resource-usage-out");
-const scalarDataTestBtn       = document.querySelector("#scalar-test-btn");
 const scalarDataTestBtnOut    = document.querySelector("#scalar-test-out");
-const imageTestOut    = document.querySelector("#test-image");
 const imageTestBtn    = document.querySelector("#image-test-btn");
-const startSimTestBtn    = document.querySelector("#start-test-sim-btn");
-const simTestTimestepsSlider = document.querySelector("#test-sim-steps-slider")
-const queryProgressTestBtn = document.querySelector("#query-test-btn");
-const stopSimTestBtn = document.querySelector("#stop-test-btn");
-const fillHistoryTestBtn = document.querySelector("#fill-sim-history-test-btn");
-const deleteAllSimsTestBtn = document.querySelector("#delete-all-sims-test-btn");
-const deleteSelectedSimsTestBtn = document.querySelector("#delete-selected-sims-test-btn");
-
 
 
 // Constants
@@ -79,6 +64,8 @@ let rescaleDetailsAxisY         = false;
 
 // General
 const tooltip                   = document.querySelector(".tooltip")
+const deleteAllSimsTestBtn      = document.querySelector("#delete-all-sims-test-btn");
+const deleteSelectedSimsTestBtn = document.querySelector("#delete-selected-sims-test-btn");
 // Plots
 const plotArea                  = document.querySelector("#plots-area");
 // Multimedia Filter
@@ -137,6 +124,7 @@ class SimSelection {
         this.element.classList.remove("prefab");
 
         // Set up new selection box
+        debug(config);
         this.selectionID = `${simID}`;
         this.input.id            = this.selectionID;
         this.input.checked       = startChecked;
@@ -144,6 +132,7 @@ class SimSelection {
         this.label.textContent   = config.name;
     }
 
+    setChecked(newChecked) { this.input.checked = newChecked; }
     checked() { return this.input.checked; }
     isDone() { return this.meter.classList.contains("complete"); }    
     removeElement() { if (this.element) { this.element.remove(); } }
@@ -195,13 +184,15 @@ class Simulation {
         // selection: the associated SimSelection
         // data: DataReport holding all the data
         // status: SimStatus object
-        // meta: meta information associated with sim
+        // info: meta information associated with sim
         this.id         = simID;
         this.active     = false;
         this.selection  = null;
         this.data       = new dataUtils.DataReport(simID);
         this.status     = null;
-        this.meta       = null;
+        this.info       = null;
+
+        this.name       = null;
     }
 
     checked() {
@@ -230,6 +221,16 @@ class Simulation {
         this.status = newStatus;
         if (simulations.isSimHovered(this.id)) {
             tooltipUpdateToSimSelection(this.id);
+        }
+    }
+    /**
+     * Sets Simulation info. Object like StoredSimulationInfo
+     * @param {*} newInfo 
+     */
+    setInfo(newInfo) {
+        this.info = newInfo;
+        if (this.info) {
+            this.name = this.info.name;
         }
     }
     /**
@@ -272,6 +273,22 @@ class SimulationMap {
             callbackFn(simID, this.simulations[simID]);
         }
     }
+    /**
+     * Invokes a callback function for the given simID
+     * if it is stored in the map. Otherwise does nothing.
+     * Callback arguments are:
+     *  1) simID: The invoking ID
+     *  2) simulation: The found sim
+     * 
+     * @param {String} simID 
+     * @param {Function} callbackFn 
+     */
+    forOne(simID, callbackFn) {
+        const sim = this.get(simID);
+        if (sim) {
+            callbackFn(simID, sim);
+        }
+    }
 
     /**
      * Returns object mapping from simID to SimSelection
@@ -309,15 +326,20 @@ class SimulationMap {
     get(simID) {
         return this.simulations[simID];
     }
+    has(simID) {
+        return Object.hasOwn(this.simulations, simID);
+    }
 
     /**
      * Adds a simulation to the map. If a simulation with the same
-     * ID already exists, replace it.
+     * ID already exists, replace it. Makes a call to retrieve all
+     * data for this simulation before it is used.
      * 
      * @param {Simulation} simulation 
      */
     add(simulation) {
         this.simulations[simulation.id] = simulation;
+        updateData({[simulation.id]: simulation.selection}, dataUtils.getAll);
     }
     /**
      * Removes a property from the simulations Object corresponding
@@ -366,15 +388,15 @@ class SimulationMap {
                 if (!validID(simID)) {
                     return info;
                 }
-                // Create new Simulation if it doesn't exist yet
-                if (!Object.hasOwn(this.simulations, simID)) {
-                    this.simulations[simID] = new Simulation(simID);
+                let simulation = this.get(simID);
+                if (!simulation) {
+                    simulation = new Simulation(simID);
                 }
-                const simulation = this.simulations[simID];
                 // Create new SimSelection and add to corresponding Simulation
                 const startChecked = Object.hasOwn(tempSelected, simID);
                 const newSelection = createSimSelection(config, simID, startChecked);
                 simulation.setSelection(newSelection);
+                simulation.setInfo(info);
                 // Note: Check to see whether to set the Simulation to active or not.
                 if (info.is_done) {
                     simulation.setActive(true);
@@ -385,6 +407,9 @@ class SimulationMap {
                     }
                 } else {
                     simulation.setActive(true);
+                }
+                if (!this.has(simID)) {
+                    this.add(simulation);
                 }
                 debug(info);
             });
@@ -438,6 +463,10 @@ class Filter {
         }
     }
 
+    /**
+     * Returns a copy Array of all the Filter Elements.
+     * @returns {Array<Element>}
+     */
     getInputs() {
         return [...this.inputs];
     }
@@ -519,66 +548,14 @@ const simulations = new SimulationMap();
 let selectedControlRequest;
 let selectedMMIData;
 
-const testImageOutputs = []
 
-let testSimTimesteps = Number(simTestTimestepsSlider.value)
-
-function call_random() {
-    return fetch(apiURL("random"));
-    // return fetch(apiURL("big-data1000");
-    // return fetch(apiURL("big-data100000");
-    // return fetch(apiURL("big-data1000000");
+function getSimName(simID) {
+    const sim = simulations.get(simID);
+    if (sim) { return sim.name; }
+    else { return null; }
 }
 
-function getSimName(simIDorSelection) {
-    if (typeof simIDorSelection === "string") {
-        const selections = getAllSelections();
-        if (Object.hasOwn(getAllSelections(), simIDorSelection)) {
-            return selections[simIDorSelection].querySelector("label").textContent;
-        }
-    } else {
-        return simIDorSelection.querySelector("label").textContent;
-    }
-}
-/**
- * Return a mapping from all simulation selection IDs to the simulation
- * selection nodes.
- * 
- * @returns Object mapping each simulation ID to the selection object
- */
-function getAllSelections() {
-    const mapping = Array.from(document.querySelectorAll(".sim-selection-checkbox")).reduce(
-        (curr_map, curr_chkbox) => {
-            curr_map[curr_chkbox.id] = curr_chkbox.parentElement.parentElement;
-            return curr_map;
-        },
-        {}
-    )
-    return mapping;
-}
-/**
- * Return a mapping from each selected simulation ID to the selected
- * selection object.
- * 
- * @returns Object mapping each selected simulation ID to the selection object.
- */
-function getSelectedSelections() {
-    const mapping = Array.from(document.querySelectorAll(".sim-selection-checkbox")).reduce(
-        (curr_map, curr_chkbox) => {
-            if (curr_chkbox.checked) {
-                curr_map[curr_chkbox.id] = curr_chkbox.parentElement.parentElement;
-            }
-            return curr_map;
-        },
-        {}
-    )
-    return mapping;
-}
-function getSelectionFor(simID) {
-    return getAllSelections()[simID];
-}
 function getSelectedData() {
-    // const selectedSelections = getSelectedSelections();
     const selectedSelections = simulations.selected();
     const selectedData = {};
     for (const id in selectedSelections) {
@@ -586,133 +563,40 @@ function getSelectedData() {
     }
     return selectedData;
 }
-function forEachSelection(doThis) {
-    const selections = getAllSelections();
-    for (const simID in selections) {
-        doThis(selections[simID]);
-    }
-}
 function selectAll() {
-    forEachSelection((selection) => {
-        const input = selection.querySelector(".sim-selection-checkbox")
-        input.checked = true;
-    })
+    simulations.forEach((_, sim) => sim.selection.setChecked(true));
 }
 function deselectAll() {
-    forEachSelection((selection) => {
-        const input = selection.querySelector(".sim-selection-checkbox")
-        input.checked = false;
-    })
+    simulations.forEach((_, sim) => sim.selection.setChecked(false));
 }
 
-function displayNumberOutput(num) {
-    tryBtnOut.textContent = num;
-}
-function displayTestNumberOutput(outputs) {
-    testBtnOut.textContent = outputs;
-}
-
-function getNumber() {
-    return call_random()
-        .then((response) => {
-            if (!response.ok) {
-                throw new Error("Network response was not ok");
-            }
-            // .json() returns a Promise with the result being the JSON info
-            return response.json();
-        })
-        .then((response) => {
-            displayNumberOutput(response.value);
-            return response;
-        })
-}
-
-function timeGetNumber() {
-    let start = Date.now();
-    return call_random()
-        .then((response) => {
-            if (!response.ok) {
-                throw new Error("Network response was not ok");
-            }
-            let time = Date.now() - start;
-            return Promise.resolve({time});
-        });
-}
-
-function testNumberAPI() {
-    const numRequests = 1000;
-    // Make n simultaneous API calls and time
-    const times = [];
-    const promises = [];
-    for (let i = 0; i < numRequests; i++) {
-        promises.push(
-            timeGetNumber().then((response) => {
-                times.push(response.time);
-                return response;
-            }).then((response) => {
-                displayTestNumberOutput(times);
-            })
-        );
-    }
-    Promise.all(promises).then((responses) => {
-        // Process all the response times.
-        const max = Math.max(...times);
-        const min = Math.min(...times);
-        const avg = times.reduce((sum, value) => {return sum + value;}) / times.length;
-        const metricString = `You requested ${numRequests} numbers. We measured ${times.length} times. Metrics (min, avg, max): (${min/1000}, ${avg/1000}, ${max/1000})s`;
-        console.log(metricString);
-        setTimeout(displayTestNumberOutput(metricString), 0);
-    });
-}
-
-function displayResourceUsage() {
-    resourceUsageUtils.getResourceUsageDetailed()
-    // resourceUsageUtils.getResourceUsageSimple()
-        .then((usageValues) => {
-            let usageString = "";
-            for (const [key, value] of Object.entries(usageValues)) {
-                usageString += `\t${key} = ${value}`;
-            }
-            usageString += `\tcpu=${(usageValues.cpus_percent.reduce((sum, value) => { return sum + value})/usageValues.cpus_percent.length).toFixed(2)}%`;
-            usageString += `\tmemory=${((usageValues.memory_total - usageValues.memory_available)*100 / usageValues.memory_total).toFixed(2)}%`;
-            usageString += `\tdisk=${((usageValues.disk_total - usageValues.disk_available)*100 / usageValues.disk_total).toFixed(2)}%`;
-            resourceBtnOut.textContent = usageString;
-        });
-}
-
-function displayScalarDataTest() {
-    dataUtils.getAllNewScalars()
-        .then((results) => {
-            scalarDataTestBtnOut.textContent = `Recent logged results: ${results}`;
-            console.log(results);
-        });
-}
-
-function setImageOutput(index, imgSrc) {
-    while (index >= testImageOutputs.length) {
-        const img = document.createElement("img");
-        document.body.appendChild(img);
-        testImageOutputs.push(img);
-    }
-    testImageOutputs[index].src = imgSrc;
-}
 function displayVideoTest() {
-    updateData()
+    updateData(simulations.selected(), dataUtils.getRecent)
         .then((allDataReports) => {
             createPlots();
         });
 }
 
-
-function updateData() {
+/**
+ * Updates data for given simulation selections by retrieving
+ * data from the backend and combining DataReports.
+ * 
+ * @param {Array<SimSelection>} selections
+ * @param {Function} retrievalCallback 
+ * @returns {Array<Promise<dataUtils.DataReport>>}
+ */
+function updateData(selections, retrievalCallback) {
     const dataRetrievalPromises = [];
     const allDataReports = [];
-    const selectionOptions = simulations.selected();
+    const selectionOptions = selections;
+    // Get data for each selected simulation
+    // Whether ALL or RECENT data is supplied depends
+    // on the data utility callback used.
     for (const simID in selectionOptions){
         debug(`Getting new data for sim: ${simID}`);
         dataRetrievalPromises.push(
-            dataUtils.getAll(simID, [], [], true)
-            // dataUtils.getRecent(simID, [], [], true)
+            // retrievalCallback should probably be some dataUtil method
+            retrievalCallback(simID, [], [], true)
                 .then((dataReport) => {
                     debug("Got data report.");
                     debug(dataReport);
@@ -725,109 +609,20 @@ function updateData() {
                 })
         );
     }
+    // Combine all the retrieved DataReports into the existing
+    // tracked Simulations.
     return Promise.all(dataRetrievalPromises)
         .then((allDataReports) => {
             // Add the data from each new report to the current
             // Simulation DataReports
             for (let j = 0; j < allDataReports.length; j++) {
                 simulations.combineData(allDataReports[j]);
-                // const simID = allDataReports[j].simID;
-                // if (!Object.hasOwn(allData, simID)) {
-                //     allData[simID] = new dataUtils.DataReport(simID);
-                // }
-                // allData[simID].addDataReport(allDataReports[j]);
             }
-            debug("ALL DATA");
             return Promise.resolve(allDataReports);
         })
         .catch((error) => {
             console.error(`Error processing all data reports: ${error}`)
         });
-}
-
-function startSimTest() {
-    const data = {
-        name: "cartpole",
-        sim_key: "my_custom_sim",
-        // sim_key: "stable_baselines/ppo",
-        sim_family: "",
-        sim_type: "",
-        kwargs: {
-            "num_steps": testSimTimesteps,
-            "episode_trigger": 50,
-            "policy": "MlpPolicy",
-            "env": "LunarLander-v3",
-            "algorithm": "ppo"
-        }
-    };
-    fetch(apiURL("start-new-test"), {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-    })
-    .then((response) => {
-        const info = response.json();
-        console.log(info);
-        return info;
-    })
-    .catch((error) => {
-        console.error("Error: " + error);
-    });
-}
-
-function stopSimTest() {
-    const simulationQuery = {
-        id: "dummy_id",
-        timeout: 0.0,
-        stop_simulation: {
-            triggered: true,
-            value: "stop, please"
-        }
-    };
-    fetch(apiURL("query-sim"), {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(simulationQuery),
-    })
-    .then((response) => {
-        const info = response.json();
-        console.log(info);
-        return info;
-    })
-    .catch((error) => {
-        console.error("Error: " + error);
-    })
-}
-
-function testQueryProgress() {
-    const simulationQuery = {
-        id: "dummy_id",
-        timeout: 1.0,
-        stop_simulation: {}, // This would contain fields 'triggered' and 'value'
-        progress: {
-            triggered: true,
-            value: "give me this information, please",
-        } // This would contain fields 'triggered' and 'value'
-    };
-    fetch(apiURL("query-sim"), {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(simulationQuery),
-    })
-    .then((response) => {
-        const info = response.json();
-        console.log(info);
-        return info;
-    })
-    .catch((error) => {
-        console.error("Error: " + error);
-    })
 }
 
 function createQueryBody(simID, timeout=defaultTimeout) {
@@ -849,21 +644,6 @@ function queryProgress(simID, onlyStatus=False) {
         q.progress = { triggered: true, value: null, };
     }
     return query(q);
-}
-function controlStopSim(simID) {
-    if (!validID(simID)) { return Promise.resolve({id: noID}); }
-    const q = {
-        id: simID,
-        timeout: defaultTimeout,
-        stop_simulation: {triggered: true, value: null},
-    };
-    return fetch(apiURL("cancel-sim"), {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(q),
-    }).then((response) => { return response.json(); });
 }
 // Returns a promise of the simulation query
 function query(queryBody) {
@@ -898,6 +678,12 @@ function querySimulationStatus(simIDs) {
 
 
 // Utils
+/**
+ * Custom conversion to turn kwarg string into a value.
+ * 
+ * @param {String} valueString 
+ * @returns 
+ */
 function convertKwargValue(valueString) {
     // Return the input if it is not a string
     if (typeof valueString !== "string") { return valueString; }
@@ -944,6 +730,8 @@ function convertKwargValue(valueString) {
 /**
  * Gathers all keyword arguments from input kwarg panel into a single
  * kwarg object.
+ * @param {Element} elementWithKwargPanel 
+ * @returns {Object}
  */
 function getKwargs(elementWithKwargPanel) {
     const kwargArea = elementWithKwargPanel.querySelector(".kwarg-area");
@@ -968,62 +756,27 @@ function getKwargs(elementWithKwargPanel) {
         }
         kwargs[key] = val;
     }
-    console.log("KWARGS");
-    console.log(kwargs);
+    debug("KWARGS");
+    debug(kwargs);
     return kwargs;
 }
-function isSimHovered(simSelection) {
-    return hoveredSimSelection && hoveredSimSelection === simSelection;
-}
+/**
+ * Updates the selection progress for all active simulations.
+ */
 function updateAllSimSelectionProgress() {
     // We only want to update progress for simulations that are active.
     // Otherwise, we don't care about showing progress for inactive sims.
     for (const [simID, sim] of Object.entries(simulations.simulations)) {
         if (sim.active) {
             sim.selection.updateProgress();
-            // updateSimSelectionProgress(simID, sim.selection);
         }
     }
 }
-// /**
-//  * 
-//  * @param {String} simID 
-//  * @param {SimSelection} simSelection 
-//  * @returns 
-//  */
-// function updateSimSelectionProgress(simID, simSelection) {
-//     if (!simSelection) { return; }
-//     const meter = simSelection.meter;
-//     // if (meter.classList.contains("complete")) { return; }
-//     const is_done = simSelection.isDone();
-//     if (is_done) { return Promise.resolve(); }
-//     const outer = simSelection.outer;
-//     return queryProgress(simID, is_done)
-//         .then((info) => {
-//             console.log(info);
-//             if (info.is_done) {
-//                 meter.classList.add("complete");
-//                 meter.classList.remove("incomplete");
-//                 if (info.cancelled || info.failed) {
-//                     meter.classList.add("fail");
-//                 } else {
-//                     meter.classList.add("success");
-//                 }
-//             }
-//             if (Object.hasOwn(info, "progress")) {
-//                 if (info.progress[1] === 0) { return info; }
-//                 outer.style.setProperty("--prog-num", `${info.progress[0]}`);
-//                 outer.style.setProperty("--prog-den", `${info.progress[1]}`);
-//                 outer.style.setProperty("--prog", `${100*info.progress[0]/info.progress[1]}%`);
-//                 if (isSimHovered(simSelection)) {
-//                     tooltipUpdateToSimSelection(simID);
-//                 }
-//             }
-//         })
-//         .catch((error) => {
-//             console.error(`Update sim selection progress error: ${error}`)
-//         });
-// }
+/**
+ * Updates the status for ALL tracked simulations.
+ * 
+ * @returns {Promise<Object>}
+ */
 function updateAllSimSelectionStatus() {
     const simIDs = Object.keys(simulations.selections());
     return querySimulationStatus(simIDs)
@@ -1038,21 +791,7 @@ function updateAllSimSelectionStatus() {
                 //     tooltipUpdateToSimSelection(simID);
                 // }
             }
-        });
-}
-function updateSimSelectionStatus(simID) {
-    return querySimulationStatus([simID])
-        .then((info) => {
-            // Dict: simID -> SimStatus
-            for (const simID in info) {
-                const statusInfo = info[simID];
-                simulations.get(simID).setStatus(statusInfo);
-                // allRecentStatus[simID] = statusInfo;
-                // // if (isSimHovered(sim_selections[simID])) {
-                // if (simulations.isSimHovered(simID)) {
-                //     tooltipUpdateToSimSelection(simID);
-                // }
-            }
+            return Promise.resolve(info);
         });
 }
 
@@ -1103,10 +842,10 @@ function repositionTooltip(tt, element, direction="right") {
 }
 
 function tooltipUpdateToSimSelection(simID) {
-    // const selection = getSelectionFor(simID);
     const selection = simulations.get(simID).selection;
     if (!selection) { return; }
     const meter = selection.meter;
+    // Update tooltip text based on simulation status
     const status = simulations.get(simID).status;
     if (meter.classList.contains("fail")) {
         let newText = "Failed";
@@ -1122,6 +861,7 @@ function tooltipUpdateToSimSelection(simID) {
         }
         tooltip.textContent = newText;
     }
+    // Or update if active & running
     else {
         const progressMeter = selection.outer;
         const progNum = progressMeter.style.getPropertyValue("--prog-num");
@@ -1222,7 +962,7 @@ function startSimulation() {
     })
     .then((response) => response.json())
     .then((info) => {
-        console.log(info);
+        debug(info);
         const simID = info.id;
         if (!validID(simID)) {
             return info;
@@ -1230,6 +970,7 @@ function startSimulation() {
         const newSelection = createSimSelection(config, simID);
         const simulation = Simulation.fromSelection(simID, newSelection);
         simulation.setActive(true);
+        simulation.setInfo(info);
         // Store new simulation in tracker
         simulations.add(simulation);
         return info;
@@ -1239,6 +980,7 @@ function startSimulation() {
     });
 }
 /**
+ * Attempts to stop a simulation given a SimSelection.
  * 
  * @param {SimSelection} simSelection
  */
@@ -1271,35 +1013,59 @@ function stopSimulationFromSelection(simSelection) {
             console.error(`Error while stopping simulation: ${error}`);
         });
 }
-// Sends the request to actually stop the given simulation
+/**
+ * Sends a request to stop the given simulation. Returns a
+ * JSON object response to the cancellation request.
+ * 
+ * @param {String} simID
+ * @returns {Promise<Object>}
+ */
 function stopSimulation(simID) {
-    return controlStopSim(simID);
+    if (!validID(simID)) { return Promise.resolve({id: noID}); }
+    const q = {
+        id: simID,
+        timeout: defaultTimeout,
+        stop_simulation: {triggered: true, value: null},
+    };
+    return fetch(apiURL("cancel-sim"), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(q),
+    }).then((response) => { return response.json(); });
 }
 
+/**
+ * Displays a confirmation dialog requesting permission
+ * to actually delete all simulations.
+ */
 function showDeleteAllSimulationsOption() {
     deleteAllSimulations();
 }
+/**
+ * Attempts to delete all simulations for the project.
+ */
 function deleteAllSimulations() {
     // Visually indicate all running sims as cancelling
-    // for (const [key, simSelection] of Object.entries(sim_selections)) {
     for (const [key, simSelection] of Object.entries(simulations.selections())) {
         const meter = simSelection.meter;
         const simID = key;
         // Set stopping visuals and remove from sim_selections
-        // delete sim_selections[simID];
         simulations.get(simID).setActive(false);
         meter.classList.add("cancelling");
     }
     fetch(apiURL("delete-all-sims"))
         .then((response) => { return response.json(); })
         .then((info) => {
-            // sim_selections = {};
-            // allData = {};
             refreshSimulationSidebar();
             simulations.clear();
         })
         .catch((error) => { console.error(`Error while deleting all simulations: ${error}`)});
 }
+/**
+ * Attempts to delete selected simulations.
+ */
 function deleteSelectedSimulations() {
     console.log("deleteSelectedSimulations");
     // Visually indicate all running sims as cancelling
@@ -1317,6 +1083,12 @@ function deleteSelectedSimulations() {
     }
     deleteSimulations(simIDs);
 }
+/**
+ * Sends a request to delete the given simulations
+ * from the backend.
+ * 
+ * @param {Array<String>} simIDs 
+ */
 function deleteSimulations(simIDs) {
     console.log("SIM IDS");
     console.log(simIDs);
@@ -1329,8 +1101,6 @@ function deleteSimulations(simIDs) {
     })
     .then((response) => { return response.json(); })
     .then((info) => {
-        // sim_selections = {};
-        // allData = {};
         refreshSimulationSidebar();
         for (const simID of simIDs) {
             simulations.remove(simID);
@@ -1343,7 +1113,6 @@ function deleteSimulations(simIDs) {
 function setupKwargBox(kwargPanel) {
     const addKwargBtn = kwargPanel.querySelectorAll(".add-kwarg");
     for (const btn of addKwargBtn) {
-        console.log(`Adding event listener to btn ${btn}`);
         btn.addEventListener("click", addKwarg.bind(null, kwargPanel));
     }
 }
@@ -1383,9 +1152,6 @@ function addSubkwargs(kwargRow) {
     setupKwargBox(newSubkwargs);
     subkwargArea.appendChild(newSubkwargs);
 }
-function clearKwargBox(kwargPanel, deleteRows=false) {
-
-}
 
 function selectControlRequest(requestBox, detailsString) {
     if (selectedControlRequest) {
@@ -1399,11 +1165,11 @@ function selectControlRequest(requestBox, detailsString) {
     }
     controlRequestDetails.textContent = detailsString;
 }
-function setupControlRequest(simID, simSelection, request_data) {
+function setupControlRequest(simID, request_data) {
     const requestBox = prefabcontrolRequestBox.cloneNode(true);
-    const previewText = `${getSimName(simSelection)}: ${request_data.details}`;
+    const previewText = `${getSimName(simID)}: ${request_data.details}`;
     const detailText =
-`sim='${getSimName(simSelection)}'
+`sim='${getSimName(simID)}'
 id=${simID}
 details=${request_data.details}
 channel_key=${request_data.key}
@@ -1425,17 +1191,12 @@ subkeys=${request_data.subkeys}`;
 }
 function updateControlRequestQueue(requests_model) {
     const requests = requests_model.requests;
-    const selections = getAllSelections();
     for (const simID in requests) {
-        const selection = selections[simID];
         for (const channel_key in requests[simID]) {
             console.log(requests[simID]);
             console.log(requests[simID][channel_key]);
             for (const request of requests[simID][channel_key]) {
-                setupControlRequest(simID, selection, request);
-                // const requestBox = prefabcontrolRequestBox.cloneNode(true);
-                // requestBox.textContent = `sim='${getSimName(selection)}'(${simID}), channel='${request.key}', details='${request.details}'.`;
-                // controlResponsePanel.appendChild(requestBox);
+                setupControlRequest(simID, request);
             }
         }        
     }
@@ -1449,22 +1210,9 @@ const miniResourcePreview = document.querySelector(".resource-preview.mini-previ
 resourceUsageDisplayUtils.setupResourceUsageDisplay(fullResourcePreview);
 resourceUsageDisplayUtils.setupResourceUsageDisplay(miniResourcePreview, true);
 
-tryBtn.addEventListener("click", getNumber);
-testBtn.addEventListener("click", testNumberAPI);
-resourceBtn.addEventListener("click", displayResourceUsage);
-scalarDataTestBtn.addEventListener("click", displayScalarDataTest);
-imageTestBtn.addEventListener("click", displayVideoTest);
-startSimTestBtn.addEventListener("click", startSimTest);
-queryProgressTestBtn.addEventListener("click", testQueryProgress);
-stopSimTestBtn.addEventListener("click", stopSimTest);
-fillHistoryTestBtn.addEventListener("click", refreshSimulationSidebar);
 deleteAllSimsTestBtn.addEventListener("click", showDeleteAllSimulationsOption);
 deleteSelectedSimsTestBtn.addEventListener("click", deleteSelectedSimulations);
-
-
-simTestTimestepsSlider.addEventListener("change", (e) => {
-    testSimTimesteps = Number(e.target.value);
-});
+imageTestBtn.addEventListener("click", displayVideoTest);
 
 // Listening for control requests sent from server
 const ctrlReqSrc = new EventSource(apiURL("get-control-requests"));
@@ -1595,23 +1343,10 @@ function showMMInstance(simID, type, datum) {
     if (!panel) { return panel; }
     
     const caption = panel.querySelector(".media-info");
-    const simSelection = getAllSelections()[simID];
-    caption.textContent = `sim: ${getSimName(simSelection)}`;
+    caption.textContent = `sim: ${getSimName(simID)}`;
     return panel;
 }
-// function gatherFilters(filterPanel) {
-//     const filters = [];
-//     const discreteFilterArea   = filterPanel.querySelectorAll(".discrete-filter-area");
-//     const betweenFilters    = filterPanel.querySelectorAll(".between-filter-setting");
-//     // Create Filters for each area
-//     for (const elem of discreteFilterArea) {
-//         filters.push(new Filter(elem));
-//     }
-//     for (const elem of betweenFilters) {
-//         filters.push(new Filter(elem));
-//     }
-//     return filters;
-// }
+
 function filterMMIData(data) {
     debug(`MMI data starts with ${data.length} datapoints`);
     // Gather up filter information from inputs
@@ -1643,13 +1378,13 @@ function filterMMIData(data) {
     // Apply all filters based on filter type
 }
 function displayMMIData(mmiData) {
-    console.log("display mmi data");
-    console.log(mmiData);
+    debug("display mmi data");
+    debug(mmiData);
     clearMediaPanel();
     let data = mmiData.getData();
     data = filterMMIData(data);
-    console.log("filtered mmi data");
-    console.log(data);
+    debug("filtered mmi data");
+    debug(data);
     for (const datapoint of data) {
         const newInstancePanel = showMMInstance(datapoint.simID, datapoint.type, datapoint.datum);
     }
@@ -1856,20 +1591,5 @@ function addResizeBar(resizablePanel, direction="ew", position="after") {
         document.documentElement.removeEventListener('mouseup', stopDrag, false);
     }
 
-    // var p = document.querySelector('.media-panel'); // element to make resizable
-    
-
     newBar.addEventListener('mousedown', initDrag, false);
-
-    // resizer.addEventListener('click', function init() {
-    //     p.removeEventListener('click', init, false);
-    //     p.className = p.className + ' resizable';
-    //     // var resizer = document.createElement('div');
-    //     // resizer.className = 'resizer';
-    //     // p.appendChild(resizer);
-    //     resizer.addEventListener('mousedown', initDrag, false);
-    //     // resizer.style.minWidth = "50px";
-    //     // resizer.style.width = "50px";
-    //     // resizer.style.flex = "1 1 50px";
-    // }, false);
 }

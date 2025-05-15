@@ -115,38 +115,6 @@ app.add_middleware(
     compresslevel=1
 )
 
-
-@app.get("/")
-async def test():
-    return {
-        "Message": "This is the result of an API call."
-    }
-
-@app.get("/random")
-async def thinking_of_a_number():
-    return {
-        "value": randint(1, 10)
-    }
-
-@app.get("/big-data1000")
-async def thinking_of_a_number2():
-    return {
-        "value": np.random.random((10, 10, 10)).flatten().tolist()
-    }
-
-@app.get("/big-data100000")
-async def thinking_of_a_number3():
-    return {
-        "value": np.random.random(100_000).flatten().tolist()
-    }
-
-# https://stackoverflow.com/questions/73921756/how-to-add-gzip-middleware-for-the-fastapi
-@app.get("/big-data1000000")
-async def thinking_of_a_number4():
-    return {
-        "value": np.random.random((100, 100, 100)).flatten().tolist()
-    }
-
 @app.get("/resource-usage-simple")
 async def get_resource_usage_simple():
     return get_usage_simple()
@@ -201,7 +169,6 @@ async def queue_new_simulation_call(config: SimulationStartConfig):
     logger.debug(f"API called queue-new-sim with config: {config}")
     if simulation_tracker.is_clearing:
         return { "id": str(simulation_tracker.no_id) }
-    # id, _ = simulation_tracker.start_sim(config)
     id, _ = simulation_tracker.queue_sim(config)
     return { "id": str(id) }
 
@@ -297,29 +264,3 @@ async def get_sim_data_all(query: StatQuery):
 @app.get("/get-control-requests")
 async def get_control_requests():
     return StreamingResponse(simulation_tracker.control_request_generator(), media_type="text/event-stream")
-
-# @app.get("/read-key/")
-# async def get_read_test(exp_key: str, key: str, recent: bool = True):
-#     """
-#     Parameters:
-#         exp_key:    The experiment key. Points towards the
-#             internal tb file containing the stats.
-#         key:        The scalar stat key to query.
-#         recent:     If true, only queries and returns the
-#             most recently acquired values from the key.
-#             If false, returns the entire data sequence.
-#     """
-#     streamer = StreamerRegistry.get_streamer(exp_key)
-#     print(f"Got streamer: '{streamer}'")
-#     if not streamer:
-#         print(f"No streamer '{exp_key}'")
-#         return {}
-#     else:
-#         try:
-#             recent = streamer.get_all_recent()
-#             print(recent)
-#             return recent
-#         except Exception as e:
-#             print(f"caught exception: {e}")
-#             traceback.print_exc()
-#         return {}
