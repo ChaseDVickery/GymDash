@@ -98,3 +98,7 @@
     filter: saturate(120%);
     stroke-width: 2px;
 }
+.plot-line.selection-hovered-line {
+    filter: saturate(140%);
+    stroke-width: 3px;
+}

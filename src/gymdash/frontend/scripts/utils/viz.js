@@ -400,6 +400,7 @@ const vizUtils = (
                             .datum(finalData)
                             .classed("line-smooth", true)
                             .classed("plot-line", true)
+                            .attr("data-sim-id", line.attr("data-sim-id"))
                             .attr("clip-path", "url(#clip)")
                             .attr("fill", "none")
                             .attr("stroke", line.attr("stroke"))
@@ -600,9 +601,9 @@ const vizUtils = (
          * Returns the extent of a scalar data key's value
          * or step.
          * 
-         * @param {Object[DataReport]} allData 
-         * @param {string} key 
-         * @param {Array} simIDs 
+         * @param {Object<dataUtils.DataReport>} allData 
+         * @param {String} key 
+         * @param {Array<String>} simIDs 
          * @param {value_or_step} dataPointAttribute 
          * @returns 
          */
@@ -615,17 +616,15 @@ const vizUtils = (
             if (simIDs.length < 1) {
                 return extent;
             }
-            if (!allData[simIDs[0]].has(key)) {
-                return extent;
-            }
-            // If the given key is not scalar and we are trying to find the
-            // extent of it's "value", then that's not possible. We can find
-            // the extent of its "step" or "wall_time", but "value" only
-            // makes sense for scalars.
-            if (!allData[simIDs[0]].isScalar(key) && dataPointAttribute === "value") {
-                return extent;
-            }
             for (const simID of simIDs) {
+                // If the given key is not scalar and we are trying to find the
+                // extent of it's "value", then that's not possible. We can find
+                // the extent of its "step" or "wall_time", but "value" only
+                // makes sense for scalars.
+                if (!allData[simID].isScalar(key) && dataPointAttribute === "value") {
+                    continue;
+                }
+                if (!allData[simID].has(key)) { continue; }
                 const tempExt = d3.extent(allData[simID].getData(key).map(x => x[dataPointAttribute]));
                 if (tempExt[0] !== undefined && tempExt[0] < extent[0]) {
                     extent[0] = tempExt[0];
@@ -709,18 +708,23 @@ const vizUtils = (
             const lines = [];
             for (const simID in allData) {
                 const data = allData[simID].getScalar(key);
-                lines.push(svg
-                    .append("path")
-                    .datum(data)
-                    .classed("plot-line", true)
-                    .attr("clip-path", "url(#clip)")
-                    .attr("fill", "none")
-                    .attr("stroke", color(colorT))
-                    .attr("stroke-width", 1.5)
-                    .attr("d", d3.line()
-                        .x(d => xScale(d.step))
-                        .y(d => yScale(d.value))
-                    ));
+                if (!data || data.length < 1) {
+
+                } else {
+                    lines.push(svg
+                        .append("path")
+                        .datum(data)
+                        .classed("plot-line", true)
+                        .attr("data-sim-id", simID)
+                        .attr("clip-path", "url(#clip)")
+                        .attr("fill", "none")
+                        .attr("stroke", color(colorT))
+                        .attr("stroke-width", 1.5)
+                        .attr("d", d3.line()
+                            .x(d => xScale(d.step))
+                            .y(d => yScale(d.value))
+                        ));
+                }
                 colorT = colorT + colorTStep;
                 if (colorT > 1) { colorT -= 1; }
             }

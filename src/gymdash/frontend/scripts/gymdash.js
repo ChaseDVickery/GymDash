@@ -17,17 +17,9 @@ const defaultTimeout = 2.5; // (s)
 const noID = "00000000-0000-0000-0000-000000000000"; // (str(UUID))
 
 // Structures
-// sim_selections store information
-// let sim_selections = {};
-// let allData = {};
-// let allRecentStatus = {};
 const mainPlots = [];
 const allPlots = [];
-// let hoveredSimSelection;
 let canQuerySimStatus = true;
-
-// By the end, sim_selections, allData, and allRecentStatus should not be used.
-// Also hoveredSimSelection?
 
 
 // Sidebar
@@ -191,6 +183,7 @@ class Simulation {
         this.data       = new dataUtils.DataReport(simID);
         this.status     = null;
         this.info       = null;
+        this.lines      = []
 
         this.name       = null;
     }
@@ -564,10 +557,18 @@ function getSelectedData() {
     return selectedData;
 }
 function selectAll() {
-    simulations.forEach((_, sim) => sim.selection.setChecked(true));
+    const event = new Event("change");
+    simulations.forEach((_, sim) => {
+        sim.selection.setChecked(true);
+        sim.selection.input.dispatchEvent(event);
+    });
 }
 function deselectAll() {
-    simulations.forEach((_, sim) => sim.selection.setChecked(false));
+    const event = new Event("change");
+    simulations.forEach((_, sim) => {
+        sim.selection.setChecked(false);
+        sim.selection.input.dispatchEvent(event);
+    });
 }
 
 function displayVideoTest() {
@@ -897,25 +898,66 @@ function createSimSelection(config, simID, startChecked=true) {
         "click",
         stopSimulationFromSelection.bind(null, newSelection)
     );
-    // Set up tooltip hover
+    // Set up checkbox with custom listeners
+    newSelection.input.addEventListener(
+        "change",
+        function(e) {
+            const isOn = e.target.checked;
+            // Toggle Plot Lines
+            const allLines = Array.from(document.querySelectorAll(".plot-line"));
+            const simLines = allLines.filter((v, i) => {
+                return v.dataset.simId === simID;
+            });
+            const simSelections = d3.selectAll(simLines);
+            simSelections
+                .attr("visibility", isOn ? "visible" : "hidden");
+            // Toggle MMI Data and change MMI Filters
+            // for (const plot of allPlots) {
+            //     for (const mmiSelection of plot.createdMMIs) {
+            //         const mmiData = mmiSelection.data()[0];
+            //         mmiData.
+            //     }
+            // }
+        }
+    )
+    // Set up hover
     newSelection.element.addEventListener(
         "mouseover",
         function(e) {
             simulations.hoveredSimSelection = newSelection;
+            // Tooltip
             tooltip.style.visibility = "visible";
-            // updateSimSelectionStatus(simID);
             updateAllSimSelectionStatus().then((p) => {
                 tooltipUpdateToSimSelection(simID);
                 repositionTooltip(tooltip, newSelection.element, "right");
-            })
+            });
+            // Plots
+            const allLines = Array.from(document.querySelectorAll(".plot-line"));
+            const simLines = allLines.filter((v, i) => {
+                return v.dataset.simId === simID;
+            });
+            const simSelections = d3.selectAll(simLines);
+            simSelections
+                .classed("selection-hovered-line", true)
+                .raise();
         }
     );
     newSelection.element.addEventListener(
         "mouseout",
         function(e) {
             simulations.hoveredSimSelection = undefined;
+            // Tooltip
             tooltip.style.visibility = null;
             tooltip.textContent = "";
+            // Plots
+            const allLines = Array.from(document.querySelectorAll(".plot-line"));
+            const simLines = allLines.filter((v, i) => {
+                return v.dataset.simId === simID;
+            });
+            const simSelections = d3.selectAll(simLines);
+            simSelections
+                .classed("selection-hovered-line", false)
+                .raise();
         }
     );
     // Return selection box
@@ -1500,10 +1542,12 @@ function createPlots() {
     const selectedData = getSelectedData();
 
     const allScalarKeys = new Set();
+    // console.log(allScalarKeys);
     for (const simID in selectedData) {
         const report = selectedData[simID];
         report.scalar_keys.forEach(k => allScalarKeys.add(k));
     }
+    console.log(allScalarKeys);
 
     if (Object.keys(selectedData).length <= 0) { return; }
 
