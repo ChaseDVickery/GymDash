@@ -576,18 +576,30 @@ function getSelectedData() {
     return selectedData;
 }
 function selectAll() {
-    const event = new Event("change");
+    const eventSingle = new Event("customSelectDeselectSingle");
+    const eventAll = new Event("customSelectDeselectAll");
     simulations.forEach((_, sim) => {
         sim.selection.setChecked(true);
-        sim.selection.input.dispatchEvent(event);
+        sim.selection.input.dispatchEvent(eventSingle);
     });
+    for (const simID in simulations.simulations) {
+        if (!Object.hasOwn(simulations.simulations, simID)) { continue; }
+        simulations.get(simID).selection.input.dispatchEvent(eventAll);
+        break;
+    }
 }
 function deselectAll() {
-    const event = new Event("change");
+    const eventSingle = new Event("customSelectDeselectSingle");
+    const eventAll = new Event("customSelectDeselectAll");
     simulations.forEach((_, sim) => {
         sim.selection.setChecked(false);
-        sim.selection.input.dispatchEvent(event);
+        sim.selection.input.dispatchEvent(eventSingle);
     });
+    for (const simID in simulations.simulations) {
+        if (!Object.hasOwn(simulations.simulations, simID)) { continue; }
+        simulations.get(simID).selection.input.dispatchEvent(eventAll);
+        break;
+    }
 }
 
 function displayVideoTest() {
@@ -921,22 +933,36 @@ function createSimSelection(config, simID, startChecked=true) {
     newSelection.input.addEventListener(
         "change",
         function(e) {
-            const isOn = e.target.checked;
             // Toggle Plot Lines
-            const allLines = Array.from(document.querySelectorAll(".plot-line"));
-            const simLines = allLines.filter((v, i) => {
-                return v.dataset.simId === simID;
-            });
-            const simSelections = d3.selectAll(simLines);
-            simSelections
-                .attr("visibility", isOn ? "visible" : "hidden");
-            // Toggle MMI Data and change MMI Filters
-            // for (const plot of allPlots) {
-            //     for (const mmiSelection of plot.createdMMIs) {
-            //         const mmiData = mmiSelection.data()[0];
-            //         mmiData.
-            //     }
-            // }
+            for (const plot of allPlots) {
+                plot.modifyToSelectedSims();
+            }
+            // const event = new Event("customSelectDeselectSingle");
+            // e.target.dispatchEvent(event);
+        }
+    )
+    newSelection.input.addEventListener(
+        "customSelectDeselectSingle",
+        function(e) {
+            
+        }
+    )
+    // Have this listener for things you only want to trigger
+    // once when pressing Select/Deselect All so that it
+    // doesn't have to retrigger for every simulation checkbox.
+    newSelection.input.addEventListener(
+        "customSelectDeselectAll",
+        function(e) {
+            // Toggle Plot Lines
+            for (const plot of allPlots) {
+                plot.modifyToSelectedSims();
+            }
+        }
+    )
+    newSelection.element.addEventListener(
+        "mousedown touchstart",
+        function(e) {
+            
         }
     )
     // Set up hover
@@ -1558,7 +1584,8 @@ function createPlots() {
     clearMainPlot();
 
     const condense = true;
-    const selectedData = getSelectedData();
+    // const selectedData = getSelectedData();
+    const selectedData = simulations.data();
 
     const allScalarKeys = new Set();
     // console.log(allScalarKeys);

@@ -127,6 +127,9 @@ const vizUtils = (
             isValid() {
                 return this.selection !== null;
             }
+            isHidden() {
+                return this.selection.attr("visibility") === "hidden";
+            }
             data() {
                 return this.selection.datum();
             }
@@ -136,21 +139,28 @@ const vizUtils = (
         }
 
         class SimPlot {
-            constructor(svg, data, key, extentX, extentY, scaleX, scaleY, axisX, axisY, lines, simulation_map=null) {
+            constructor(svg, data, key, scaleX, scaleY, axisX, axisY, lines, simulation_map=null) {
                 this.svg        = svg;
                 this.data       = data;
                 this.key        = key;
-                this.extentX    = extentX;
-                this.extentY    = extentY;
                 this.scaleX     = scaleX;
                 this.scaleY     = scaleY;
                 this.axisX      = axisX;
                 this.axisY      = axisY;
                 this.lines      = lines;
                 this.simulations= simulation_map;
+
+                this.extentValues= {};
+                this.extentSteps= {};
+
+                // Refresh
+                this.lastRefreshExtentX = [undefined, undefined];
+                this.lastRefreshExtentY = [undefined, undefined];
                 
                 // Smoothed lines
                 this.lastSmooth = 0;
+                this.lastSmoothExtentX = [undefined, undefined];
+                this.lastSmoothExtentY = [undefined, undefined];
                 this.smoothed   = {};
 
                 this.tooltip = new Tooltip(this.svg);
@@ -179,11 +189,60 @@ const vizUtils = (
             smoothedSelections() {
                 return Object.values(this.smoothed).filter(l => l.isValid()).map(l => l.selection);
             }
+            /** Return dictionary mapping simID to all associated Lines */
             allLines() {
-                return [...Object.values(this.lines), ...Object.values(this.smoothed)]
+                const lines = {};
+                for (const simID in this.lines) {
+                    lines[simID] = [];
+                    if (this.lines[simID]) {
+                        lines[simID].push(this.lines[simID]);
+                    }
+                    if (this.smoothed[simID]) {
+                        lines[simID].push(this.smoothed[simID]);
+                    }
+                }
+                return lines;
             }
             linesMatching(tag) {
-                return this.allLines().filter((line) => line.matches(tag));
+                return [...Object.values(this.lines), ...Object.values(this.smoothed)].filter((line) => line.matches(tag));
+            }
+
+            modifyToSelectedSims() {
+                // Get the selected simulations
+                const lines = this.allLines();
+                const selections = this.simulations.selections();
+                for (const [simID, simSelection] of Object.entries(selections)) {
+                    // Toggle lines on/off
+                    for (const line of lines[simID]) {
+                        if (!line.isValid()) { continue; }
+                        line.selection.attr("visibility", simSelection.checked() ? "visible" : "hidden");
+                    }
+                    // Alter MMIs
+                }
+                // Alter the scales and axes so that they are only based on the
+                // currently selected simulations
+                const asdfasdf =this.extentOfExtents(
+                    Object.values(this.simulations.selected())
+                        .filter((simSel) => simSel.checked())
+                        .map((simSel) => this.extentSteps[simSel.id])
+                );
+                this.scaleX.domain(this.extentOfExtents(
+                    Object.values(this.simulations.selected())
+                        .filter((simSel) => simSel.checked())
+                        .map((simSel) => this.extentSteps[simSel.id])
+                ));
+                this.scaleY.domain(this.extentOfExtents(
+                    Object.values(this.simulations.selected())
+                        .filter((simSel) => simSel.checked())
+                        .map((simSel) => this.extentValues[simSel.id])
+                ));
+                this.axisX.call(d3.axisBottom(this.scaleX));
+                this.axisY.call(d3.axisLeft(this.scaleY));
+                this.#refreshLines();
+            }
+
+            doSomethingElse() {
+                this.#rebuildLines();
             }
 
             static createLinePlot(simulation_map, key) {
@@ -191,8 +250,8 @@ const vizUtils = (
     
                 const allData = simulation_map.data();
     
-                const extentY = extentOf(allData, key, undefined, "value");
-                const extentX = d3.extent([...extentOf(allData, key, undefined, "step"), 0]);
+                const extentY = extentOfKey(allData, key, undefined, "value");
+                const extentX = d3.extent([...extentOfKey(allData, key, undefined, "step"), 0]);
     
                 const width = plotWidth;
                 const height = plotHeight;
@@ -232,11 +291,17 @@ const vizUtils = (
                 let colorT = 0;
                 const colorTStep = 0.17;
                 const lines = {};
+                const extentSteps = {};
+                const extentValues = {};
                 for (const simID in allData) {
                     const data = allData[simID].getScalar(key);
                     if (!data || data.length < 1) {
                         lines[simID] = Line.none();
+                        extentSteps[simID] = [undefined, undefined];
+                        extentValues[simID] = [undefined, undefined];
                     } else {
+                        extentSteps[simID] = d3.extent(data.map(d => d.step));
+                        extentValues[simID] = d3.extent(data.map(d => d.value));
                         const newLineSelection = svg
                             .append("path")
                             .datum(data)
@@ -256,12 +321,10 @@ const vizUtils = (
                     colorT = colorT + colorTStep;
                     if (colorT > 1) { colorT -= 1; }
                 }
-                return new SimPlot(
+                const plot = new SimPlot(
                     svg,
                     allData,
                     key,
-                    extentX, 
-                    extentY,
                     xScale,
                     yScale,
                     xAxis,
@@ -269,6 +332,10 @@ const vizUtils = (
                     lines,
                     simulation_map
                 );
+                plot.extentSteps = extentSteps;
+                plot.extentValues = extentValues;
+                plot.modifyToSelectedSims();
+                return plot;
             }
 
             #svgSize() {
@@ -282,16 +349,43 @@ const vizUtils = (
              * of lines even if underlying simulation data has changed.
              */
             #refreshLines() {
+                debug("REFRESH LINES", true);
                 const sx = this.scaleX;
                 const sy = this.scaleY;
-                for (const line of this.lineSelections()) {
-                    line
-                        .style("opacity", 1)
-                        .attr("d", d3.line()
-                            .x(function(d) { return sx(d.step) })
-                            .y(function(d) { return sy(d.value) })
-                        );
+                const eX = sx.domain();
+                const eY = sy.domain();
+                const sameExtentX = this.lastRefreshExtentX[0] === eX[0] &&
+                                    this.lastRefreshExtentX[1] === eX[1];
+                const sameExtentY = this.lastRefreshExtentY[0] === eY[0] &&
+                                    this.lastRefreshExtentY[1] === eY[1];
+                const reloadData = 
+                !(
+                    sameExtentX &&
+                    sameExtentY &&
+                    Number.isNaN(eX[0]) &&
+                    Number.isNaN(eX[1]) &&
+                    Number.isNaN(eY[0]) &&
+                    Number.isNaN(eY[1])
+                );
+                console.log(`Extent X old vs new: ${this.lastRefreshExtentX} vs ${eX}. same=${sameExtentX}`);
+                console.log(`Extent Y old vs new: ${this.lastRefreshExtentY} vs ${eY}. same=${sameExtentY}`);
+                this.lastRefreshExtentX = [eX[0] ? eX[0] : this.lastRefreshExtentX[0], eX[1] ? eX[1] : this.lastRefreshExtentX[1]];
+                this.lastRefreshExtentY = [eY[0] ? eY[0] : this.lastRefreshExtentY[0], eY[1] ? eY[1] : this.lastRefreshExtentY[1]];
+
+                // If the lines would be visually different, then
+                // update all the orig lines before updating the
+                // smoothed ones.
+                if (reloadData) {
+                    for (const line of this.lineSelections()) {
+                        line
+                            .style("opacity", 1)
+                            .attr("d", d3.line()
+                                .x(function(d) { return sx(d.step) })
+                                .y(function(d) { return sy(d.value) })
+                            );
+                    }
                 }
+
                 this.smoothLines(this.lastSmooth);
             }
             /**
@@ -320,6 +414,7 @@ const vizUtils = (
                 // Look for the nearest point on any lines.
                 const usedLines = this.numSmoothed() > 0 ? this.smoothedSelections() : this.lineSelections();
                 for (const line of usedLines) {
+                    if (line.attr("visibility") === "hidden") { continue; }
                     // First filter just by step value (only within certain number of steps).
                     const lineData = line.data()[0];
                     const idxStep = d3.bisectCenter(lineData.map(d => d.step), estStep);
@@ -425,11 +520,18 @@ const vizUtils = (
                 this.addAllMMIs(this.data, this.onClickMMI, true);
             }
 
-            updateExtentX(otherExtentOrValues) {
-                this.extentX = d3.extent([...otherExtentOrValues, ...this.extentX]);
+            extentX() {
+                return this.extentOfExtents(Object.values(this.extentSteps));
             }
-            updateExtentY(otherExtentOrValues) {
-                this.extentY = d3.extent([...otherExtentOrValues, ...this.extentY]);
+            extentY() {
+                return this.extentOfExtents(Object.values(this.extentValues));
+            }
+            extentOfExtents(extentsArray) {
+                return d3.extent(
+                    extentsArray
+                        .filter(e => e && e[0] && e[1])
+                        .reduce((all, curr_extent) => all.concat(curr_extent), [])
+                );
             }
 
             clearBrush() {
@@ -444,6 +546,8 @@ const vizUtils = (
             clear() {
                 this.lines = {};
                 this.smoothed = {};
+                this.extentValues = {};
+                this.extentSteps = {};
                 this.svg.selectAll(".plot-line").remove();
                 this.svg.selectAll(".mmi-marker").remove();
                 selectedMMI = undefined;
@@ -494,7 +598,7 @@ const vizUtils = (
                 this.addAllMMIs(this.data, this.onClickMMI, true);
             }
             resetX() {
-                const extentX = d3.extent([...extentOf(this.data, this.key, undefined, "step"), 0]);
+                const extentX = d3.extent([...extentOfKey(this.data, this.key, undefined, "step"), 0]);
                 this.scaleX
                     .domain(extentX);
                 this.axisX
@@ -502,7 +606,7 @@ const vizUtils = (
                 
             }
             resetY() {
-                const extentY = extentOf(this.data, this.key, undefined, "value");
+                const extentY = extentOfKey(this.data, this.key, undefined, "value");
                 this.scaleY
                     .domain(extentY);
                 this.axisY
@@ -528,44 +632,94 @@ const vizUtils = (
             }
 
             smoothLines(smoothing) {
+                // const eX = this.extentX();
+                // const eY = this.extentY();
+                const eX = this.scaleX.domain();
+                const eY = this.scaleY.domain();
+                const sameSmooth = this.lastSmooth === smoothing;
+                const sameExtentX = this.lastSmoothExtentX[0] === eX[0] &&
+                                    this.lastSmoothExtentX[1] === eX[1];
+                const sameExtentY = this.lastSmoothExtentY[0] === eY[0] &&
+                                    this.lastSmoothExtentY[1] === eY[1];
+                const reloadData = !(sameSmooth && sameExtentX && sameExtentY);
                 this.lastSmooth = smoothing;
+                this.lastSmoothExtentX = eX;
+                this.lastSmoothExtentY = eY;
                 // Remove prior smoothed lines
-                this.svg.selectAll(".line-smooth").remove();
-                this.smoothed = {};
+                // this.svg.selectAll(".line-smooth").remove();
+                // this.smoothed = {};
                 // Add them back if we are doing any smoothing
                 if (smoothing > 0) {
                     for (const line of this.lineSelections()) {
-                        // Get data from orig line
-                        const data = line.datum();
-                        // Get smoothed version of data
-                        const smoothedData = dataUtils.smoothData(data.map(d => d.value), smoothing);
-                        const finalData = [];
-                        for (let i = 0; i < smoothedData.length; i++) {
-                            finalData.push({...(data[i])});
-                            finalData[i].value = smoothedData[i];
+                        const simID = line.attr("data-sim-id");
+                        if (Object.hasOwn(this.smoothed, simID)) {
+                            // Trying to reuse exsiting line selections
+                            if (!this.smoothed[simID].isValid()) { continue; }
+                            this.smoothed[simID].selection
+                                .style("opacity", 1)
+                                .attr("stroke", line.attr("stroke"))
+                                .attr("visibility", line.attr("visibility"))
+                            if (reloadData) {
+                                // Recalculate smoothed point positions
+                                // Get data from orig line
+                                const data = line.datum();
+                                // Get smoothed version of data
+                                const smoothedData = dataUtils.smoothData(data.map(d => d.value), smoothing);
+                                const finalData = [];
+                                for (let i = 0; i < smoothedData.length; i++) {
+                                    finalData.push({...(data[i])});
+                                    finalData[i].value = smoothedData[i];
+                                }
+                                this.smoothed[simID].selection
+                                .datum(finalData)
+                                .attr("d", d3.line()
+                                    .x(d => this.scaleX(d.step))
+                                    .y(d => this.scaleY(d.value))
+                                );
+                            }
+                            
+                                
+                        } else {
+                            // Get data from orig line
+                            const data = line.datum();
+                            // Get smoothed version of data
+                            const smoothedData = dataUtils.smoothData(data.map(d => d.value), smoothing);
+                            const finalData = [];
+                            for (let i = 0; i < smoothedData.length; i++) {
+                                finalData.push({...(data[i])});
+                                finalData[i].value = smoothedData[i];
+                            }
+                            // Append newly smoothed line
+                            const newLineSelection = this.svg
+                                .append("path")
+                                .datum(finalData)
+                                .classed("line-smooth", true)
+                                .classed("plot-line", true)
+                                .attr("data-sim-id", line.attr("data-sim-id"))
+                                .attr("clip-path", "url(#clip)")
+                                .attr("fill", "none")
+                                .style("opacity", 1)
+                                .attr("stroke", line.attr("stroke"))
+                                .attr("visibility", line.attr("visibility"))
+                                .attr("stroke-width", 1.5)
+                                .attr("d", d3.line()
+                                    .x(d => this.scaleX(d.step))
+                                    .y(d => this.scaleY(d.value))
+                                )
+                            const newLine = new Line(newLineSelection, "smooth");
+                            this.smoothed[line.attr("data-sim-id")] = newLine;
                         }
-                        // Append newly smoothed line
-                        const newLineSelection = this.svg
-                            .append("path")
-                            .datum(finalData)
-                            .classed("line-smooth", true)
-                            .classed("plot-line", true)
-                            .attr("data-sim-id", line.attr("data-sim-id"))
-                            .attr("clip-path", "url(#clip)")
-                            .attr("fill", "none")
-                            .attr("stroke", line.attr("stroke"))
-                            .attr("stroke-width", 1.5)
-                            .attr("d", d3.line()
-                                .x(d => this.scaleX(d.step))
-                                .y(d => this.scaleY(d.value))
-                            )
-                        const newLine = new Line(newLineSelection, "smooth");
-                        this.smoothed[line.attr("data-sim-id")] = newLine;
+                        
                         // Lower opacity of orig line.
                         line
                             .style("opacity", 0.3);
                     }
                 } else {
+                    for (const line of this.smoothedSelections()) {
+                        // Return orig line opacity
+                        line
+                            .style("opacity", 0);
+                    }
                     for (const line of this.lineSelections()) {
                         // Return orig line opacity
                         line
@@ -759,7 +913,7 @@ const vizUtils = (
          * @param {value_or_step} dataPointAttribute 
          * @returns 
          */
-        const extentOf = function(allData, key, simIDs, dataPointAttribute="value") {
+        const extentOfKey = function(allData, key, simIDs, dataPointAttribute="value") {
             // Use all simulations if IDs is not specified
             if (simIDs === undefined) {
                 simIDs = Object.keys(allData);

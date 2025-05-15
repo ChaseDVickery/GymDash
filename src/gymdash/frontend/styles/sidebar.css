@@ -21,6 +21,7 @@
     box-shadow: var(--main-contrast-color) 0 0 5px 1px inset;
 } */
 .sim-selection-box {
+    user-select: none;
     justify-content: space-between;
     border: 1px var(--main-contrast-color) solid;
     border-radius: var(--panel-br);
