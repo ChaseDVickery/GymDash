@@ -116,8 +116,27 @@ const vizUtils = (
             }
         }
 
-        class Plot {
-            constructor(svg, data, key, extentX, extentY, scaleX, scaleY, axisX, axisY, lines) {
+        class Line {
+            constructor(selection, ...tags) {
+                this.selection  = selection;
+                this.tags       = new Set(tags);
+            }
+            static none() {
+                return new Line(null);
+            }
+            isValid() {
+                return this.selection !== null;
+            }
+            data() {
+                return this.selection.datum();
+            }
+            matches(otherTag) {
+                return this.tags.has(otherTag);
+            }
+        }
+
+        class SimPlot {
+            constructor(svg, data, key, extentX, extentY, scaleX, scaleY, axisX, axisY, lines, simulation_map=null) {
                 this.svg        = svg;
                 this.data       = data;
                 this.key        = key;
@@ -128,10 +147,11 @@ const vizUtils = (
                 this.axisX      = axisX;
                 this.axisY      = axisY;
                 this.lines      = lines;
+                this.simulations= simulation_map;
                 
                 // Smoothed lines
                 this.lastSmooth = 0;
-                this.smoothed   = [];
+                this.smoothed   = {};
 
                 this.tooltip = new Tooltip(this.svg);
 
@@ -147,15 +167,124 @@ const vizUtils = (
                 this.init();
             }
 
+            numLines() {
+                return Object.keys(this.lines).length;
+            }
+            numSmoothed() {
+                return Object.keys(this.smoothed).length;
+            }
+            lineSelections() {
+                return Object.values(this.lines).filter(l => l.isValid()).map(l => l.selection);
+            }
+            smoothedSelections() {
+                return Object.values(this.smoothed).filter(l => l.isValid()).map(l => l.selection);
+            }
+            allLines() {
+                return [...Object.values(this.lines), ...Object.values(this.smoothed)]
+            }
+            linesMatching(tag) {
+                return this.allLines().filter((line) => line.matches(tag));
+            }
+
+            static createLinePlot(simulation_map, key) {
+                const svg = getPlotOrMakeNew(undefined);
+    
+                const allData = simulation_map.data();
+    
+                const extentY = extentOf(allData, key, undefined, "value");
+                const extentX = d3.extent([...extentOf(allData, key, undefined, "step"), 0]);
+    
+                const width = plotWidth;
+                const height = plotHeight;
+    
+                var clip = svg.append("defs").append("svg:clipPath")
+                    .attr("id", "clip")
+                    .append("svg:rect")
+                    .attr("width", width-margin.left-margin.right )
+                    .attr("height", height-margin.top-margin.bottom )
+                    .attr("x", margin.left)
+                    .attr("y", margin.bottom);
+    
+                const xScale = d3
+                    .scaleLinear()
+                    .domain(extentX)
+                    .range([margin.left, width - margin.right]);
+                const yScale = d3
+                    .scaleLinear()
+                    .domain(extentY)
+                    .nice()
+                    .range([height - margin.bottom, margin.top]);
+    
+                const xAxis = svg
+                    .append("g")
+                    .attr("transform", `translate(0,${height - margin.bottom})`)
+                    .call(d3.axisBottom(xScale));
+                const yAxis = svg
+                    .append("g")
+                    .attr("transform", `translate(${margin.left}, 0)`)
+                    .call(d3.axisLeft(yScale));
+    
+                // var color = d3.scaleOrdinal()
+                //     .domain(res)
+                //     .range(['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#ffff33','#a65628','#f781bf','#999999'])
+                const color = d3.scaleSequential(d3.interpolateSinebow)
+    
+                let colorT = 0;
+                const colorTStep = 0.17;
+                const lines = {};
+                for (const simID in allData) {
+                    const data = allData[simID].getScalar(key);
+                    if (!data || data.length < 1) {
+                        lines[simID] = Line.none();
+                    } else {
+                        const newLineSelection = svg
+                            .append("path")
+                            .datum(data)
+                            .classed("plot-line", true)
+                            .attr("data-sim-id", simID)
+                            .attr("clip-path", "url(#clip)")
+                            .attr("fill", "none")
+                            .attr("stroke", color(colorT))
+                            .attr("stroke-width", 1.5)
+                            .attr("d", d3.line()
+                                .x(d => xScale(d.step))
+                                .y(d => yScale(d.value))
+                            );
+                        const newLine = new Line(newLineSelection);
+                        lines[simID] = newLine;
+                    }
+                    colorT = colorT + colorTStep;
+                    if (colorT > 1) { colorT -= 1; }
+                }
+                return new SimPlot(
+                    svg,
+                    allData,
+                    key,
+                    extentX, 
+                    extentY,
+                    xScale,
+                    yScale,
+                    xAxis,
+                    yAxis,
+                    lines,
+                    simulation_map
+                );
+            }
+
             #svgSize() {
                 const box = this.svg.node().getBoundingClientRect();
                 return {width: box.width, height: box.height};
             }
 
-            #rebuildLines() {
+            /**
+             * Resets the data for each existing line and potentially
+             * calls smoothing on all lines. Does NOT change the number
+             * of lines even if underlying simulation data has changed.
+             */
+            #refreshLines() {
                 const sx = this.scaleX;
                 const sy = this.scaleY;
-                for (const line of this.lines) {
+                for (const line of this.lineSelections()) {
                     line
                         .style("opacity", 1)
                         .attr("d", d3.line()
@@ -165,12 +294,19 @@ const vizUtils = (
                 }
                 this.smoothLines(this.lastSmooth);
             }
+            /**
+             * Rebuilds lines by destroying current lines and using the
+             * Simulation map to recreate them using the underlying data.
+             */
+            #rebuildLines() {
+                
+            }
 
             #onhover(event) {
                 const width = plotWidth;
                 const height = plotHeight;
                 
-                if (this.lines.length < 1) { return; }
+                if (this.numLines() < 1) { return; }
                 // We have to scale the absolute pointer offset values by
                 // the size of the svg because it can change in size.
                 const offsetX = event.offsetX * (width/this.#svgSize().width);
@@ -182,7 +318,7 @@ const vizUtils = (
                 let nearestDistance = Infinity;
                 const neighborhood = 10;
                 // Look for the nearest point on any lines.
-                const usedLines = this.smoothed.length > 0 ? this.smoothed : this.lines;
+                const usedLines = this.numSmoothed() > 0 ? this.smoothedSelections() : this.lineSelections();
                 for (const line of usedLines) {
                     // First filter just by step value (only within certain number of steps).
                     const lineData = line.data()[0];
@@ -283,7 +419,7 @@ const vizUtils = (
                 this.resetX();
                 this.resetY();
                 // Rebuild the lines
-                this.#rebuildLines();
+                this.#refreshLines();
 
                 this.clearMMIs();
                 this.addAllMMIs(this.data, this.onClickMMI, true);
@@ -300,6 +436,20 @@ const vizUtils = (
                 this.svg.select(".brush").call(
                     this.brushX.move, null
                 );
+            }
+            /**
+             * Clears the svg of all lines and markers as well as clearing
+             * certain fields
+             */
+            clear() {
+                this.lines = {};
+                this.smoothed = {};
+                this.svg.selectAll(".plot-line").remove();
+                this.svg.selectAll(".mmi-marker").remove();
+                selectedMMI = undefined;
+                lastHoveredMMI = undefined;
+                hoveredLine = undefined;
+                createdMMIs = [];
             }
 
             addBrushX(onbrush, eventType="end") {
@@ -324,7 +474,7 @@ const vizUtils = (
                     const endStep   = extentX[1];
                     let extentY = [];
                     // Calculate the Y extent in that same region
-                    for (const line of this.lines) {
+                    for (const line of this.lineSelections()) {
                         // Retrieve range of data based on step extent
                         const data = line.datum();
                         const steps = data.map(d => d.step);
@@ -339,7 +489,7 @@ const vizUtils = (
                 } else {
                     this.resetY();
                 }
-                this.#rebuildLines();
+                this.#refreshLines();
                 this.clearMMIs();
                 this.addAllMMIs(this.data, this.onClickMMI, true);
             }
@@ -362,7 +512,7 @@ const vizUtils = (
                 this.scaleX.domain(extentX);
                 this.axisX.call(d3.axisBottom(this.scaleX));
                 if (rebuild) {
-                    this.#rebuildLines();
+                    this.#refreshLines();
                     this.clearMMIs();
                     this.addAllMMIs(this.data, this.onClickMMI, true);
                 }
@@ -371,7 +521,7 @@ const vizUtils = (
                 this.scaleY.domain(extentY);
                 this.axisY.call(d3.axisLeft(this.scaleY));
                 if (rebuild) {
-                    this.#rebuildLines();
+                    this.#refreshLines();
                     this.clearMMIs();
                     this.addAllMMIs(this.data, this.onClickMMI, true);
                 }
@@ -381,10 +531,10 @@ const vizUtils = (
                 this.lastSmooth = smoothing;
                 // Remove prior smoothed lines
                 this.svg.selectAll(".line-smooth").remove();
-                this.smoothed.splice(0, this.smoothed.length);
+                this.smoothed = {};
                 // Add them back if we are doing any smoothing
                 if (smoothing > 0) {
-                    for (const line of this.lines) {
+                    for (const line of this.lineSelections()) {
                         // Get data from orig line
                         const data = line.datum();
                         // Get smoothed version of data
@@ -395,7 +545,7 @@ const vizUtils = (
                             finalData[i].value = smoothedData[i];
                         }
                         // Append newly smoothed line
-                        this.smoothed.push(this.svg
+                        const newLineSelection = this.svg
                             .append("path")
                             .datum(finalData)
                             .classed("line-smooth", true)
@@ -408,13 +558,15 @@ const vizUtils = (
                             .attr("d", d3.line()
                                 .x(d => this.scaleX(d.step))
                                 .y(d => this.scaleY(d.value))
-                            ));
+                            )
+                        const newLine = new Line(newLineSelection, "smooth");
+                        this.smoothed[line.attr("data-sim-id")] = newLine;
                         // Lower opacity of orig line.
                         line
                             .style("opacity", 0.3);
                     }
                 } else {
-                    for (const line of this.lines) {
+                    for (const line of this.lineSelections()) {
                         // Return orig line opacity
                         line
                             .style("opacity", 1);
@@ -651,97 +803,6 @@ const vizUtils = (
             }
             return existingSVG;
         }
-        /**
-         * Creates a d3 svg line plot for the given key and given
-         * data report.
-         * 
-         * @param {string} key
-         * @param {dataReport} allData
-         */
-        const createLinePlotForKey = function(key, allData, svg) {
-            svg = getPlotOrMakeNew(svg);
-
-            const extentY = extentOf(allData, key, undefined, "value");
-            const extentX = d3.extent([...extentOf(allData, key, undefined, "step"), 0]);
-
-            const width = plotWidth;
-            const height = plotHeight;
-
-            var clip = svg.append("defs").append("svg:clipPath")
-                .attr("id", "clip")
-                .append("svg:rect")
-                .attr("width", width-margin.left-margin.right )
-                .attr("height", height-margin.top-margin.bottom )
-                .attr("x", margin.left)
-                .attr("y", margin.bottom);
-
-            const xScale = d3
-                .scaleLinear()
-                .domain(extentX)
-                // .range([margin.left, width - margin.right - margin.left]);
-                .range([margin.left, width - margin.right]);
-                // .range([0, width - margin.right]);
-            const yScale = d3
-                .scaleLinear()
-                .domain(extentY)
-                .nice()
-                // .range([height - margin.bottom - margin.top, margin.top]);
-                .range([height - margin.bottom, margin.top]);
-                // .range([height - margin.bottom, 0]);
-
-            const xAxis = svg
-                .append("g")
-                .attr("transform", `translate(0,${height - margin.bottom})`)
-                .call(d3.axisBottom(xScale));
-            const yAxis = svg
-                .append("g")
-                .attr("transform", `translate(${margin.left}, 0)`)
-                .call(d3.axisLeft(yScale));
-
-            // var color = d3.scaleOrdinal()
-            //     .domain(res)
-            //     .range(['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#ffff33','#a65628','#f781bf','#999999'])
-            const color = d3.scaleSequential(d3.interpolateSinebow)
-
-            let colorT = 0;
-            const colorTStep = 0.17;
-            const lines = [];
-            for (const simID in allData) {
-                const data = allData[simID].getScalar(key);
-                if (!data || data.length < 1) {
-
-                } else {
-                    lines.push(svg
-                        .append("path")
-                        .datum(data)
-                        .classed("plot-line", true)
-                        .attr("data-sim-id", simID)
-                        .attr("clip-path", "url(#clip)")
-                        .attr("fill", "none")
-                        .attr("stroke", color(colorT))
-                        .attr("stroke-width", 1.5)
-                        .attr("d", d3.line()
-                            .x(d => xScale(d.step))
-                            .y(d => yScale(d.value))
-                        ));
-                }
-                colorT = colorT + colorTStep;
-                if (colorT > 1) { colorT -= 1; }
-            }
-            return new Plot(
-                svg,
-                allData,
-                key,
-                extentX, 
-                extentY,
-                xScale,
-                yScale,
-                xAxis,
-                yAxis,
-                lines
-            );
-            // return svg;
-        }
 
         const getMMIPoints = function(offset=[0,0]) {
             const data = [
@@ -764,7 +825,7 @@ const vizUtils = (
         }
 
         return {
-            createLinePlotForKey,
+            SimPlot
         };
     }
 )();

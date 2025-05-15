@@ -183,7 +183,6 @@ class Simulation {
         this.data       = new dataUtils.DataReport(simID);
         this.status     = null;
         this.info       = null;
-        this.lines      = []
 
         this.name       = null;
     }
@@ -321,6 +320,26 @@ class SimulationMap {
     }
     has(simID) {
         return Object.hasOwn(this.simulations, simID);
+    }
+    /**
+     * Returns an Array of active Simulations.
+     * @returns {Array<Simulation>}
+     */
+    active() {
+        return Object.values(this.simulations).filter(s => s.active);
+    }
+
+    /**
+     * Returns an object mapping each simulation ID to
+     * its corresponding DataReport.
+     * 
+     * @returns {Object<dataUtils.DataReport>}
+     */
+    data() {
+        return Object.entries(this.simulations).reduce((curr_map, [simID, sim]) => {
+            curr_map[simID] = sim.data;
+            return curr_map;
+        }, {});
     }
 
     /**
@@ -1551,8 +1570,10 @@ function createPlots() {
 
     if (Object.keys(selectedData).length <= 0) { return; }
 
-    const plot = vizUtils.createLinePlotForKey(key, selectedData);
-    const detailsPlot = vizUtils.createLinePlotForKey(key, selectedData);
+    // const plot = vizUtils.createLinePlotForKey(key, selectedData);
+    // const detailsPlot = vizUtils.createLinePlotForKey(key, selectedData);
+    const plot = vizUtils.SimPlot.createLinePlot(simulations, key);
+    const detailsPlot = vizUtils.SimPlot.createLinePlot(simulations, key);
     mainPlots.push(plot);
     mainPlots.push(detailsPlot);
     allPlots.push(plot);
@@ -1571,7 +1592,8 @@ function createPlots() {
     d3.select("#plots-area").append(() => detailsPlot.svg.node());
 
     for (const k of allScalarKeys) {
-        const p = vizUtils.createLinePlotForKey(k, selectedData);
+        // const p = vizUtils.createLinePlotForKey(k, selectedData);
+        const p = vizUtils.SimPlot.createLinePlot(simulations, k);
         allPlots.push(p);
         p.smoothLines(plotSmoothValue);
         d3.select("#plots-area").append(() => p.svg.node());
