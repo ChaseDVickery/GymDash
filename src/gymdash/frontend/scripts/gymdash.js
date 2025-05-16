@@ -20,10 +20,19 @@ const noID = "00000000-0000-0000-0000-000000000000"; // (str(UUID))
 const mainPlots = [];
 const allPlots = [];
 let canQuerySimStatus = true;
+let draggingSimSelectionLeft = false;
+let draggingSimSelectionRight = false;
+let mouseInterpCount = 10;
+let mouseLastPos = [0,0];
+let mouseInterpRect = {x: 0, y: 0, width: 1, height: 1, top: 0, bottom: 1, left: 0, right: 1};
+let mouseInterpCircle = {x: 0, y: 0, r: 1};
+const selectionRectStart = [0,0];
+const selectionRect = {x: 0, y: 0, width: 1, height: 1, top: 0, bottom: 1, left: 0, right: 1};
 
 
 // Sidebar
 const simSidebar = document.querySelector(".sim-selection-sidebar");
+const simSidebarContent         = simSidebar.querySelector("#sim-selection-sidebar-selections");
 const deselectAllBtn            = simSidebar.querySelector("#deselect-all-btn");
 const selectAllBtn              = simSidebar.querySelector("#select-all-btn");
 // Control
@@ -923,7 +932,7 @@ function entryToConfig() {
 function createSimSelection(config, simID, startChecked=true) {
     const newSelectionElement = prefabSimSelectBox.cloneNode(true);
     const newSelection = new SimSelection(newSelectionElement, config, simID, startChecked);
-    simSidebar.appendChild(newSelection.element);
+    simSidebarContent.appendChild(newSelection.element);
     // Set up cancel button
     newSelection.cancelButton.addEventListener(
         "click",
@@ -947,6 +956,10 @@ function createSimSelection(config, simID, startChecked=true) {
             
         }
     )
+    newSelection.element.addEventListener(
+        "contextmenu",
+        function(e) { e.preventDefault(); return false; }
+    )
     // Have this listener for things you only want to trigger
     // once when pressing Select/Deselect All so that it
     // doesn't have to retrigger for every simulation checkbox.
@@ -959,10 +972,42 @@ function createSimSelection(config, simID, startChecked=true) {
             }
         }
     )
+    // newSelection.element.addEventListener(
+    //     "dragstart",
+    //     function(e) {
+    //         if (e.button === 0) {
+
+    //         }
+    //         else if (e.button === 2) {
+    //             const changeEvent = new Event("change");
+    //             newSelection.setChecked(!newSelection.checked());
+    //             newSelection.input.dispatchEvent(changeEvent);
+    //         }
+    //     }
+    // )
     newSelection.element.addEventListener(
-        "mousedown touchstart",
+        "mousedown",
         function(e) {
-            
+            if (e.button === 0) {
+                draggingSimSelectionLeft = true;
+            }
+            else if (e.button === 2) {
+                draggingSimSelectionRight = true;
+                const changeEvent = new Event("change");
+                newSelection.setChecked(!newSelection.checked());
+                newSelection.input.dispatchEvent(changeEvent);
+            }
+        }
+    )
+    newSelection.element.addEventListener(
+        "mouseenter",
+        function(e) {
+            // Maybe drag selection
+            if (draggingSimSelectionRight) {
+                const changeEvent = new Event("change");
+                newSelection.setChecked(!newSelection.checked());
+                newSelection.input.dispatchEvent(changeEvent);
+            }
         }
     )
     // Set up hover
@@ -1288,6 +1333,54 @@ function updateControlRequestQueue(requests_model) {
         }        
     }
 }
+
+function intersectInterpRect(rect) {
+    return intersectRects(rect, mouseInterpRect);
+}
+function intersectRects(r1, r2) {
+    return !(
+        r1.left > r2.right ||
+        r1.right < r2.left ||
+        r1.top > r2.bottom ||
+        r1.bottom < r2.top
+    );
+}
+function onMouseDown(e) {
+    selectionRectStart[0] = e.clientX;
+    selectionRectStart[1] = e.clientY;
+}
+function onMouseUp(e) {
+    draggingSimSelectionLeft = false;
+    draggingSimSelectionRight = false;
+}
+function onMouseMove(e) {
+    // Interp Rect:
+    // Rectangle where the prior mouse position and the new
+    // mouse position are opposite corners of the rectangle.
+    mouseInterpRect.x = Math.min(e.clientX, mouseLastPos[0]);
+    mouseInterpRect.y = Math.min(e.clientY, mouseLastPos[1]);
+    mouseInterpRect.width = Math.abs(e.clientX - mouseLastPos[0]);
+    mouseInterpRect.height = Math.abs(e.clientY - mouseLastPos[1]);
+    mouseInterpRect.top = mouseInterpRect.y;
+    mouseInterpRect.bottom = mouseInterpRect.y + mouseInterpRect.height;
+    mouseInterpRect.left = mouseInterpRect.x;
+    mouseInterpRect.right = mouseInterpRect.x + mouseInterpRect.width;
+    // Interp Circle:
+    // Circle where the prior mouse position and the new
+    // mouse position are on opposite sides of a circle.
+    mouseInterpCircle.x = (e.clientX + mouseLastPos[0]) / 2;
+    mouseInterpCircle.y = (e.clientY + mouseLastPos[1]) / 2;
+    mouseInterpCircle.r = Math.sqrt(
+        Math.pow(e.clientX - mouseLastPos[0], 2) +
+        Math.pow(e.clientY - mouseLastPos[1], 2)
+    ) / 2;
+    mouseLastPos[0] = e.clientX;
+    mouseLastPos[1] = e.clientY;
+}
+
+document.addEventListener("mousedown", onMouseDown);
+document.addEventListener("mousemove", onMouseMove);
+document.addEventListener("mouseup", onMouseUp);
 
 setupKwargBoxes();
 
@@ -1632,6 +1725,7 @@ addResizeBar(plotArea, "ew");
 addResizeBar(startPanel);
 // addResizeBar(controlColumn);
 addResizeBar(queryColumn, "ew", "before");
+addResizeBar(simSidebar, "ew", "after");
 // addResizeBar(queryColumn, "ew", "after");
 // queryPanel
 
