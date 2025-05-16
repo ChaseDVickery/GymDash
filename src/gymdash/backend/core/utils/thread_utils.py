@@ -12,6 +12,9 @@ def execute_queued():
     if threading.current_thread() is threading.main_thread():
         while queued.qsize() != 0:
             callback = queued.get()
-            callback()
+            try:
+                callback()
+            except Exception as e:
+                logger.error(f"FUNCTION QUEUED TO RUN ON MAIN THREAD FAILED WITH ERROR: {e}")
     else:
         logger.warning("execute_queued should only be invoked from the main thread.")

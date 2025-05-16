@@ -714,7 +714,10 @@ function querySimulationStatus(simIDs) {
             "Content-Type": "application/json",
         },
         body: JSON.stringify({ ids: simIDs }),
-    }).then((response) => { return response.json(); });
+    }).then((response) => { return response.json(); })
+    .catch((error) => {
+        console.error("Error calling get-sim-status: " + error);
+    });
 }
 
 
@@ -1236,9 +1239,15 @@ function deleteSimulations(simIDs) {
         refreshSimulationSidebar();
         for (const simID of simIDs) {
             simulations.remove(simID);
+            for (const plot of allPlots) {
+                plot.removeSim(simID);
+            }
+        }
+        for (const plot of allPlots) {
+            plot.modifyToSelectedSims();
         }
     })
-    .catch((error) => { console.error(`Error while deleting all simulations: ${error}`)});
+    .catch((error) => { console.error(`Error while deleting specific simulations: ${error}`)});
 }
 
 

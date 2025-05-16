@@ -203,6 +203,10 @@ const vizUtils = (
                 }
                 return lines;
             }
+            linesFrom(simID) {
+                return this.allLines()[simID];
+                // return [...Object.values(this.lines), ...Object.values(this.smoothed)].filter((line) => line.selection.attr("data-sim-id")===simID);
+            }
             linesMatching(tag) {
                 return [...Object.values(this.lines), ...Object.values(this.smoothed)].filter((line) => line.matches(tag));
             }
@@ -343,13 +347,28 @@ const vizUtils = (
                 return {width: box.width, height: box.height};
             }
 
+            removeSim(simID) {
+                // Destroy associated lines.
+                const lines = this.linesFrom(simID);
+                if (!lines) { return; }
+                for (const line of lines) {
+                    if (line.isValid()) {
+                        line.selection.remove();
+                    }
+                }
+                // Remove associated info.
+                delete this.lines[simID];
+                delete this.extentValues[simID];
+                delete this.extentSteps[simID];
+                delete this.smoothed[simID];
+            }
+
             /**
              * Resets the data for each existing line and potentially
              * calls smoothing on all lines. Does NOT change the number
              * of lines even if underlying simulation data has changed.
              */
             #refreshLines() {
-                debug("REFRESH LINES", true);
                 const sx = this.scaleX;
                 const sy = this.scaleY;
                 const eX = sx.domain();
@@ -367,8 +386,6 @@ const vizUtils = (
                     Number.isNaN(eY[0]) &&
                     Number.isNaN(eY[1])
                 );
-                console.log(`Extent X old vs new: ${this.lastRefreshExtentX} vs ${eX}. same=${sameExtentX}`);
-                console.log(`Extent Y old vs new: ${this.lastRefreshExtentY} vs ${eY}. same=${sameExtentY}`);
                 this.lastRefreshExtentX = [eX[0] ? eX[0] : this.lastRefreshExtentX[0], eX[1] ? eX[1] : this.lastRefreshExtentX[1]];
                 this.lastRefreshExtentY = [eY[0] ? eY[0] : this.lastRefreshExtentY[0], eY[1] ? eY[1] : this.lastRefreshExtentY[1]];
 
