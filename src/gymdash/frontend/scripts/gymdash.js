@@ -1098,7 +1098,7 @@ function startSimulation() {
     .then((response) => response.json())
     .then((info) => {
         debug(info);
-        const simID = info.id;
+        const simID = info.sim_id;
         if (!validID(simID)) {
             return info;
         }
@@ -1669,6 +1669,7 @@ function refreshMMIDisplay() {
     }
 }
 function onClickMMI(d) {
+    console.log("onClickMMI");
     const mmiData = d3.select(d.target).data()[0];
     selectedMMIData = mmiData;
     updateMMIFilters(mmiData);
@@ -1688,6 +1689,8 @@ function createPlots() {
     const condense = true;
     // const selectedData = getSelectedData();
     const selectedData = simulations.data();
+    console.log("selectedData");
+    console.log(selectedData);
 
     const allScalarKeys = new Set();
     // console.log(allScalarKeys);
@@ -1711,11 +1714,16 @@ function createPlots() {
     plot.smoothLines(plotSmoothValue);
     detailsPlot.smoothLines(plotSmoothValue);
 
+    plot.enableMMIs();
+    detailsPlot.enableMMIs();
     plot.addAllMMIs(selectedData, onClickMMI, condense);
     detailsPlot.addAllMMIs(selectedData, onClickMMI, condense);
+    plot.refreshMMIs();
+    detailsPlot.refreshMMIs();
     plot.addBrushX(function(event) {
         detailsPlot.updatePlotEvent(event, plot);
     }, "brush");
+    
     
     d3.select("#plots-area").append(() => plot.svg.node());
     d3.select("#plots-area").append(() => detailsPlot.svg.node());

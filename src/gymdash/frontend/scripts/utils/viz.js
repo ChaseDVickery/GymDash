@@ -82,31 +82,97 @@ const vizUtils = (
         class Tooltip {
             constructor(svg) {
                 this.svg = svg;
+                this.spots = [];
+                this.padding = 5;
+                this.width = 54;
+                this.height = 20;
+                this.tooltipDistance = 10;
+                this.spotHeight = 12;
                 
                 this.node = svg.append("g")
                     .attr("pointer-events", "none")
                     .attr("display", "none")
                     .attr("font-family", "sans-serif")
                     .attr("font-size", "0.5em")
-                    .attr("text-anchor", "middle");
-                this.node.append("rect")
-                    .attr("x", "-27")
-                    .attr("y", "-30")
-                    .attr("width", "54")
-                    .attr("height", "20")
-                    .attr("fill", "white");
-                this._date = this.node.append("text")
-                    .attr("y", "-22");
-                this._close = this.node.append("text")
-                    .attr("y", "-12");
-                this.node.append("circle")
+                    .attr("text-anchor", "middle")
+                    .attr("dominant-baseline", "text-bottom");
+                this.pointer = this.node.append("circle")
                     .attr("r", "2.5")
                     .attr("fill", "orange");
+                this.rect = this.node.append("rect")
+                    .attr("fill", "white");
+                this.#setWidth(this.width);
+                // this.#setHeight(this.height);
+                // Add 2 spots
+                this.spot(0);
+                this.spot(1);
             }
-            show(d) {
+            #setWidth(newWidth) {
+                if (newWidth < 0) { return; }
+                this.width = Math.abs(newWidth);
+                // Resize and recenter
+                this.rect
+                    .attr("x", -(this.width/2))
+                    .attr("width", this.width);
+            }
+            #setHeight(newHeight) {
+                if (newHeight < 0) { return; }
+                this.height = Math.abs(newHeight);
+                // Resize and recenter
+                this.rect
+                    .attr("y", -(this.height + this.tooltipDistance))
+                    .attr("height", this.height);
+            }
+            show(spotsText) {
+                // Fill in spots text
+                this.toNumSpots(spotsText.length);
+                let maxTextWidth = 0;
+                for (let i = 0; i < spotsText.length; i++) {
+                    const spot = this.spot(i);
+                    if (spot) { spot.text(spotsText[i]); }
+                    const spotWidth = spot.node().getBBox().width;
+                    maxTextWidth = Math.max(maxTextWidth, spotWidth);
+                }
+                this.#setWidth((2*this.padding) + maxTextWidth);
                 this.node.attr("display", null);
-                this._date.text(d.step);
-                this._close.text(d.value.toFixed(2));
+            }
+            clearSpots() { for(const s of this.spots) { s.text(""); }}
+            spot(idx) {
+                if (idx < 0) { return undefined; }
+                // Create spots until we reach the desired index.
+                while(idx >= this.spots.length) {
+                    this.#addSpot();
+                }
+                return this.spots[idx];
+            }
+            #addSpot() {
+                const newSpot = this.node.append("text");
+                // Set spot position
+                newSpot
+                    .attr("y", -(this.tooltipDistance + this.padding + (this.spotHeight*(this.spots.length + 0.25))));
+                this.spots.push(newSpot);
+                // Set height to be padding + total height for spots
+                this.#setHeight((2*this.padding) + (this.spotHeight*this.spots.length));
+                this.pointer.raise();
+            }
+            #popSpot() {
+                const popped = this.spots.pop();
+                popped.remove();
+                // Set height to be padding + total height for spots
+                this.#setHeight((2*this.padding) + (this.spotHeight*this.spots.length));
+                return popped;
+            }
+            toNumSpots(numSpots) {
+                if (numSpots < 0) { numSpots = this.spots.length - numSpots; }
+                if (numSpots < 0) { numSpots = 0; }
+                // Increase spots until we match numSpots
+                while (numSpots > this.spots.length) {
+                    this.#addSpot();
+                }
+                // Decrease spots until we match numSpots
+                while (numSpots < this.spots.length) {
+                    this.#popSpot();
+                }
             }
             moveTo(newPoint) {
                 this.node.attr("transform", `translate(${newPoint[0]},${newPoint[1]})`);
@@ -165,6 +231,8 @@ const vizUtils = (
 
                 this.tooltip = new Tooltip(this.svg);
 
+                this._mmiCondense = true;
+                this._mmisEnabled = false;
                 this.onClickMMI = undefined;
                 this.selectedMMI = undefined;
                 this.lastHoveredMMI = undefined;
@@ -175,6 +243,25 @@ const vizUtils = (
                 this.rescaleY = true;
 
                 this.init();
+            }
+
+            refreshMMIs() {
+                this.clearMMIs();
+                this.addAllMMIsFromSims(this.onClickMMI, this._mmiCondense);
+            }
+            setCondenseMMIs(newValue) {
+                this._mmiCondense = newValue;
+                if (this._mmisEnabled) {
+                    this.refreshMMIs();
+                }
+            }
+            enableMMIs() {
+                this._mmisEnabled = true;
+                this.refreshMMIs();
+            }
+            disableMMIs() {
+                this._mmisEnabled = false;
+                this.clearMMIs();
             }
 
             numLines() {
@@ -243,6 +330,7 @@ const vizUtils = (
                 this.axisX.call(d3.axisBottom(this.scaleX));
                 this.axisY.call(d3.axisLeft(this.scaleY));
                 this.#refreshLines();
+                this.refreshMMIs();
             }
 
             doSomethingElse() {
@@ -427,7 +515,7 @@ const vizUtils = (
                 let finalLine;
                 let dataPoint;
                 let nearestDistance = Infinity;
-                const neighborhood = 10;
+                const neighborhood = 0;
                 // Look for the nearest point on any lines.
                 const usedLines = this.numSmoothed() > 0 ? this.smoothedSelections() : this.lineSelections();
                 for (const line of usedLines) {
@@ -451,8 +539,15 @@ const vizUtils = (
                         }
                     }
                 }
-                if (dataPoint) {
-                    this.tooltip.show(dataPoint);
+                if (dataPoint && finalLine) {
+                    const simName = this.simulations.get(finalLine.attr("data-sim-id")).name;
+                    const step = dataPoint.step;
+                    const value = dataPoint.value;
+                    this.tooltip.show([
+                        `val : ${value.toFixed(2)}`,
+                        `step: ${step}`,
+                        simName,
+                    ]);
                     this.tooltip.moveTo([this.scaleX(dataPoint.step), this.scaleY(dataPoint.value)]);
                 }
                 this.#hoverLine(finalLine);
@@ -504,6 +599,9 @@ const vizUtils = (
                 if (this.mmiExtentRect) {
                     this.mmiExtentRect.raise();
                 }
+                if (this.tooltip) {
+                    this.tooltip.node.raise();
+                }
             }
 
             #tryInitBrushes() {
@@ -533,8 +631,7 @@ const vizUtils = (
                 // Rebuild the lines
                 this.#refreshLines();
 
-                this.clearMMIs();
-                this.addAllMMIs(this.data, this.onClickMMI, true);
+                this.refreshMMIs();
             }
 
             extentX() {
@@ -611,8 +708,7 @@ const vizUtils = (
                     this.resetY();
                 }
                 this.#refreshLines();
-                this.clearMMIs();
-                this.addAllMMIs(this.data, this.onClickMMI, true);
+                this.refreshMMIs();
             }
             resetX() {
                 const extentX = d3.extent([...extentOfKey(this.data, this.key, undefined, "step"), 0]);
@@ -634,8 +730,7 @@ const vizUtils = (
                 this.axisX.call(d3.axisBottom(this.scaleX));
                 if (rebuild) {
                     this.#refreshLines();
-                    this.clearMMIs();
-                    this.addAllMMIs(this.data, this.onClickMMI, true);
+                    this.refreshMMIs();
                 }
             }
             updatePlotY(extentY, rebuild=true) {
@@ -643,8 +738,7 @@ const vizUtils = (
                 this.axisY.call(d3.axisLeft(this.scaleY));
                 if (rebuild) {
                     this.#refreshLines();
-                    this.clearMMIs();
-                    this.addAllMMIs(this.data, this.onClickMMI, true);
+                    this.refreshMMIs();
                 }
             }
 
@@ -808,7 +902,6 @@ const vizUtils = (
                     d3.select(this.selectedMMI).attr("fill", mmiDefaultColor);
                 }
                 this.selectedMMI = mmi.target;
-                debug(this.selectedMMI);
                 d3.select(this.selectedMMI)
                     .attr("fill", mmiSelectColor);
 
@@ -827,7 +920,20 @@ const vizUtils = (
                 }
                 this.createdMMIs.length = 0;
             }
+            addAllMMIsFromSims(onclick, condense=true) {
+                const allData = this.simulations.data();
+                const subData = {};
+                for (const simID in this.simulations.selected()) {
+                    // Check if the simulation's DataReport has a scalar
+                    // key relating to this plot. Include it if so.
+                    if (allData[simID].isScalar(this.key)) {
+                        subData[simID] = allData[simID];
+                    }
+                }
+                this.addAllMMIs(subData, onclick, condense);
+            }
             addAllMMIs(allData, onclick, condense=true) {
+                this.onClickMMI = onclick;
                 const mediaKeys = new Set();
                 for (const simID in allData) {
                     allData[simID].getMediaKeys().forEach(mediaKeys.add, mediaKeys);
@@ -856,28 +962,11 @@ const vizUtils = (
                     this.addMMI(o.datum, o.id, o.key, allData, onclick, condense, createdMMIs);
                 }
             }
-            addMMIs(key, allData, onclick, condense=true, createdMMIs=[]) {
-                for (const simID in allData) {
-                    const data = allData[simID].getData(key);
-                    if (data === undefined) { continue; }
-                    for (const point of data) {
-                        this.addMMI(
-                            point,
-                            simID,
-                            key,
-                            allData,
-                            onclick,
-                            condense,
-                            createdMMIs
-                        );
-                    }
-                }
-                return createdMMIs;
-            }
             addMMI(datum, simID, key, allData, onclick, condense=true, createdMMIs=[]) {
                 const width = plotWidth;
                 const height = plotHeight;
                 const xScale = this.scaleX;
+                if (!this._mmisEnabled) { return; }
                 if (!datum) { return; }
                 // Check if this point would be too close to an existing
                 // MMI. If so, then get that MMI's MMIData and add this
@@ -899,7 +988,7 @@ const vizUtils = (
                     const markerPoints = getMMIPoints([xScale(datum.step), height-margin.bottom]);
                     const mmiData = new MMIData();
                     mmiData.addData(allData[simID], key, datum.step);
-                    this.onClickMMI = onclick;
+                    // this.onClickMMI = onclick;
                     const mmi = createMMI(this.svg, markerPoints)
                         .data([mmiData])
                         .on("mouseover", this.mouseoverMMI.bind(this))

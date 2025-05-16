@@ -74,7 +74,7 @@
 #image-media-area {
     display: grid;
     grid-template-rows: 1fr;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
     /* grid-template-columns: repeat(auto-fit, clamp(0px, minmax(300px, 1fr), 1000px)); */
 }
 #audio-media-area {
