@@ -141,6 +141,15 @@ class SimSelection {
     checked() { return this.input.checked; }
     isDone() { return this.meter.classList.contains("complete"); }    
     removeElement() { if (this.element) { this.element.remove(); } }
+    setColor(newColor) {
+        if (!newColor) { return; }
+        // this.element.style.border = `1px solid ${newColor}`;
+        // this.element.style.color = newColor;
+        this.element.style.border = `var(--main-bg-color)`;
+        this.element.style.color = `var(--main-bg-color)`;
+        this.element.style.backgroundColor = `${newColor}`;
+        
+    }
 
     completeProgress(failOrSuccess=null) {
         this.meter.classList.add("complete");
@@ -572,6 +581,8 @@ class Filter {
 const simulations = new SimulationMap();
 let selectedControlRequest;
 let selectedMMIData;
+
+vizUtils.setupStaticFields();
 
 
 function getSimName(simID) {
@@ -1761,9 +1772,6 @@ function createPlots() {
     allPlots.push(plot);
     allPlots.push(detailsPlot);
 
-    plot.smoothLines(plotSmoothSpread, plotSmoothFactor);
-    detailsPlot.smoothLines(plotSmoothSpread, plotSmoothFactor);
-
     plot.enableMMIs();
     detailsPlot.enableMMIs();
     plot.addAllMMIs(selectedData, onClickMMI, condense);
@@ -1782,8 +1790,42 @@ function createPlots() {
         // const p = vizUtils.createLinePlotForKey(k, selectedData);
         const p = vizUtils.SimPlot.createLinePlot(simulations, k);
         allPlots.push(p);
-        p.smoothLines(plotSmoothSpread, plotSmoothFactor);
         d3.select("#plots-area").append(() => p.svg.node());
+    }
+
+
+
+    for (const p of allPlots) {
+        p.setColorSettings(d3.scaleSequential(d3.interpolateSinebow), 0.1);
+        
+        p.smoothLines(plotSmoothSpread, plotSmoothFactor);
+        p.addOnHoverLine((e) => {
+            if (e.detail && e.detail.simID && e.detail.simID !== "undefined") {
+                simulations.get(e.detail.simID).selection.element.style.transform = "scale(1.05)";
+            }
+        });
+        p.addOnUnhoverLine((e) => {
+            if (e.detail && e.detail.simID && e.detail.simID !== "undefined") {
+                simulations.get(e.detail.simID).selection.element.style.transform = null;
+            }
+        });
+        p.addOnEnter((e) => {
+            if (!e.detail || !e.detail.plot) { return; }
+            selectionsToPlotColors(e.detail.plot);
+        });
+        p.addOnLeave((e) => {
+            for (const simID in simulations.selections()) {
+                simulations.get(simID).selection.element.style.transform = null;
+            }
+        });
+    }
+}
+
+function selectionsToPlotColors(plot) {
+    // Set colors for sim selections matching new plots.
+    for (const simID in simulations.selections()) {
+        if (!simulations.get(simID)) { continue; }
+        simulations.get(simID).selection.setColor(plot.colorFor(simID));
     }
 }
 

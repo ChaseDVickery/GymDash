@@ -16,12 +16,17 @@ const vizUtils = (
         const mmiGap = 0;
         const minMMIRectWidth = 2;
 
+        let _setup_done = false;
+
         class MMIData {
             static COLOR_DEFAULT    = "rgba(0,255,0,0.2)";
             static COLOR_HOVER      = "rgba(0,255,0,1)";
             static COLOR_SELECT     = "rgba(255,50,0,1)";
 
             constructor() {
+                if (!_setup_done) {
+                    console.error("Do not use vizUtils until you call setupStaticFields();");
+                }
                 this.reports = [];
                 this.keys = [];
                 this.steps = [];
@@ -81,6 +86,9 @@ const vizUtils = (
         // Adapted from https://observablehq.com/@d3/learn-d3-interaction
         class Tooltip {
             constructor(svg) {
+                if (!_setup_done) {
+                    console.error("Do not use vizUtils until you call setupStaticFields();");
+                }
                 this.svg = svg;
                 this.spots = [];
                 this.padding = 5;
@@ -184,6 +192,9 @@ const vizUtils = (
 
         class Line {
             constructor(selection, ...tags) {
+                if (!_setup_done) {
+                    console.error("Do not use vizUtils until you call setupStaticFields();");
+                }
                 this.selection  = selection;
                 this.tags       = new Set(tags);
             }
@@ -205,7 +216,15 @@ const vizUtils = (
         }
 
         class SimPlot {
+            // Have to do this because I cannot invoke d3 in the class definition.
+            // Static fields declared after
+            static defaultColorScale;
+            static defaultColorStep;
+
             constructor(svg, data, key, scaleX, scaleY, axisX, axisY, lines, simulation_map=null) {
+                if (!_setup_done) {
+                    console.error("Do not use vizUtils until you call setupStaticFields();");
+                }
                 this.svg        = svg;
                 this.data       = data;
                 this.key        = key;
@@ -242,6 +261,8 @@ const vizUtils = (
 
                 // Default settings
                 this.rescaleY = true;
+                this.colorScale = SimPlot.defaultColorScale;
+                this.colorStep = SimPlot.defaultColorStep;
 
                 this.init();
             }
@@ -334,8 +355,35 @@ const vizUtils = (
                 this.refreshMMIs();
             }
 
-            doSomethingElse() {
-                this.#rebuildLines();
+            static calculateColorAt(colorScale, step, idx) {
+                const mult = idx * step;
+                const colorValue = mult - Math.floor(mult);
+                return colorScale(colorValue);
+            }
+
+            colorAt(idx) {
+                const mult = idx * this.colorStep;
+                const colorValue = mult - Math.floor(mult);
+                return this.colorScale(colorValue);
+            }
+
+            colorFor(simID) {
+                const allData = this.simulations.data();
+                // Use the iteration order of allData to pick the index
+                let idx = 0;
+                for (const id in allData) {
+                    if (simID === id) {
+                        break;
+                    }
+                    idx += 1;
+                }
+                return this.colorAt(idx);
+            }
+
+            setColorSettings(newScale=undefined, newStep=undefined) {
+                this.colorScale = newScale ? newScale : this.colorScale;
+                this.colorStep = newStep ? newStep : this.colorStep;
+                this.#refreshLines();
             }
 
             static createLinePlot(simulation_map, key) {
@@ -348,6 +396,11 @@ const vizUtils = (
     
                 const width = plotWidth;
                 const height = plotHeight;
+
+                const bg = svg.append("rect")
+                    .attr("width", "100%")
+                    .attr("height", "100%")
+                    .attr("fill", "rgb(230,230,230)");
     
                 var clip = svg.append("defs").append("svg:clipPath")
                     .attr("id", "clip")
@@ -376,16 +429,10 @@ const vizUtils = (
                     .attr("transform", `translate(${margin.left}, 0)`)
                     .call(d3.axisLeft(yScale));
     
-                // var color = d3.scaleOrdinal()
-                //     .domain(res)
-                //     .range(['#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00','#ffff33','#a65628','#f781bf','#999999'])
-                const color = d3.scaleSequential(d3.interpolateSinebow)
-    
-                let colorT = 0;
-                const colorTStep = 0.17;
                 const lines = {};
                 const extentSteps = {};
                 const extentValues = {};
+                let idx = 0;
                 for (const simID in allData) {
                     const data = allData[simID].getScalar(key);
                     if (!data || data.length < 1) {
@@ -402,7 +449,7 @@ const vizUtils = (
                             .attr("data-sim-id", simID)
                             .attr("clip-path", "url(#clip)")
                             .attr("fill", "none")
-                            .attr("stroke", color(colorT))
+                            .attr("stroke", SimPlot.calculateColorAt(SimPlot.defaultColorScale, SimPlot.defaultColorStep, idx))
                             .attr("stroke-width", 1.5)
                             .attr("d", d3.line()
                                 .x(d => xScale(d.step))
@@ -411,8 +458,7 @@ const vizUtils = (
                         const newLine = new Line(newLineSelection);
                         lines[simID] = newLine;
                     }
-                    colorT = colorT + colorTStep;
-                    if (colorT > 1) { colorT -= 1; }
+                    idx += 1;
                 }
                 const plot = new SimPlot(
                     svg,
@@ -491,6 +537,13 @@ const vizUtils = (
                             );
                     }
                 }
+                // Reapply the current color scales
+                for (const line of this.lineSelections()) {
+                    const simID = line.attr("data-sim-id");
+                    if (!simID) { continue; }
+                    line
+                        .attr("stroke", this.colorFor(simID));
+                }
 
                 this.smoothLines(this.lastSmoothSpread, this.lastSmoothFactor);
             }
@@ -500,6 +553,19 @@ const vizUtils = (
              */
             #rebuildLines() {
                 
+            }
+
+            addOnLeave(leaveFunc) {
+                this.svg.node().addEventListener("customSimPlotOnLeave", leaveFunc);
+            }
+            addOnEnter(enterFunc) {
+                this.svg.node().addEventListener("customSimPlotOnEnter", enterFunc);
+            }
+            addOnHoverLine(hoverFunc) {
+                this.svg.node().addEventListener("customSimPlotOnHover", hoverFunc);
+            }
+            addOnUnhoverLine(leaveFunc) {
+                this.svg.node().addEventListener("customSimPlotOnUnhover", leaveFunc);
             }
 
             #onhover(event) {
@@ -541,7 +607,9 @@ const vizUtils = (
                     }
                 }
                 if (dataPoint && finalLine) {
-                    const simName = this.simulations.get(finalLine.attr("data-sim-id")).name;
+                    const simID = finalLine.attr("data-sim-id");
+                    const sim = this.simulations.get(simID);
+                    const simName = sim ? sim.name : "";
                     const step = dataPoint.step;
                     const value = dataPoint.value;
                     this.tooltip.show([
@@ -551,11 +619,31 @@ const vizUtils = (
                     ]);
                     this.tooltip.moveTo([this.scaleX(dataPoint.step), this.scaleY(dataPoint.value)]);
                 }
+                // Fire custom events on the simID
+                if (dataPoint && finalLine) {
+                    // If prior hoveredLine and not the same as new hovered line, 
+                    // then trigger unhover event on old line
+                    if (this.hoveredLine && this.hoveredLine !== finalLine) {
+                        const lastHoveredID = this.hoveredLine.attr("data-sim-id");
+                        const customUnhoverEvent = new CustomEvent("customSimPlotOnUnhover", {detail: {simID: lastHoveredID, line: this.hoveredLine}});
+                        this.svg.node().dispatchEvent(customUnhoverEvent);
+                    }
+                    const simID = finalLine.attr("data-sim-id");
+                    const sim = this.simulations.get(simID);
+                    const customHoverEvent = new CustomEvent("customSimPlotOnHover", {detail: {simID: simID, line: finalLine}});
+                    this.svg.node().dispatchEvent(customHoverEvent);
+                }
                 this.#hoverLine(finalLine);
+            }
+            #onenter(event) {
+                const customEvent = new CustomEvent("customSimPlotOnEnter", {detail: {plot: this, key: this.key}});
+                this.svg.node().dispatchEvent(customEvent);
             }
             #onleave(event) {
                 this.tooltip.hide();
                 this.#hoverLine(undefined);
+                const customEvent = new CustomEvent("customSimPlotOnLeave", {detail: {plot: this, key: this.key}});
+                this.svg.node().dispatchEvent(customEvent);
             }
             #hoverLine(line) {
                 if (this.hoveredLine) {
@@ -575,6 +663,8 @@ const vizUtils = (
                 // https://developer.mozilla.org/en-US/docs/Web/API/Element#mouse_events
                 this.svg
                     .on("mousemove", this.#onhover.bind(this));
+                this.svg
+                    .on("mouseenter", this.#onenter.bind(this));
                 this.svg
                     .on("mouseleave", this.#onleave.bind(this));
 
@@ -1082,8 +1172,15 @@ const vizUtils = (
                 .attr("fill", mmiDefaultColor);
         }
 
+        const setupStaticFields = function() {
+            SimPlot.defaultColorScale = d3.scaleSequential(d3.interpolateSinebow);
+            SimPlot.defaultColorStep = 0.27;
+            _setup_done = true;
+        }
+
         return {
-            SimPlot
+            SimPlot,
+            setupStaticFields
         };
     }
 )();

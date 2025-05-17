@@ -58,6 +58,9 @@
         gap: 10px;
     }
 }
+.sim-selection-box:hover {
+    transform: scale(1.05);
+}
 
 /* .incomplete */
 .radial-progress-completion {
