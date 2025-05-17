@@ -224,7 +224,8 @@ const vizUtils = (
                 this.lastRefreshExtentY = [undefined, undefined];
                 
                 // Smoothed lines
-                this.lastSmooth = 0;
+                this.lastSmoothSpread = 0;
+                this.lastSmoothFactor = 1;
                 this.lastSmoothExtentX = [undefined, undefined];
                 this.lastSmoothExtentY = [undefined, undefined];
                 this.smoothed   = {};
@@ -491,7 +492,7 @@ const vizUtils = (
                     }
                 }
 
-                this.smoothLines(this.lastSmooth);
+                this.smoothLines(this.lastSmoothSpread, this.lastSmoothFactor);
             }
             /**
              * Rebuilds lines by destroying current lines and using the
@@ -742,25 +743,22 @@ const vizUtils = (
                 }
             }
 
-            smoothLines(smoothing) {
-                // const eX = this.extentX();
-                // const eY = this.extentY();
+            smoothLines(smoothingSpread, smoothingFactor=1) {
                 const eX = this.scaleX.domain();
                 const eY = this.scaleY.domain();
-                const sameSmooth = this.lastSmooth === smoothing;
+                const sameSmoothSpread = this.lastSmoothSpread === smoothingSpread;
+                const sameSmoothFactor = this.lastSmoothFactor === smoothingFactor;
                 const sameExtentX = this.lastSmoothExtentX[0] === eX[0] &&
                                     this.lastSmoothExtentX[1] === eX[1];
                 const sameExtentY = this.lastSmoothExtentY[0] === eY[0] &&
                                     this.lastSmoothExtentY[1] === eY[1];
-                const reloadData = !(sameSmooth && sameExtentX && sameExtentY);
-                this.lastSmooth = smoothing;
+                const reloadData = !(sameSmoothSpread && sameSmoothFactor && sameExtentX && sameExtentY);
+                this.lastSmoothSpread = smoothingSpread;
+                this.lastSmoothFactor = smoothingFactor;
                 this.lastSmoothExtentX = eX;
                 this.lastSmoothExtentY = eY;
-                // Remove prior smoothed lines
-                // this.svg.selectAll(".line-smooth").remove();
-                // this.smoothed = {};
                 // Add them back if we are doing any smoothing
-                if (smoothing > 0) {
+                if (smoothingSpread > 0) {
                     for (const line of this.lineSelections()) {
                         const simID = line.attr("data-sim-id");
                         if (Object.hasOwn(this.smoothed, simID)) {
@@ -775,7 +773,7 @@ const vizUtils = (
                                 // Get data from orig line
                                 const data = line.datum();
                                 // Get smoothed version of data
-                                const smoothedData = dataUtils.smoothData(data.map(d => d.value), smoothing);
+                                const smoothedData = dataUtils.smoothData(data.map(d => d.value), smoothingSpread, smoothingFactor);
                                 const finalData = [];
                                 for (let i = 0; i < smoothedData.length; i++) {
                                     finalData.push({...(data[i])});
@@ -794,7 +792,7 @@ const vizUtils = (
                             // Get data from orig line
                             const data = line.datum();
                             // Get smoothed version of data
-                            const smoothedData = dataUtils.smoothData(data.map(d => d.value), smoothing);
+                            const smoothedData = dataUtils.smoothData(data.map(d => d.value), smoothingSpread, smoothingFactor);
                             const finalData = [];
                             for (let i = 0; i < smoothedData.length; i++) {
                                 finalData.push({...(data[i])});

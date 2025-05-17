@@ -235,7 +235,7 @@ const dataUtils = (
                 keys: keys,
                 exclusion_mode: exclusion_mode
             })
-        });}
+        }).catch((error)=>{console.error("Caught error on call to sim-data-all: " + error)});}
         // const fetchAllRecentValues    = () => {return fetch(apiURL(`read-key/?exp_key=${encodeURIComponent("tb\\stock\\train")}&key=${encodeURIComponent("rollout/ep_rew_mean")}&recent=True`));}
 
         // Public Utilities
@@ -497,6 +497,7 @@ const dataUtils = (
                         // Return promise of media report
                         return generateStatReportFromZip(blob);
                     } else {
+                        console.log(`Problem fetching all data for sim ${simID}`);
                         return Promise.resolve(new DataReport(simID));
                     }
                     
@@ -511,43 +512,46 @@ const dataUtils = (
          * Returns a new data array where values have been smoothed
          * using a sliding average window around each original data point.
          * The sliding window size is based on the length of data and the
-         * smoothFactor.
+         * smoothSpread. Repeats a number of times equal to smoothFactor
          * 
          * @param {Array} data 
+         * @param {Number} smoothSpread 
          * @param {Number} smoothFactor 
-         * @returns 
+         * @returns {Array}
          */
-        const smoothData = function(data, smoothFactor=0.1) {
+        const smoothData = function(data, smoothSpread=0.1, smoothFactor=1) {
             const dataLen = data.length;
-            const halfWindow = Math.floor((smoothFactor*dataLen)/2)-1;
+            const halfWindow = Math.floor((smoothSpread*dataLen)/2)-1;
             const window = (2*halfWindow) + 1;
-            if (halfWindow <= 0)    { return data; }
-            // Pad the front and back of data with repeats of the
-            // first data value and last value respectively.
-            const tempData = [
-                ...(new Array(halfWindow).fill(data[0])),
-                ...data,
-                ...(new Array(halfWindow).fill(data[dataLen-1])),
-            ];
-            const smoothed      = new Array(dataLen);
-            const windowValues  = tempData.slice(0, window);
-            let windowIdx = 0;
-            let windowSum = windowValues.reduce((sum, current) => sum+=current, 0);
-            let dataIdx = window;
-            for (let idx = 0; idx < dataLen; idx++) {
-                // Get average of window values
-                smoothed[idx] = windowSum / window;
-                // Replace oldest window value with newest window value by
-                // changing the current window sum, and then altering the
-                // window element's value to an updated value.
-                const replacementValue = tempData[dataIdx];
-                windowSum -= windowValues[windowIdx];
-                windowSum += replacementValue;
-                windowValues[windowIdx] = replacementValue;
-                // Update indices for accessing the next window element
-                // and the next data element.
-                windowIdx = (windowIdx + 1) % window;
-                dataIdx += 1;
+            const smoothed = [...data];
+            if (halfWindow <= 0)    { return smoothed; }
+            for (let i = 0; i < smoothFactor; i++) {
+                // Pad the front and back of data with repeats of the
+                // first data value and last value respectively.
+                const tempData = [
+                    ...(new Array(halfWindow).fill(smoothed[0])),
+                    ...smoothed,
+                    ...(new Array(halfWindow).fill(smoothed[dataLen-1])),
+                ];
+                const windowValues  = tempData.slice(0, window);
+                let windowIdx = 0;
+                let windowSum = windowValues.reduce((sum, current) => sum+=current, 0);
+                let dataIdx = window;
+                for (let idx = 0; idx < dataLen; idx++) {
+                    // Get average of window values
+                    smoothed[idx] = windowSum / window;
+                    // Replace oldest window value with newest window value by
+                    // changing the current window sum, and then altering the
+                    // window element's value to an updated value.
+                    const replacementValue = tempData[dataIdx];
+                    windowSum -= windowValues[windowIdx];
+                    windowSum += replacementValue;
+                    windowValues[windowIdx] = replacementValue;
+                    // Update indices for accessing the next window element
+                    // and the next data element.
+                    windowIdx = (windowIdx + 1) % window;
+                    dataIdx += 1;
+                }
             }
             return smoothed;
         }

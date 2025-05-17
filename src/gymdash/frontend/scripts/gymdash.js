@@ -56,11 +56,15 @@ const sendQueryBtn              = document.querySelector("#send-query-btn");
 // Settings
 const settingBarTitle           = document.querySelector("#setting-bar-title");
 const settingBarContent         = document.querySelector("#setting-bar-content");
-const plotSmoothSlider_Setting  = document.querySelector("#plot-smoothing-slider");
-const plotSmoothLabel_Setting   = document.querySelector("label[for=plot-smoothing-slider]");
+const plotSmoothSpreadSlider_Setting  = document.querySelector("#plot-smooth-spread-slider");
+const plotSmoothFactorSlider_Setting  = document.querySelector("#plot-smooth-factor-slider");
+const plotSmoothSpreadLabel_Setting   = document.querySelector("label[for=plot-smooth-spread-slider]");
+const plotSmoothFactorLabel_Setting   = document.querySelector("label[for=plot-smooth-factor-slider]");
+
 const rescaleDetailsY_Setting   = document.querySelector("#rescale-details-axis");
 
-let plotSmoothValue             = 0;
+let plotSmoothSpread            = 0;
+let plotSmoothFactor            = 1;
 let rescaleDetailsAxisY         = false;
 
 // General
@@ -611,6 +615,12 @@ function deselectAll() {
     }
 }
 
+function refreshData() {
+    updateData(simulations.selections(), dataUtils.getRecent)
+        .then((allDataReports) => {
+            createPlots();
+        });
+}
 function displayVideoTest() {
     updateData(simulations.selected(), dataUtils.getRecent)
         .then((allDataReports) => {
@@ -657,6 +667,7 @@ function updateData(selections, retrievalCallback) {
             // Add the data from each new report to the current
             // Simulation DataReports
             for (let j = 0; j < allDataReports.length; j++) {
+                if (!allDataReports[j]) { continue; }
                 simulations.combineData(allDataReports[j]);
             }
             return Promise.resolve(allDataReports);
@@ -1069,14 +1080,16 @@ function queueSimulation() {
     })
     .then((response) => response.json())
     .then((info) => {
+        console.log("queued simulation:");
         console.log(info);
-        const simID = info.id;
+        const simID = info.sim_id;
         if (!validID(simID)) {
             return info;
         }
         const newSelection = createSimSelection(config, simID);
         const simulation = Simulation.fromSelection(simID, newSelection);
         simulation.setActive(true);
+        simulation.setInfo(info);
         // Store new simulation in tracker
         simulations.add(simulation);
         return info;
@@ -1401,7 +1414,9 @@ resourceUsageDisplayUtils.setupResourceUsageDisplay(miniResourcePreview, true);
 
 deleteAllSimsTestBtn.addEventListener("click", showDeleteAllSimulationsOption);
 deleteSelectedSimsTestBtn.addEventListener("click", deleteSelectedSimulations);
-imageTestBtn.addEventListener("click", displayVideoTest);
+// imageTestBtn.addEventListener("click", displayVideoTest);
+imageTestBtn.addEventListener("click", refreshData);
+
 
 // Listening for control requests sent from server
 const ctrlReqSrc = new EventSource(apiURL("get-control-requests"));
@@ -1436,10 +1451,15 @@ toggleDisplay(mmFilterAreaSim);
 toggleDisplay(mmFilterAreaStep);
 
 // Settings
-plotSmoothSlider_Setting.addEventListener("input", (e) => {
-    changeSetting_PlotSmooth(Number(e.target.value));
-    plotSmoothValue = Number(e.target.value);
-    plotSmoothLabel_Setting.textContent = `Smoothing: (${plotSmoothValue.toFixed(2)})`;
+plotSmoothSpreadSlider_Setting.addEventListener("input", (e) => {
+    const newValue = Number(e.target.value);
+    changeSetting_PlotSmoothSpread(newValue);
+    plotSmoothSpreadLabel_Setting.textContent = `Smooth Spread: (${plotSmoothSpread.toFixed(2)})`;
+});
+plotSmoothFactorSlider_Setting.addEventListener("input", (e) => {
+    const newValue = Math.floor(Number(e.target.value));
+    changeSetting_PlotSmoothFactor(newValue);
+    plotSmoothFactorLabel_Setting.textContent = `Smooth Factor: (${plotSmoothFactor.toFixed(2)})`;
 });
 rescaleDetailsY_Setting.addEventListener("change", (e) => {
     changeSetting_RescaleDetailsAxisY(rescaleDetailsY_Setting.checked);
@@ -1459,12 +1479,19 @@ refreshSimulationSidebar();
 openTab(null, "tab-analyze");
 
 
-function changeSetting_PlotSmooth(newSmooth) {
+function changeSetting_PlotSmoothSpread(newSmoothSpread) {
     // Clamp smoothing value
-    plotSmoothValue = 0.5 * Math.min(1, Math.max(0, newSmooth));
+    plotSmoothSpread = 0.5 * Math.min(1, Math.max(0, newSmoothSpread));
     // Apply smoothing to all plots
     for (const plot of allPlots) {
-        plot.smoothLines(plotSmoothValue);
+        plot.smoothLines(plotSmoothSpread, plotSmoothFactor);
+    }
+}
+function changeSetting_PlotSmoothFactor(newSmoothFactor) {
+    plotSmoothFactor = Math.min(10, Math.max(1, newSmoothFactor));
+    // Apply smoothing to all plots
+    for (const plot of allPlots) {
+        plot.smoothLines(plotSmoothSpread, plotSmoothFactor);
     }
 }
 function changeSetting_RescaleDetailsAxisY(shouldRescale) {
@@ -1687,7 +1714,6 @@ function createPlots() {
     clearMainPlot();
 
     const condense = true;
-    // const selectedData = getSelectedData();
     const selectedData = simulations.data();
     console.log("selectedData");
     console.log(selectedData);
@@ -1711,8 +1737,8 @@ function createPlots() {
     allPlots.push(plot);
     allPlots.push(detailsPlot);
 
-    plot.smoothLines(plotSmoothValue);
-    detailsPlot.smoothLines(plotSmoothValue);
+    plot.smoothLines(plotSmoothSpread, plotSmoothFactor);
+    detailsPlot.smoothLines(plotSmoothSpread, plotSmoothFactor);
 
     plot.enableMMIs();
     detailsPlot.enableMMIs();
@@ -1732,7 +1758,7 @@ function createPlots() {
         // const p = vizUtils.createLinePlotForKey(k, selectedData);
         const p = vizUtils.SimPlot.createLinePlot(simulations, k);
         allPlots.push(p);
-        p.smoothLines(plotSmoothValue);
+        p.smoothLines(plotSmoothSpread, plotSmoothFactor);
         d3.select("#plots-area").append(() => p.svg.node());
     }
 }

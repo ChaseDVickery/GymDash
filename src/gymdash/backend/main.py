@@ -161,7 +161,11 @@ async def get_sim_recent_media(sim_id: SimulationIDModel):
 async def start_new_simulation_call(config: SimulationStartConfig):
     logger.debug(f"API called start-new-test with config: {config}")
     if simulation_tracker.is_clearing:
-        return { "id": str(simulation_tracker.no_id) }
+        return StoredSimulationInfo(
+            name = config.name,
+            sim_id = str(simulation_tracker.no_id),
+            config = config
+        )
     id, _ = simulation_tracker.start_sim(config)
     return StoredSimulationInfo(
         name = config.name,
@@ -172,7 +176,11 @@ async def start_new_simulation_call(config: SimulationStartConfig):
 async def queue_new_simulation_call(config: SimulationStartConfig):
     logger.debug(f"API called queue-new-sim with config: {config}")
     if simulation_tracker.is_clearing:
-        return { "id": str(simulation_tracker.no_id) }
+        return StoredSimulationInfo(
+            name = config.name,
+            sim_id = str(simulation_tracker.no_id),
+            config = config
+        )
     id, _ = simulation_tracker.queue_sim(config)
     return StoredSimulationInfo(
         name = config.name,
@@ -237,8 +245,9 @@ async def get_all_recent_scalars():
 async def get_sim_data_recent(query: StatQuery):
     sim = simulation_tracker.get_sim(query.id)
     if sim is None:
+        # https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Status/418
         raise HTTPException(
-            status_code=404,
+            status_code=418,
             detail=f"sim-data-recent endpoint found no simulation with id '{query.id}'"
         )
     return StreamingResponse(
@@ -256,7 +265,7 @@ async def get_sim_data_all(query: StatQuery):
     sim = simulation_tracker.get_sim(query.id)
     if sim is None:
         raise HTTPException(
-            status_code=404,
+            status_code=418,
             detail=f"sim-data-all endpoint found no simulation with id '{query.id}'"
         )
     return StreamingResponse(
