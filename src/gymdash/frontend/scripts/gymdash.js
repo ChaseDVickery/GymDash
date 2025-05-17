@@ -1189,7 +1189,32 @@ function stopSimulation(simID) {
  * to actually delete all simulations.
  */
 function showDeleteAllSimulationsOption() {
-    deleteAllSimulations();
+    let affectedSimsString = "Are you sure you wish to delete the following simulations and all their data? This cannot be reversed:\n\n";
+    for (const simID of Object.keys(simulations.selections())) {
+        if (!simulations.get(simID)) { continue; }
+        affectedSimsString += `${simulations.get(simID).name} (${simID})\n`;
+    }
+    if (window.confirm(affectedSimsString)) {
+        deleteAllSimulations();
+    } else {
+        console.log("Simulations not deleted");
+    }
+}
+/**
+ * Displays a confirmation dialog requesting permission
+ * to actually delete selected simulations.
+ */
+function showDeleteSelectedSimulationsOption() {
+    let affectedSimsString = "Are you sure you wish to delete the following simulations and all their data? This cannot be reversed:\n\n";
+    for (const simID of Object.keys(simulations.selected())) {
+        if (!simulations.get(simID)) { continue; }
+        affectedSimsString += `${simulations.get(simID).name} (${simID})\n`;
+    }
+    if (window.confirm(affectedSimsString)) {
+        deleteSelectedSimulations();
+    } else {
+        console.log("Simulations not deleted");
+    }
 }
 /**
  * Attempts to delete all simulations for the project.
@@ -1215,7 +1240,6 @@ function deleteAllSimulations() {
  * Attempts to delete selected simulations.
  */
 function deleteSelectedSimulations() {
-    console.log("deleteSelectedSimulations");
     // Visually indicate all running sims as cancelling
     const simIDs = [];
     // for (const [key, simSelection] of Object.entries(getAllSelections())) {
@@ -1413,7 +1437,7 @@ resourceUsageDisplayUtils.setupResourceUsageDisplay(fullResourcePreview);
 resourceUsageDisplayUtils.setupResourceUsageDisplay(miniResourcePreview, true);
 
 deleteAllSimsTestBtn.addEventListener("click", showDeleteAllSimulationsOption);
-deleteSelectedSimsTestBtn.addEventListener("click", deleteSelectedSimulations);
+deleteSelectedSimsTestBtn.addEventListener("click", showDeleteSelectedSimulationsOption);
 // imageTestBtn.addEventListener("click", displayVideoTest);
 imageTestBtn.addEventListener("click", refreshData);
 

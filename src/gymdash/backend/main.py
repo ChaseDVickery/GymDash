@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (FileResponse, JSONResponse, Response,
                                StreamingResponse)
-
+import matplotlib.pyplot as plt
 import gymdash
 from gymdash.backend.core.api.config.config import tags
 from gymdash.backend.core.api.models import (SimulationIDModel,
@@ -35,6 +35,9 @@ from gymdash.backend.project import ProjectManager
 logger = logging.getLogger(__name__)
 # logging.basicConfig(level = logging.DEBUG, format = '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s')
 logging.basicConfig(level = logging.INFO, format = '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s')
+
+# Switch matplotlib backend?
+plt.switch_backend('agg')
 
 simulation_tracker = SimulationTracker()
 # Apply patching methods to other packages

@@ -362,6 +362,7 @@ class SimulationStreamer:
         self._cached_keys = []
         self._cached_tag_key_map = {}
         self._cached_key_tag_map = {}
+        self._mutex = Lock()
         
 
     def key_has_tag(self, key: str, tag: str) -> bool:
@@ -420,13 +421,15 @@ class SimulationStreamer:
         return None
 
     def clear(self):
-        self.log_map.clear()
-        self.key_log_map.clear()
-        self._cached_tag_key_map.clear()
-        self._cached_keys.clear()
+        with self._mutex:
+            self.log_map.clear()
+            self.key_log_map.clear()
+            self._cached_tag_key_map.clear()
+            self._cached_keys.clear()
 
     def get_streamer(self, log_key: str):
-        return self.log_map[log_key] if log_key in self.log_map else None
+        with self._mutex:
+            return self.log_map[log_key] if log_key in self.log_map else None
 
     def _get_or_register(self, log_key: str, streamer: Any):
         retrieved = self.get_streamer(log_key)
@@ -444,20 +447,25 @@ class SimulationStreamer:
         return self._get_or_register(streamer.streamer_name, streamer)
     
     def register(self, log_key: str, streamer: Any):
-        if (log_key in self.log_map):
-            return False
-        self.log_map[log_key] = streamer
-        # Add stat keys from the streamer to my map
-        for stat_key, tag in streamer.get_stat_keys():
-            self.key_log_map[stat_key] = log_key
-        print(f"Register streamer '{log_key}'")
-        return True
+        with self._mutex:
+            if (log_key in self.log_map):
+                return False
+            self.log_map[log_key] = streamer
+            # Add stat keys from the streamer to my map
+            for stat_key, tag in streamer.get_stat_keys():
+                self.key_log_map[stat_key] = log_key
+            print(f"Register streamer '{log_key}'")
+            return True
     
     def items(self):
-        return self.log_map.items()
+        """Return an array of references to registered Streamer keys and Streamers."""
+        with self._mutex:
+            return [x for x in self.log_map.items()]
     
     def streamers(self):
-        return self.log_map.values()
+        """Return an array of references to registered Streamers."""
+        with self._mutex:
+            return [x for x in self.log_map.values()]
 
 class Simulation():
 
