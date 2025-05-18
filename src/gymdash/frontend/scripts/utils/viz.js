@@ -9,9 +9,9 @@ const vizUtils = (
         const margin = {top: 30, right: 30, bottom: 30, left: 60};
         const mmiExtentMarginPercent = 0.05;
         // MMIs
-        const mmiDefaultColor = "rgba(0,255,0,0.2)";
-        const mmiHoverColor = "rgba(0,255,0,1)";
-        const mmiSelectColor = "rgba(255,50,0,1)";
+        // const mmiDefaultColor = "rgba(0,255,0,0.2)";
+        // const mmiHoverColor = "rgba(0,255,0,1)";
+        // const mmiSelectColor = "rgba(255,50,0,1)";
         const mmiSideLength = 20;
         const mmiGap = 0;
         const minMMIRectWidth = 2;
@@ -224,6 +224,10 @@ const vizUtils = (
             static defaultColorAxisText;
             static defaultColorScale;
             static defaultColorStep;
+
+            static mmiDefaultColor  = "rgba(0,255,0,0.2)";
+            static mmiHoverColor    = "rgba(0,255,0,1)";
+            static mmiSelectColor   = "rgba(255,50,0,1)";
             
 
             constructor() {
@@ -237,12 +241,17 @@ const vizUtils = (
                 this.axisTextColor  = PlotSettings.defaultColorAxisText;
                 this.colorScale     = PlotSettings.defaultColorScale;
                 this.colorScaleStep = PlotSettings.defaultColorStep;
+
+                
+                this.mmiDefaultColor= PlotSettings.mmiDefaultColor;
+                this.mmiHoverColor  = PlotSettings.mmiHoverColor;
+                this.mmiSelectColor = PlotSettings.mmiSelectColor;
             }
 
             colorAt(idx) {
                 // Need to check if a categorical scale or function
                 if (Array.isArray(this.colorScale)) {
-                    if (Array.isArray(this.colorScale[0])) {
+                    if (Array.isArray(this.colorScale[this.colorScale.length-1])) {
                         const colorArray = this.colorScale[this.colorScale.length-1];
                         return colorArray[idx % colorArray.length];
                     } else {
@@ -261,7 +270,7 @@ const vizUtils = (
              * 
              * @param {SimPlot} plot 
              */
-            applyToPlot(plot) {
+            apply(plot) {
                 plot.bg
                     .attr("fill", this.bgColor);
                 this.applyAxisSettings(plot.axisX);
@@ -273,18 +282,19 @@ const vizUtils = (
                     line
                         .attr("stroke", plot.colorFor(simID));
                 }
+                plot.refreshMMIs();
             }
 
             applyAxisSettings(axisSelection) {
                 // Axis text color
                 axisSelection
-                    .style("stroke", this.axisTextColor);
+                    .attr("stroke", this.axisTextColor);
                 // Axis line color
                 axisSelection.select(".domain")
-                    .style("stroke", this.axisColor);
+                    .attr("stroke", this.axisColor);
                 // Axis tick color
-                axisSelection.selectAll(".tick line")
-                    .style("stroke", this.axisColor);
+                axisSelection.selectAll(".tick > line")
+                    .attr("stroke", this.axisColor);
             }
 
             /**
@@ -307,9 +317,12 @@ const vizUtils = (
                     this.titleColor     = settingValue;
                     this.axisColor      = settingValue;
                     this.axisTextColor  = settingValue;
+                    this.mmiSelectColor = settingValue;
+                    this.mmiHoverColor  = settingValue;
                 }
                 else if (settingName === "secondary") {
                     this.bgColor        = settingValue;
+                    this.mmiDefaultColor= invertColor(this.bgColor);
                 }
                 return this;
             }
@@ -373,7 +386,7 @@ const vizUtils = (
             useSettings(settings) {
                 if (settings && settings instanceof PlotSettings) {
                     this.settings = settings;
-                    this.settings.applyToPlot(this);
+                    this.settings.apply(this);
                 }
             }
 
@@ -463,6 +476,7 @@ const vizUtils = (
                 this.axisY.call(d3.axisLeft(this.scaleY));
                 this.#refreshLines();
                 this.refreshMMIs();
+                this.settings.apply(this);
             }
 
             colorFor(simID) {
@@ -1064,21 +1078,21 @@ const vizUtils = (
                 if (this.selectedMMI === mmi.target) { return; }
                 if (!mmiData) { return; }
                 mmiSelection
-                    .attr("fill", mmiHoverColor);
+                    .attr("fill", this.settings.mmiHoverColor);
             }
             mouseleaveMMI(mmi) {
                 const mmiSelection = d3.select(mmi.target);
                 if (this.selectedMMI === mmi.target) { return; }
                 mmiSelection
-                    .attr("fill", mmiDefaultColor);
+                    .attr("fill", this.settings.mmiDefaultColor);
             }
             clickMMI(mmi) {
                 if (this.selectedMMI && this.selectedMMI !== mmi.target) {
-                    d3.select(this.selectedMMI).attr("fill", mmiDefaultColor);
+                    d3.select(this.selectedMMI).attr("fill", this.settings.mmiDefaultColor);
                 }
                 this.selectedMMI = mmi.target;
                 d3.select(this.selectedMMI)
-                    .attr("fill", mmiSelectColor);
+                    .attr("fill", this.settings.mmiSelectColor);
 
                 if (this.onClickMMI) {
                     this.onClickMMI(mmi);
@@ -1170,6 +1184,10 @@ const vizUtils = (
                         .on("mousemove", this.mousemoveMMI.bind(this))
                         .on("mouseleave", this.mouseleaveMMI.bind(this))
                         .on("click", this.clickMMI.bind(this));
+                    // Apply a couple visual adjustments to MMI
+                    mmi
+                        .attr("fill", this.settings.mmiDefaultColor)
+                        .attr("stroke", this.settings.mmiDefaultColor);
                     const created = {step: datum.step, selection: mmi};
                     const insertIdx = sortedIndex(createdMMIs, created, (x) => x.step);
                     createdMMIs.splice(insertIdx, 0, created);
@@ -1253,10 +1271,8 @@ const vizUtils = (
             return svg.append("polygon")
                 .attr("class", "mmi-marker")
                 .attr("points", markerPointsString)
-                .attr("stroke", "yellow")
                 .attr("stroke-width", 1)
                 .attr("stroke-opacity", 0.2)
-                .attr("fill", mmiDefaultColor);
         }
 
         /**
@@ -1309,15 +1325,21 @@ const vizUtils = (
          */
         const invertColorRGB = function(rgb, bw) {
             let compact = true;
+            let rgba = false;
             if (rgb.toLowerCase().indexOf("rgb(") === 0) {
                 compact = false;
                 rgb = rgb.slice(4);
+            }
+            else if (rgb.toLowerCase().indexOf("rgba(") === 0) {
+                compact = false;
+                rgba = true;
+                rgb = rgb.slice(5);
             }
             if (rgb.endsWith(")")) {
                 rgb = rgb.slice(0, rgb.length-1);
             }
             const components = rgb.split(",");
-            if (components.length != 3) { throw new Error("Invalid RGB color."); }
+            if (components.length != 3 && components.length != 4) { throw new Error("Invalid RGB color."); }
             var r = parseInt(components[0], 10),
                 g = parseInt(components[1], 10),
                 b = parseInt(components[2], 10);
@@ -1327,7 +1349,11 @@ const vizUtils = (
             if (compact) {
                 return internal;
             }
-            return "rgb(" + internal + ")";
+            if (rgba) {
+                return "rgba(" + internal + "," + components[3] + ")";
+            } else {
+                return "rgb(" + internal + ")";
+            }
         }
         /**
          * Inverts a color string.
@@ -1336,7 +1362,6 @@ const vizUtils = (
          * @param {Boolean} bw 
          */
         const invertColor = function(colorString, bw) {
-            colorString.startsWith
             if (colorString.startsWith("rgb")) {
                 return invertColorRGB(colorString, bw);
             }

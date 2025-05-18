@@ -114,6 +114,57 @@ prefabcontrolRequestBox.remove();
 prefabFilterDiscrete.remove();
 prefabFilterBetween.remove();
 
+class GlobalSettings {
+    static defaultColorBad      = "red";
+    static defaultColorContrast = "#eed550";
+    static defaultColorMain     = "#102030";
+    
+    constructor() {
+        // Colors
+        this.mainColor      = GlobalSettings.defaultColorMain;
+        this.contrastColor  = GlobalSettings.defaultColorContrast;
+        this.badColor       = GlobalSettings.defaultColorBad;
+    }
+
+    /**
+     * Applies the PlotSettings to the given Element.
+     * 
+     * @param {Element} element 
+     */
+    apply(element) {
+        element.style.setProperty("--main-bg-color", this.mainColor);
+        element.style.setProperty("--main-contrast-color", this.contrastColor);
+        element.style.setProperty("--badColor1", this.badColor);
+    }
+
+    /**
+     * Alter the settings using a given key-value pair
+     * and return the same settings object.
+     * 
+     * @param {String} settingName 
+     * @param {Any} settingValue 
+     * @returns 
+     */
+    changeSetting(settingName, settingValue) {
+        if (Object.hasOwn(this, settingName)) {
+            this[settingName]   = settingValue;
+        }
+        return this;
+    }
+}
+
+class Theme {
+    /**
+     * 
+     * @param {GlobalSettings} globalSettings 
+     * @param {vizUtils.PlotSettings} plotSettings 
+     */
+    constructor(globalSettings, plotSettings) {
+        this.globalSettings = globalSettings ? globalSettings : new GlobalSettings();
+        this.plotSettings   = plotSettings ? plotSettings : new vizUtils.PlotSettings();
+    }
+}
+
 class SimSelection {
     constructor(element, config, simID, startChecked=false) {
         // Elements
@@ -579,9 +630,25 @@ class Filter {
 const simulations = new SimulationMap();
 let selectedControlRequest;
 let selectedMMIData;
+let currentTheme;
 
 vizUtils.setupStaticFields();
 
+/**
+ * Applies a Theme to the page.
+ * 
+ * @param {Theme} theme 
+ */
+function applyTheme(theme) {
+    currentTheme = theme;
+    const r = document.querySelector(":root");
+    // Apply GlobalSettings
+    theme.globalSettings.apply(r);
+    // Apply PlotSettings
+    for (const plot of allPlots) {
+        plot.useSettings(theme.plotSettings);
+    }
+}
 
 function getSimName(simID) {
     const sim = simulations.get(simID);
@@ -1507,6 +1574,37 @@ setInterval(updateAllSimSelectionProgress, defaultSimProgressUpdateInterval);
 setInterval(function() { canQuerySimStatus = true; }, defaultMaxSimStatusUpdatePeriod);
 // setInterval(updateAllSimSelectionStatus, defaultSimProgressUpdateInterval);
 
+const themeClassic = new Theme(
+    new GlobalSettings(),
+    new vizUtils.PlotSettings()
+)
+const themeBW = new Theme(
+    new GlobalSettings()
+        .changeSetting("mainColor", "#ffffff")
+        .changeSetting("contrastColor", "#000000"),
+    new vizUtils.PlotSettings()
+        .changeSetting("main", "#000000")
+        .changeSetting("secondary", "#ffffff")
+        .changeSetting("colorScale", (x) => "#000000")
+);
+const themeNeon = new Theme(
+    new GlobalSettings()
+        .changeSetting("mainColor", "#000000")
+        .changeSetting("contrastColor", "#ffffff"),
+    new vizUtils.PlotSettings()
+        .changeSetting("main", "#ffffff")
+        .changeSetting("secondary", "#000000")
+        .changeSetting("mmiDefaultColor", "rgba(255,255,255,0.2)")
+        .changeSetting("colorScale", d3.interpolateSinebow)
+)
+const myTheme = new Theme(
+    new GlobalSettings()
+        .changeSetting("mainColor", "#ddeeff")
+        .changeSetting("contrastColor", "#223070"),
+    new vizUtils.PlotSettings()
+);
+applyTheme(themeClassic);
+
 
 refreshSimulationSidebar();
 openTab(null, "tab-analyze");
@@ -1797,12 +1895,12 @@ function createPlots() {
         // p.setColorSettings(d3.scaleSequential(d3.interpolateSinebow), 0.1);
         // d3.interpolatePlasma
         // d3.schemeYlOrRd
-        p.useSettings(
-            new vizUtils.PlotSettings()
-                .changeSetting("main", "black")
-                .changeSetting("secondary", "white")
-                .changeSetting("colorScale", d3.schemeCategory10)
-        );
+        // p.useSettings(
+        //     new vizUtils.PlotSettings()
+        //         .changeSetting("main", "black")
+        //         .changeSetting("secondary", "white")
+        //         .changeSetting("colorScale", d3.schemeCategory10)
+        // );
 
 
         p.smoothLines(plotSmoothSpread, plotSmoothFactor);
@@ -1826,6 +1924,8 @@ function createPlots() {
             }
         });
     }
+
+    applyTheme(currentTheme);
 }
 
 function selectionsToPlotColors(plot) {
