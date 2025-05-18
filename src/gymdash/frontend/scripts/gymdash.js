@@ -143,11 +143,9 @@ class SimSelection {
     removeElement() { if (this.element) { this.element.remove(); } }
     setColor(newColor) {
         if (!newColor) { return; }
-        // this.element.style.border = `1px solid ${newColor}`;
-        // this.element.style.color = newColor;
         this.element.style.border = `var(--main-bg-color)`;
-        this.element.style.color = `var(--main-bg-color)`;
         this.element.style.backgroundColor = `${newColor}`;
+        this.label.style.color = vizUtils.invertColor(newColor, true);
         
     }
 
@@ -1796,12 +1794,21 @@ function createPlots() {
 
 
     for (const p of allPlots) {
-        p.setColorSettings(d3.scaleSequential(d3.interpolateSinebow), 0.1);
-        
+        // p.setColorSettings(d3.scaleSequential(d3.interpolateSinebow), 0.1);
+        // d3.interpolatePlasma
+        // d3.schemeYlOrRd
+        p.useSettings(
+            new vizUtils.PlotSettings()
+                .changeSetting("main", "black")
+                .changeSetting("secondary", "white")
+                .changeSetting("colorScale", d3.schemeCategory10)
+        );
+
+
         p.smoothLines(plotSmoothSpread, plotSmoothFactor);
         p.addOnHoverLine((e) => {
             if (e.detail && e.detail.simID && e.detail.simID !== "undefined") {
-                simulations.get(e.detail.simID).selection.element.style.transform = "scale(1.05)";
+                simulations.get(e.detail.simID).selection.element.style.transform = "scale(1.025)";
             }
         });
         p.addOnUnhoverLine((e) => {

@@ -215,11 +215,107 @@ const vizUtils = (
             }
         }
 
-        class SimPlot {
+        class PlotSettings {
             // Have to do this because I cannot invoke d3 in the class definition.
             // Static fields declared after
+            static defaultColorBackground;
+            static defaultColorTitle;
+            static defaultColorAxis;
+            static defaultColorAxisText;
             static defaultColorScale;
             static defaultColorStep;
+            
+
+            constructor() {
+                if (!_setup_done) {
+                    console.error("Do not use vizUtils until you call setupStaticFields();");
+                }
+                // Colors
+                this.bgColor        = PlotSettings.defaultColorBackground;
+                this.titleColor     = PlotSettings.defaultColorTitle;
+                this.axisColor      = PlotSettings.defaultColorAxis;
+                this.axisTextColor  = PlotSettings.defaultColorAxisText;
+                this.colorScale     = PlotSettings.defaultColorScale;
+                this.colorScaleStep = PlotSettings.defaultColorStep;
+            }
+
+            colorAt(idx) {
+                // Need to check if a categorical scale or function
+                if (Array.isArray(this.colorScale)) {
+                    if (Array.isArray(this.colorScale[0])) {
+                        const colorArray = this.colorScale[this.colorScale.length-1];
+                        return colorArray[idx % colorArray.length];
+                    } else {
+                        return this.colorScale[idx % this.colorScale.length];
+                    }
+                } else {
+                    const mult = idx * this.colorScaleStep;
+                    const colorValue = mult - Math.floor(mult);
+                    return this.colorScale(colorValue);
+                }                    
+            }
+
+            /**
+             * Applies the PlotSettings to the given SimPlot.
+             * Refreshes the SimPlot when necessary.
+             * 
+             * @param {SimPlot} plot 
+             */
+            applyToPlot(plot) {
+                plot.bg
+                    .attr("fill", this.bgColor);
+                this.applyAxisSettings(plot.axisX);
+                this.applyAxisSettings(plot.axisY);
+                // Reapply the current color scales to all lines
+                for (const line of plot.lineSelections()) {
+                    const simID = line.attr("data-sim-id");
+                    if (!simID) { continue; }
+                    line
+                        .attr("stroke", plot.colorFor(simID));
+                }
+            }
+
+            applyAxisSettings(axisSelection) {
+                // Axis text color
+                axisSelection
+                    .style("stroke", this.axisTextColor);
+                // Axis line color
+                axisSelection.select(".domain")
+                    .style("stroke", this.axisColor);
+                // Axis tick color
+                axisSelection.selectAll(".tick line")
+                    .style("stroke", this.axisColor);
+            }
+
+            /**
+             * Alter the PlotSettings using a given key-value pair
+             * and return the same PlotSettings object.
+             * 
+             * @param {String} settingName 
+             * @param {Any} settingValue 
+             * @returns 
+             */
+            changeSetting(settingName, settingValue) {
+                if (Object.hasOwn(this, settingName)) {
+                    this[settingName]   = settingValue;
+                }
+                else if (settingName === "axis") {
+                    this.axisColor      = settingValue;
+                    this.axisTextColor  = settingValue;
+                }
+                else if (settingName === "main") {
+                    this.titleColor     = settingValue;
+                    this.axisColor      = settingValue;
+                    this.axisTextColor  = settingValue;
+                }
+                else if (settingName === "secondary") {
+                    this.bgColor        = settingValue;
+                }
+                return this;
+            }
+        }
+
+        class SimPlot {
 
             constructor(svg, data, key, scaleX, scaleY, axisX, axisY, lines, simulation_map=null) {
                 if (!_setup_done) {
@@ -234,6 +330,7 @@ const vizUtils = (
                 this.axisY      = axisY;
                 this.lines      = lines;
                 this.simulations= simulation_map;
+                this.bg         = this.svg.select(".plot-bg");
 
                 this.extentValues= {};
                 this.extentSteps= {};
@@ -261,10 +358,23 @@ const vizUtils = (
 
                 // Default settings
                 this.rescaleY = true;
-                this.colorScale = SimPlot.defaultColorScale;
-                this.colorStep = SimPlot.defaultColorStep;
+                this.settings = new PlotSettings();
 
                 this.init();
+
+                this.useSettings(this.settings);
+            }
+
+            /**
+             * Caches and applies a PlotSettings to this plot.
+             * 
+             * @param {PlotSettings} settings 
+             */
+            useSettings(settings) {
+                if (settings && settings instanceof PlotSettings) {
+                    this.settings = settings;
+                    this.settings.applyToPlot(this);
+                }
             }
 
             refreshMMIs() {
@@ -355,18 +465,6 @@ const vizUtils = (
                 this.refreshMMIs();
             }
 
-            static calculateColorAt(colorScale, step, idx) {
-                const mult = idx * step;
-                const colorValue = mult - Math.floor(mult);
-                return colorScale(colorValue);
-            }
-
-            colorAt(idx) {
-                const mult = idx * this.colorStep;
-                const colorValue = mult - Math.floor(mult);
-                return this.colorScale(colorValue);
-            }
-
             colorFor(simID) {
                 const allData = this.simulations.data();
                 // Use the iteration order of allData to pick the index
@@ -377,17 +475,12 @@ const vizUtils = (
                     }
                     idx += 1;
                 }
-                return this.colorAt(idx);
-            }
-
-            setColorSettings(newScale=undefined, newStep=undefined) {
-                this.colorScale = newScale ? newScale : this.colorScale;
-                this.colorStep = newStep ? newStep : this.colorStep;
-                this.#refreshLines();
+                return this.settings.colorAt(idx);
             }
 
             static createLinePlot(simulation_map, key) {
                 const svg = getPlotOrMakeNew(undefined);
+                const defaultSettings = new PlotSettings();
     
                 const allData = simulation_map.data();
     
@@ -398,6 +491,7 @@ const vizUtils = (
                 const height = plotHeight;
 
                 const bg = svg.append("rect")
+                    .classed("plot-bg", true)
                     .attr("width", "100%")
                     .attr("height", "100%")
                     .attr("fill", "rgb(230,230,230)");
@@ -449,7 +543,7 @@ const vizUtils = (
                             .attr("data-sim-id", simID)
                             .attr("clip-path", "url(#clip)")
                             .attr("fill", "none")
-                            .attr("stroke", SimPlot.calculateColorAt(SimPlot.defaultColorScale, SimPlot.defaultColorStep, idx))
+                            .attr("stroke", defaultSettings.colorAt(idx))
                             .attr("stroke-width", 1.5)
                             .attr("d", d3.line()
                                 .x(d => xScale(d.step))
@@ -536,13 +630,6 @@ const vizUtils = (
                                 .y(function(d) { return sy(d.value) })
                             );
                     }
-                }
-                // Reapply the current color scales
-                for (const line of this.lineSelections()) {
-                    const simID = line.attr("data-sim-id");
-                    if (!simID) { continue; }
-                    line
-                        .attr("stroke", this.colorFor(simID));
                 }
 
                 this.smoothLines(this.lastSmoothSpread, this.lastSmoothFactor);
@@ -1172,15 +1259,123 @@ const vizUtils = (
                 .attr("fill", mmiDefaultColor);
         }
 
+        /**
+         * Taken from:
+         * https://stackoverflow.com/questions/35969656/how-can-i-generate-the-opposite-color-according-to-current-color
+         * for invertColorHex
+         */
+        function padZero(str, len) {
+            len = len || 2;
+            var zeros = new Array(len).join('0');
+            return (zeros + str).slice(-len);
+        }
+        /**
+         * Inverts a color represented with a hex code, optionally
+         * converting to black or white depending on which has
+         * more contrast to the input color. This was taken and modified
+         * from: https://stackoverflow.com/questions/35969656/how-can-i-generate-the-opposite-color-according-to-current-color
+         * 
+         * @param {String} hex 
+         * @param {Boolean} bw 
+         * @returns {Color}
+         */
+        const invertColorHex = function(hex, bw) {
+            if (hex.indexOf('#') === 0) {
+                hex = hex.slice(1);
+            }
+            // convert 3-digit hex to 6-digits.
+            if (hex.length === 3) {
+                hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+            }
+            if (hex.length !== 6) {
+                throw new Error('Invalid HEX color.');
+            }
+            var r = parseInt(hex.slice(0, 2), 16),
+                g = parseInt(hex.slice(2, 4), 16),
+                b = parseInt(hex.slice(4, 6), 16);
+            const inverted = invertColorValues(r,g,b,bw);
+            // pad each with zeros and return
+            return "#" + padZero(inverted.r.toString(16)) + padZero(inverted.g.toString(16)) + padZero(inverted.b.toString(16));
+        }
+        /**
+         * Inverts a color represented with a rgb code, optionally
+         * converting to black or white depending on which has
+         * more contrast to the input color. RGB color should look like:
+         * rgb(#,#,#) or #,#,#. Values should be in the range of 0-255.
+         * 
+         * @param {String} rgb 
+         * @param {Boolean} bw 
+         * @returns {Color}
+         */
+        const invertColorRGB = function(rgb, bw) {
+            let compact = true;
+            if (rgb.toLowerCase().indexOf("rgb(") === 0) {
+                compact = false;
+                rgb = rgb.slice(4);
+            }
+            if (rgb.endsWith(")")) {
+                rgb = rgb.slice(0, rgb.length-1);
+            }
+            const components = rgb.split(",");
+            if (components.length != 3) { throw new Error("Invalid RGB color."); }
+            var r = parseInt(components[0], 10),
+                g = parseInt(components[1], 10),
+                b = parseInt(components[2], 10);
+            const inverted = invertColorValues(r,g,b,bw);
+            // pad each with zeros and return
+            const internal = inverted.r.toString(10) + "," + inverted.g.toString(10) + "," + inverted.b.toString(10);
+            if (compact) {
+                return internal;
+            }
+            return "rgb(" + internal + ")";
+        }
+        /**
+         * Inverts a color string.
+         * 
+         * @param {String} colorString 
+         * @param {Boolean} bw 
+         */
+        const invertColor = function(colorString, bw) {
+            colorString.startsWith
+            if (colorString.startsWith("rgb")) {
+                return invertColorRGB(colorString, bw);
+            }
+            if (colorString.startsWith("#")) {
+                return invertColorHex(colorString, bw);
+            }
+            throw new Error("Could not find way to invert color string.");
+        }
+        const invertColorValues = function(r,g,b, bw) {
+            if (bw) {
+                // https://stackoverflow.com/a/3943023/112731
+                return (r * 0.299 + g * 0.587 + b * 0.114) > 186
+                    ? {r: 0, g: 0, b: 0}
+                    : {r: 255, g: 255, b: 255};
+            }
+            // invert color components
+            r = (255 - r);
+            g = (255 - g);
+            b = (255 - b);
+            return {r: r, g: g, b: b};
+        }
+
         const setupStaticFields = function() {
-            SimPlot.defaultColorScale = d3.scaleSequential(d3.interpolateSinebow);
-            SimPlot.defaultColorStep = 0.27;
+            PlotSettings.defaultColorBackground = "rgb(230,230,230)";
+            PlotSettings.defaultColorTitle      = "rgb(25,25,25)";
+            PlotSettings.defaultColorAxis       = "rgb(25,25,25)";
+            PlotSettings.defaultColorAxisText   = "rgb(25,25,25)";
+            PlotSettings.defaultColorScale      = d3.scaleSequential(d3.interpolateSinebow);
+            PlotSettings.defaultColorStep       = 0.27;
             _setup_done = true;
         }
 
         return {
             SimPlot,
-            setupStaticFields
+            PlotSettings,
+            setupStaticFields,
+            invertColorRGB,
+            invertColorHex,
+            invertColor
         };
     }
 )();
