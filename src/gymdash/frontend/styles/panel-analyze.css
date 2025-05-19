@@ -14,7 +14,8 @@
 .plots-panel {
     width: 100%;
     min-width: 50px;
-    /* flex: 1 1 auto; */
+    /* display: flex; */
+    /* flex-direction: column; */
 }
 .media-panel {
     display: flex;
@@ -74,7 +75,8 @@
 #image-media-area {
     display: grid;
     grid-template-rows: 1fr;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+    gap: calc(var(--mega-gap)*3) var(--mega-gap);
     /* grid-template-columns: repeat(auto-fit, clamp(0px, minmax(300px, 1fr), 1000px)); */
 }
 #audio-media-area {
@@ -96,9 +98,40 @@
 }
 .plot-line.hovered-line {
     filter: saturate(120%);
-    stroke-width: 2px;
+    stroke-width: 3.5px;
 }
 .plot-line.selection-hovered-line {
     filter: saturate(140%);
-    stroke-width: 3px;
+    stroke-width: 3.5px;
+}
+
+#main-plots-panel {
+    display: flex;
+}
+#overview-plot-panel {
+    width: 50%;
+}
+#details-plot-panel {
+    width: 50%;
+}
+#scalar-plots-panel {
+
+}
+
+.plot-key-panel {
+    display: flex;
+    flex-direction: column;
+    gap: var(--std-gap);
+}
+.plot-key-area{
+    display: grid;
+    padding: var(--std-gap);
+    grid-template-rows: 1fr;
+    /* grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); */
+    grid-auto-columns: repeat(auto-fit, minmax(300px, 300px));
+    gap: var(--extra-gap);
+}
+.plot-key-area-label {
+    cursor: pointer;
+    text-align: center;
 }

@@ -222,7 +222,7 @@ input[type=range]::-moz-range-progress {
 }
 
 .content-panel {
-    border: dashed 1px var(--main-contrast-color);
+    border: solid 1px var(--main-contrast-color);
     border-radius: var(--panel-br);
     padding: var(--panel-pad);
 }

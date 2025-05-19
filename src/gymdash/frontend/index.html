@@ -215,7 +215,7 @@
                 </div>
                 <div class="setting">
                     <label for="plot-smooth-factor-slider">Smooth Factor</label>
-                    <input type="range" min="1" max="10" value="1" step="1" id="plot-smooth-factor-slider" class="slider">
+                    <input type="range" min="1" max="5" value="1" step="1" id="plot-smooth-factor-slider" class="slider">
                 </div>
                 <div class="setting">
                     <label for="rescale-details-axis">Rescale Details Y-Axis</label>
@@ -338,6 +338,20 @@
                 <div class="plots-panel analyze-panel content-panel" id="plots-area">
                     <p>Plots panel</p>
                     <div class="plot-settings">My Plot settings</div>
+                    <div id="main-plots-panel">
+                        <div id="overview-plot-panel"></div>
+                        <div id="details-plot-panel"></div>
+                    </div>
+                    <div id="scalar-plots-panel">
+                        <div class="plot-key-panel content-panel" id="default-plot-key-panel">
+                            <div class="plot-key-area-label">Default</div>
+                            <div class="plot-key-area"></div>
+                        </div>
+                        <div class="prefab plot-key-panel content-panel">
+                            <div class="plot-key-area-label">Key</div>
+                            <div class="plot-key-area"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="media-panel analyze-panel content-panel">
                     <h3>Multimedia</h3>

@@ -5,7 +5,7 @@ const vizUtils = (
 
         // Constants
         const plotWidth = 700;
-        const plotHeight = 500;
+        const plotHeight = 400;
         const margin = {top: 30, right: 30, bottom: 30, left: 60};
         const mmiExtentMarginPercent = 0.05;
         // MMIs
@@ -225,9 +225,11 @@ const vizUtils = (
             static defaultColorScale;
             static defaultColorStep;
 
-            static mmiDefaultColor  = "rgba(0,255,0,0.2)";
-            static mmiHoverColor    = "rgba(0,255,0,1)";
-            static mmiSelectColor   = "rgba(255,50,0,1)";
+            static mmiDefaultColor      = "rgba(0,255,0,0.2)";
+            static mmiHoverColor        = "rgba(0,255,0,1)";
+            static mmiSelectColor       = "rgba(255,50,0,1)";
+            static mmiRectHoverColor    = "rgba(0,255,0,1)";
+            static mmiRectDefaultColor  = "rgba(255,50,0,1)";
             
 
             constructor() {
@@ -246,6 +248,14 @@ const vizUtils = (
                 this.mmiDefaultColor= PlotSettings.mmiDefaultColor;
                 this.mmiHoverColor  = PlotSettings.mmiHoverColor;
                 this.mmiSelectColor = PlotSettings.mmiSelectColor;
+            }
+
+            copy() {
+                const other = new PlotSettings();
+                for (const fieldName in this) {
+                    other[fieldName] = this[fieldName];
+                }
+                return other;
             }
 
             colorAt(idx) {
@@ -275,6 +285,8 @@ const vizUtils = (
                     .attr("fill", this.bgColor);
                 this.applyAxisSettings(plot.axisX);
                 this.applyAxisSettings(plot.axisY);
+                plot.mmiExtentRect
+                    .attr("fill", this.mmiRectDefaultColor);
                 // Reapply the current color scales to all lines
                 for (const line of plot.lineSelections()) {
                     const simID = line.attr("data-sim-id");
@@ -558,7 +570,7 @@ const vizUtils = (
                             .attr("clip-path", "url(#clip)")
                             .attr("fill", "none")
                             .attr("stroke", defaultSettings.colorAt(idx))
-                            .attr("stroke-width", 1.5)
+                            .attr("stroke-width", 2.5)
                             .attr("d", d3.line()
                                 .x(d => xScale(d.step))
                                 .y(d => yScale(d.value))
@@ -1001,7 +1013,7 @@ const vizUtils = (
                                 .style("opacity", 1)
                                 .attr("stroke", line.attr("stroke"))
                                 .attr("visibility", line.attr("visibility"))
-                                .attr("stroke-width", 1.5)
+                                .attr("stroke-width", 2.5)
                                 .attr("d", d3.line()
                                     .x(d => this.scaleX(d.step))
                                     .y(d => this.scaleY(d.value))
@@ -1248,10 +1260,11 @@ const vizUtils = (
                     // .select("#plots-area")
                     // .append("svg")
                     .create("svg")
+                    .classed("plot", true)
                     .attr("viewBox", `0 0 ${width} ${height}`)
                     .attr("preserveAspectRatio", "xMinYMin meet")
-                    // .attr("width", width)
-                    // .attr("height", height)
+                    // .attr("width", "100%")
+                    // .attr("height", "100%")
                     .style("border", "1px solid black");
             }
             return existingSVG;
@@ -1385,7 +1398,7 @@ const vizUtils = (
         }
 
         const setupStaticFields = function() {
-            PlotSettings.defaultColorBackground = "rgb(230,230,230)";
+            PlotSettings.defaultColorBackground = "rgb(230,230,230,0)";
             PlotSettings.defaultColorTitle      = "rgb(25,25,25)";
             PlotSettings.defaultColorAxis       = "rgb(25,25,25)";
             PlotSettings.defaultColorAxisText   = "rgb(25,25,25)";

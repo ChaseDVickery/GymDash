@@ -73,6 +73,9 @@ const deleteAllSimsTestBtn      = document.querySelector("#delete-all-sims-test-
 const deleteSelectedSimsTestBtn = document.querySelector("#delete-selected-sims-test-btn");
 // Plots
 const plotArea                  = document.querySelector("#plots-area");
+const overviewPlotArea          = plotArea.querySelector("#overview-plot-panel");
+const detailsPlotArea           = plotArea.querySelector("#details-plot-panel");
+const scalarPlotsArea           = plotArea.querySelector("#scalar-plots-panel");
 // Multimedia Filter
 const mmInstancePanel           = document.querySelector(".media-panel");
 const mmFilterSortPanel         = mmInstancePanel.querySelector("#media-filter-sort-panel");
@@ -103,6 +106,7 @@ const prefabResizerBar          = document.querySelector(".prefab.resizer-bar");
 const prefabcontrolRequestBox   = document.querySelector(".prefab.control-request");
 const prefabFilterDiscrete      = document.querySelector(".prefab.discrete-filter-setting");
 const prefabFilterBetween       = document.querySelector(".prefab.between-filter-setting");
+const prefabPlotKeyPanel        = document.querySelector(".prefab.plot-key-panel");
 prefabSimSelectBox.remove();
 prefabKwargPanel.remove();
 prefabKwarg.remove();
@@ -113,6 +117,18 @@ prefabResizerBar.remove();
 prefabcontrolRequestBox.remove();
 prefabFilterDiscrete.remove();
 prefabFilterBetween.remove();
+prefabPlotKeyPanel.remove();
+prefabSimSelectBox.classList.remove("prefab");
+prefabKwargPanel.classList.remove("prefab");
+prefabKwarg.classList.remove("prefab");
+prefabImageMedia.classList.remove("prefab");
+prefabAudioMedia.classList.remove("prefab");
+prefabVideoMedia.classList.remove("prefab");
+prefabResizerBar.classList.remove("prefab");
+prefabcontrolRequestBox.classList.remove("prefab");
+prefabFilterDiscrete.classList.remove("prefab");
+prefabFilterBetween.classList.remove("prefab");
+prefabPlotKeyPanel.classList.remove("prefab");
 
 class GlobalSettings {
     static defaultColorBad      = "red";
@@ -1590,20 +1606,22 @@ const themeBW = new Theme(
 const themeNeon = new Theme(
     new GlobalSettings()
         .changeSetting("mainColor", "#000000")
-        .changeSetting("contrastColor", "#ffffff"),
+        .changeSetting("contrastColor", "#f000ff"),
     new vizUtils.PlotSettings()
         .changeSetting("main", "#ffffff")
         .changeSetting("secondary", "#000000")
-        .changeSetting("mmiDefaultColor", "rgba(255,255,255,0.2)")
+        .changeSetting("mmiDefaultColor", "rgba(240,0,255,0.3)")
+        .changeSetting("mmiSelectColor", "rgba(240,0,255,1)")
+        .changeSetting("mmiHoverColor", "rgba(240,0,255,1)")
         .changeSetting("colorScale", d3.interpolateSinebow)
-)
+);
 const myTheme = new Theme(
     new GlobalSettings()
         .changeSetting("mainColor", "#ddeeff")
         .changeSetting("contrastColor", "#223070"),
     new vizUtils.PlotSettings()
 );
-applyTheme(themeClassic);
+applyTheme(themeNeon);
 
 
 refreshSimulationSidebar();
@@ -1833,6 +1851,29 @@ function onClickMMI(d) {
     updateMMIFilters(mmiData);
     displayMMIData(mmiData);
 }
+/**
+ * 
+ * @param {String} key 
+ */
+function getOrCreatePlotAreaForKey(key) {
+    // Split key
+    const components = key.split("/");
+    // Couldn't split, just put in the default category
+    if (components.length == 1) {
+        return document.querySelector("#default-plot-key-panel");
+    }
+    // Look for each key component
+    const category = components[0];
+    const foundPanel = scalarPlotsArea.querySelector(`.plot-key-panel[data-key="${category}"]`);
+    if (foundPanel) {
+        return foundPanel;
+    } else {
+        const newPlotPanel = prefabPlotKeyPanel.cloneNode(true);
+        newPlotPanel.dataset.key = category;
+        scalarPlotsArea.appendChild(newPlotPanel);
+        return newPlotPanel;
+    }
+}
 function createPlots() {
     // const key = "rollout/ep_rew_mean";
     const key = "loss/train";
@@ -1842,7 +1883,16 @@ function createPlots() {
 
     mainPlots.splice(0, mainPlots.length);
     allPlots.splice(0, allPlots.length);
-    clearMainPlot();
+    for (const panel of document.querySelectorAll(".plot-key-panel")) {
+        panel.remove();
+    }
+    for (const svg of plotArea.querySelectorAll("svg")) {
+        svg.remove();
+    }
+    // clearMainPlot();
+    // for (const panel of document.querySelectorAll(".plot-key-panel")) {
+    //     panel.remove();
+    // }
 
     const condense = true;
     const selectedData = simulations.data();
@@ -1858,6 +1908,25 @@ function createPlots() {
     console.log(allScalarKeys);
 
     if (Object.keys(selectedData).length <= 0) { return; }
+
+    // Create new scalar plot areas
+    const keyPanels = {};
+    const panels = new Set();
+    for (const key of allScalarKeys) {
+        const newPlotPanel = getOrCreatePlotAreaForKey(key);
+        keyPanels[key] = newPlotPanel;
+        panels.add(newPlotPanel);
+    }
+    for (const panel of panels) {
+        const newPlotPanel = panel;
+        const newPlotArea = newPlotPanel.querySelector(".plot-key-area");
+        const newPlotAreaLabel = newPlotPanel.querySelector(".plot-key-area-label");
+        newPlotAreaLabel.textContent = newPlotPanel.dataset.key;
+        newPlotAreaLabel.addEventListener("click", (e) => {
+            toggleDisplay(newPlotArea);
+        });
+    }
+    
 
     // const plot = vizUtils.createLinePlotForKey(key, selectedData);
     // const detailsPlot = vizUtils.createLinePlotForKey(key, selectedData);
@@ -1878,31 +1947,23 @@ function createPlots() {
         detailsPlot.updatePlotEvent(event, plot);
     }, "brush");
     
-    
-    d3.select("#plots-area").append(() => plot.svg.node());
-    d3.select("#plots-area").append(() => detailsPlot.svg.node());
+    console.log(overviewPlotArea);
+    console.log(detailsPlotArea);
+    d3.select(overviewPlotArea).append(() => plot.svg.node());
+    d3.select(detailsPlotArea).append(() => detailsPlot.svg.node());
 
     for (const k of allScalarKeys) {
         // const p = vizUtils.createLinePlotForKey(k, selectedData);
         const p = vizUtils.SimPlot.createLinePlot(simulations, k);
         allPlots.push(p);
-        d3.select("#plots-area").append(() => p.svg.node());
+
+        d3.select(keyPanels[k].querySelector(".plot-key-area")).append(() => p.svg.node());
+        // d3.select(newPlotArea).append(() => p.svg.node());
     }
 
 
 
     for (const p of allPlots) {
-        // p.setColorSettings(d3.scaleSequential(d3.interpolateSinebow), 0.1);
-        // d3.interpolatePlasma
-        // d3.schemeYlOrRd
-        // p.useSettings(
-        //     new vizUtils.PlotSettings()
-        //         .changeSetting("main", "black")
-        //         .changeSetting("secondary", "white")
-        //         .changeSetting("colorScale", d3.schemeCategory10)
-        // );
-
-
         p.smoothLines(plotSmoothSpread, plotSmoothFactor);
         p.addOnHoverLine((e) => {
             if (e.detail && e.detail.simID && e.detail.simID !== "undefined") {
@@ -1949,6 +2010,7 @@ addResizeBar(simSidebar, "ew", "after");
 // https://stackoverflow.com/questions/8960193/how-to-make-html-element-resizable-using-pure-javascript
 function addResizeBar(resizablePanel, direction="ew", position="after") {
     var startX, startY, startWidth, startHeight;
+    var origToggleWidth;
     const newBar = prefabResizerBar.cloneNode(true);
     newBar.classList.add(direction);
     if (position === "after") {
@@ -1990,9 +2052,24 @@ function addResizeBar(resizablePanel, direction="ew", position="after") {
     }
     
     function stopDrag(e) {
+        // Save new orig size
         document.documentElement.removeEventListener('mousemove', doDrag, false);
         document.documentElement.removeEventListener('mouseup', stopDrag, false);
     }
 
+    function toggle(e) {
+        console.log("toggle");
+        const w = parseInt(resizablePanel.style.width.replace("px", ""), 10);
+        if (w > 0) {
+            origToggleWidth = resizablePanel.style.width;
+            resizablePanel.style.width = "0px";
+        } else {
+            // resizablePanel.style.width = origToggleWidth;
+            resizablePanel.style.width = "100%";
+        }
+    }
+
+    origToggleWidth = parseInt(document.defaultView.getComputedStyle(resizablePanel).width, 10);
     newBar.addEventListener('mousedown', initDrag, false);
+    newBar.addEventListener('dblclick', toggle, false);
 }
