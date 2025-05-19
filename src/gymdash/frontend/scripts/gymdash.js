@@ -142,6 +142,14 @@ class GlobalSettings {
         this.badColor       = GlobalSettings.defaultColorBad;
     }
 
+    copy() {
+        const other = new GlobalSettings();
+        for (const fieldName in this) {
+            other[fieldName] = this[fieldName];
+        }
+        return other;
+    }
+
     /**
      * Applies the PlotSettings to the given Element.
      * 
@@ -178,6 +186,13 @@ class Theme {
     constructor(globalSettings, plotSettings) {
         this.globalSettings = globalSettings ? globalSettings : new GlobalSettings();
         this.plotSettings   = plotSettings ? plotSettings : new vizUtils.PlotSettings();
+    }
+
+    copy() {
+        return new Theme(
+            this.globalSettings.copy(),
+            this.plotSettings.copy()
+        );
     }
 }
 
@@ -1615,13 +1630,16 @@ const themeNeon = new Theme(
         .changeSetting("mmiHoverColor", "rgba(240,0,255,1)")
         .changeSetting("colorScale", d3.interpolateSinebow)
 );
+const themeNeon2 = themeNeon.copy();
+themeNeon2.globalSettings
+    .changeSetting("contrastColor", "rgb(116,238,21)");
 const myTheme = new Theme(
     new GlobalSettings()
         .changeSetting("mainColor", "#ddeeff")
         .changeSetting("contrastColor", "#223070"),
     new vizUtils.PlotSettings()
 );
-applyTheme(themeNeon);
+applyTheme(themeNeon2);
 
 
 refreshSimulationSidebar();
