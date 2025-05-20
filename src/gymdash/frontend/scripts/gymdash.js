@@ -970,7 +970,7 @@ function sendSingleQuery(simID) {
     return query(queryBody);
 }
 function sendQuery() {
-    const selections = getSelectedSelections();
+    const selections = simulations.selected();
     const promises = [];
     for (const simID in selections) {
         promises.push(sendSingleQuery(simID));
@@ -1639,7 +1639,37 @@ const myTheme = new Theme(
         .changeSetting("contrastColor", "#223070"),
     new vizUtils.PlotSettings()
 );
-applyTheme(themeNeon2);
+// Some theme colors from: https://designpixie.com/blogs/creative-design-ideas/pastel-color-palettes-with-color-codes
+const themeSoft = new Theme(
+    new GlobalSettings()
+        .changeSetting("mainColor", "rgb(249,238,237)")
+        .changeSetting("contrastColor", "#7c5c8c"),
+    new vizUtils.PlotSettings()
+        // .changeSetting("colorScale", d3.schemePastel2)
+        .changeSetting("colorScale", d3.schemeDark2)
+        // .changeSetting("main", "#ffffff")
+        // .changeSetting("secondary", "#bcd8ec")
+        // .changeSetting("main", "#bcd8ec")
+        // .changeSetting("secondary", "#000000")
+        .changeSetting("main", "#000000")
+        .changeSetting("secondary", "rgb(239,228,227)")
+        .changeSetting("mmiDefaultColor", "#d6e5bd")
+        .changeSetting("mmiSelectColor", "#ffcbe1")
+        .changeSetting("mmiHoverColor", "#f9e1a8")
+);
+const themePlain = new Theme(
+    new GlobalSettings()
+        .changeSetting("mainColor", "rgb(239,238,237)")
+        .changeSetting("contrastColor", "#101020"),
+    new vizUtils.PlotSettings()
+        .changeSetting("colorScale", d3.schemePaired)
+        .changeSetting("main", "#000000")
+        .changeSetting("secondary", "#ffffff")
+        .changeSetting("mmiDefaultColor", "rgba(0,255,0,0.2)")
+        .changeSetting("mmiHoverColor", "rgba(0,255,0,1)")
+        .changeSetting("mmiSelectColor", "rgba(255,50,0,1)")
+);
+applyTheme(themeClassic);
 
 
 refreshSimulationSidebar();
@@ -1893,8 +1923,8 @@ function getOrCreatePlotAreaForKey(key) {
     }
 }
 function createPlots() {
-    // const key = "rollout/ep_rew_mean";
-    const key = "loss/train";
+    const key = "rollout/ep_rew_mean";
+    // const key = "loss/train";
     // const key = "loss/val";
     // const key = "acc/val";  
     // const key = "my_number";

@@ -6,7 +6,7 @@ include-package-data = true
 
 [project]
 name = "gymdash"
-version = "0.0.1"
+version = "0.1.0"
 authors = [
   { name="Chase Vickery", email="chasedvickery@gmail.com" },
 ]
