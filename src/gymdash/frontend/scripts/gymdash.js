@@ -1906,6 +1906,8 @@ function onClickMMI(d) {
 function getOrCreatePlotAreaForKey(key) {
     // Split key
     const components = key.split("/");
+    console.log(key);
+    console.log(components);
     // Couldn't split, just put in the default category
     if (components.length == 1) {
         return document.querySelector("#default-plot-key-panel");
@@ -1932,6 +1934,7 @@ function createPlots() {
     mainPlots.splice(0, mainPlots.length);
     allPlots.splice(0, allPlots.length);
     for (const panel of document.querySelectorAll(".plot-key-panel")) {
+        if (panel.id === "default-plot-key-panel") { continue; }
         panel.remove();
     }
     for (const svg of plotArea.querySelectorAll("svg")) {

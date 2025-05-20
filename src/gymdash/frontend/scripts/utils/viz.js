@@ -469,11 +469,6 @@ const vizUtils = (
                 }
                 // Alter the scales and axes so that they are only based on the
                 // currently selected simulations
-                const asdfasdf =this.extentOfExtents(
-                    Object.values(this.simulations.selected())
-                        .filter((simSel) => simSel.checked())
-                        .map((simSel) => this.extentSteps[simSel.id])
-                );
                 this.scaleX.domain(this.extentOfExtents(
                     Object.values(this.simulations.selected())
                         .filter((simSel) => simSel.checked())
@@ -832,6 +827,7 @@ const vizUtils = (
                 // Rebuild the axes
                 this.resetX();
                 this.resetY();
+                this.updatePlot(this.extentXSelected(), this.rescaleY);
                 // Rebuild the lines
                 this.#refreshLines();
 
@@ -840,6 +836,13 @@ const vizUtils = (
 
             extentX() {
                 return this.extentOfExtents(Object.values(this.extentSteps));
+            }
+            extentXSelected() {
+                return this.extentOfExtents(
+                    Object.values(this.simulations.selected())
+                        .filter(s => Object.hasOwn(this.extentSteps, s.id) && this.extentSteps[s.id][0])
+                        .map(s => this.extentSteps[s.id])
+                );
             }
             extentY() {
                 return this.extentOfExtents(Object.values(this.extentValues));
@@ -896,7 +899,11 @@ const vizUtils = (
                     const endStep   = extentX[1];
                     let extentY = [];
                     // Calculate the Y extent in that same region
-                    for (const line of this.lineSelections()) {
+                    // for (const line of this.lineSelections()) {
+                    for (const simID in this.simulations.selected()) {
+                        if (!Object.hasOwn(this.lines, simID)) { continue; }
+                        if (!this.lines[simID].isValid()) { continue; }
+                        const line = this.lines[simID].selection;
                         // Retrieve range of data based on step extent
                         const data = line.datum();
                         const steps = data.map(d => d.step);

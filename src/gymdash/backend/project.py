@@ -65,7 +65,6 @@ class ProjectManager:
         return wrapper
 
     ARGS_FILENAME   = "args.pickle"
-    TB_FOLDER       = "tb"
     SIMS_FOLDER     = "sims"
     DB_FOLDER       = "db"
     RES_FOLDER      = "resources"
@@ -133,9 +132,6 @@ class ProjectManager:
     def project_folder():
         return ProjectManager.args.project_dir
     @staticmethod
-    def tb_folder():
-        return os.path.join(ProjectManager.project_folder(), ProjectManager.TB_FOLDER)
-    @staticmethod
     def sims_folder():
         return os.path.join(ProjectManager.project_folder(), ProjectManager.SIMS_FOLDER)
     @staticmethod
@@ -155,7 +151,6 @@ class ProjectManager:
             path = Path(ProjectManager.project_folder())
             path.mkdir(parents=True, exist_ok=True)
             # Sub-dirs
-            os.makedirs(ProjectManager.tb_folder(),     exist_ok=True)
             os.makedirs(ProjectManager.db_folder(),     exist_ok=True)
             os.makedirs(ProjectManager.sims_folder(),   exist_ok=True)
         except Exception as e:
