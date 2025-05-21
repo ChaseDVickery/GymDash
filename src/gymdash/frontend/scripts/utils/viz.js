@@ -18,6 +18,10 @@ const vizUtils = (
 
         let _setup_done = false;
 
+        function validValue(val) {
+            return val !== undefined && val !== null && val !== NaN;
+        }
+
         class MMIData {
             static COLOR_DEFAULT    = "rgba(0,255,0,0.2)";
             static COLOR_HOVER      = "rgba(0,255,0,1)";
@@ -544,12 +548,20 @@ const vizUtils = (
                     .attr("transform", `translate(${margin.left}, 0)`)
                     .call(d3.axisLeft(yScale));
     
+                console.log(extentX);
+                console.log(extentY);
+                console.log(xScale);
+                console.log(yScale);
                 const lines = {};
                 const extentSteps = {};
                 const extentValues = {};
                 let idx = 0;
                 for (const simID in allData) {
                     const data = allData[simID].getScalar(key);
+                    console.log(data);
+                    // for (const d of data) {
+                    //     console.log(`${d.step} -> ${xScale(d.step)}, ${d.value} -> ${yScale(d.value)}`);
+                    // }
                     if (!data || data.length < 1) {
                         lines[simID] = Line.none();
                         extentSteps[simID] = [undefined, undefined];
@@ -570,6 +582,7 @@ const vizUtils = (
                                 .x(d => xScale(d.step))
                                 .y(d => yScale(d.value))
                             );
+                        console.log(newLineSelection.node());
                         const newLine = new Line(newLineSelection);
                         lines[simID] = newLine;
                     }
@@ -840,7 +853,7 @@ const vizUtils = (
             extentXSelected() {
                 return this.extentOfExtents(
                     Object.values(this.simulations.selected())
-                        .filter(s => Object.hasOwn(this.extentSteps, s.id) && this.extentSteps[s.id][0])
+                        .filter(s => Object.hasOwn(this.extentSteps, s.id) && validValue(this.extentSteps[s.id][0]))
                         .map(s => this.extentSteps[s.id])
                 );
             }
@@ -850,7 +863,7 @@ const vizUtils = (
             extentOfExtents(extentsArray) {
                 return d3.extent(
                     extentsArray
-                        .filter(e => e && e[0] && e[1])
+                        .filter(e => e && validValue(e[0]) && validValue(e[1]))
                         .reduce((all, curr_extent) => all.concat(curr_extent), [])
                 );
             }
@@ -1250,10 +1263,10 @@ const vizUtils = (
                 }
                 if (!allData[simID].has(key)) { continue; }
                 const tempExt = d3.extent(allData[simID].getData(key).map(x => x[dataPointAttribute]));
-                if (tempExt[0] !== undefined && tempExt[0] < extent[0]) {
+                if (validValue(tempExt[0]) && tempExt[0] < extent[0]) {
                     extent[0] = tempExt[0];
                 }
-                if (tempExt[1] !== undefined && tempExt[1] > extent[1]) {
+                if (validValue(tempExt[1]) && tempExt[1] > extent[1]) {
                     extent[1] = tempExt[1];
                 }
             }

@@ -1906,8 +1906,6 @@ function onClickMMI(d) {
 function getOrCreatePlotAreaForKey(key) {
     // Split key
     const components = key.split("/");
-    console.log(key);
-    console.log(components);
     // Couldn't split, just put in the default category
     if (components.length == 1) {
         return document.querySelector("#default-plot-key-panel");
@@ -1968,10 +1966,13 @@ function createPlots() {
         keyPanels[key] = newPlotPanel;
         panels.add(newPlotPanel);
     }
+    console.log(keyPanels);
+    console.log(panels);
     for (const panel of panels) {
         const newPlotPanel = panel;
         const newPlotArea = newPlotPanel.querySelector(".plot-key-area");
         const newPlotAreaLabel = newPlotPanel.querySelector(".plot-key-area-label");
+        console.log("making new plot area with label: " + newPlotPanel.dataset.key);
         newPlotAreaLabel.textContent = newPlotPanel.dataset.key;
         newPlotAreaLabel.addEventListener("click", (e) => {
             toggleDisplay(newPlotArea);
@@ -2004,10 +2005,11 @@ function createPlots() {
     d3.select(detailsPlotArea).append(() => detailsPlot.svg.node());
 
     for (const k of allScalarKeys) {
+        console.log("making new plot for key " + k);
         // const p = vizUtils.createLinePlotForKey(k, selectedData);
         const p = vizUtils.SimPlot.createLinePlot(simulations, k);
         allPlots.push(p);
-
+        console.log(keyPanels[k]);
         d3.select(keyPanels[k].querySelector(".plot-key-area")).append(() => p.svg.node());
         // d3.select(newPlotArea).append(() => p.svg.node());
     }

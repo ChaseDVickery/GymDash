@@ -14,4 +14,6 @@ dist/
 build/
 src/gymdash.egg-info/
 testvenv*/
+*vid_projects/
 .gymdash-projects/
+temp_project/
