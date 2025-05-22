@@ -148,6 +148,7 @@ def add_gymdash_arguments(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     parser.add_argument("--apiserver-ip",       default="127.0.0.1", type=str, help="The custom IP address through which the API should be accessible.")
     parser.add_argument("--no-frontend",        action="store_true", help="Run without the frontend display")
     parser.add_argument("--no-backend",         action="store_true", help="Run without the backend API server")
+    parser.add_argument("--no-project",         action="store_true", help="Run without building a backend project. Only used for testing.")
     return parser
 
 

@@ -13,12 +13,12 @@ from gymdash.backend.core.simulation.examples import StableBaselinesSimulation
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser = add_gymdash_arguments(parser)
-    args = parser.parse_args()
-    print(args)
+    # parser = argparse.ArgumentParser()
+    # parser = add_gymdash_arguments(parser)
+    # args = parser.parse_args()
+    # print(args)
 
-    ProjectManager.setup_from_args(args)
+    ProjectManager.setup_from_args(None)
 
     tracker = SimulationTracker()
     

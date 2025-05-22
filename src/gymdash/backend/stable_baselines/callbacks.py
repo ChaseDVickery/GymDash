@@ -4,9 +4,9 @@ try:
 except ImportError:
     _has_sb = False
     
-from src.gymdash.backend.core.simulation.base import Simulation, SimulationInteractor
-from src.gymdash.backend.gymnasium.utils.wrapper_utils import WrapperUtils
-from src.gymdash.backend.gymnasium.wrappers import TensorboardStreamWrapper
+from gymdash.backend.core.simulation.base import Simulation, SimulationInteractor
+from gymdash.backend.gymnasium.utils.wrapper_utils import WrapperUtils
+from gymdash.backend.gymnasium.wrappers import TensorboardStreamWrapper
 
 if not _has_sb:
     raise ImportError("Install stable_baselines3 to use gymdash stable baselines callbacks.")

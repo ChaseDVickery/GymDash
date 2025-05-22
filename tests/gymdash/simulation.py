@@ -2,8 +2,11 @@ import unittest
 import logging
 import asyncio
 import time
+from types import SimpleNamespace
+from gymdash.backend.project import ProjectManager
 from gymdash.backend.core.api.models import SimulationStartConfig
-from gymdash.backend.core.simulation.base import SimulationTracker, Simulation, SimulationRegistry
+from gymdash.backend.core.simulation.base import Simulation
+from gymdash.backend.core.simulation.manage import SimulationTracker, SimulationRegistry
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +39,12 @@ class DemoSimulation(Simulation):
                         completed successfully."
 
 class TestSimulation(unittest.IsolatedAsyncioTestCase):
+    @classmethod
+    def setUpClass(cls):
+        SimulationRegistry.register(SIM_KEY, DemoSimulation)
+        ProjectManager.setup_from_args(SimpleNamespace(no_project=True))
     def setUp(self) -> None:
         self.tracker = SimulationTracker()
-        SimulationRegistry.register(SIM_KEY, DemoSimulation)
 
     async def asyncSetUp(self):
         pass

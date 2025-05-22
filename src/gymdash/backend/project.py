@@ -8,6 +8,7 @@ import pickle
 import sqlite3
 import uuid
 import shutil
+from types import SimpleNamespace
 from datetime import date, datetime
 from pathlib import Path
 from threading import Lock
@@ -79,12 +80,17 @@ class ProjectManager:
 
     @staticmethod
     def setup_from_args(args):
+        if args is None:
+            args = SimpleNamespace(no_project=True)
         ProjectManager.args = args
         ProjectManager.dbcon: sqlite3.Connection = None
         ProjectManager.dbcur: sqlite3.Cursor = None
-        ProjectManager._setup_project_structure()
-        ProjectManager._setup_database()
-        ProjectManager._setup_loop()
+        # Do not setup project if the argument is not there, or
+        # if the argument value is False
+        if "no_project" in vars(args) and not args.no_project:
+            ProjectManager._setup_project_structure()
+            ProjectManager._setup_database()
+            ProjectManager._setup_loop()
 
     @staticmethod
     def _get_export_folder() -> Path:
@@ -130,7 +136,10 @@ class ProjectManager:
 
     @staticmethod
     def project_folder():
-        return ProjectManager.args.project_dir
+        if ("project_dir" in vars(ProjectManager.args)):
+            return ProjectManager.args.project_dir
+        else:
+            return "./____no_gymdash_project"
     @staticmethod
     def sims_folder():
         return os.path.join(ProjectManager.project_folder(), ProjectManager.SIMS_FOLDER)
