@@ -542,6 +542,7 @@ class Simulation():
 
     def _to_every_x_trigger(self, value):
         if isinstance(value, int):
+            if (value <= 0): return lambda x: False
             return lambda x: x%value==0
         else:
             return value

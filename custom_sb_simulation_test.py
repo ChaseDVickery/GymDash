@@ -4,14 +4,12 @@ from gymdash.backend.core.simulation.examples import StableBaselinesSimulation
 from gymdash.backend.core.simulation.export import SimulationExporter
 from gymdash.start import add_gymdash_arguments, start
 
-# logger = logging.getLogger(__name__)
-
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
                     prog='GymDash',
                     description='Start GymDash environment and frontend',
-                    epilog='Text at the bottom of help')
+                    epilog='')
     parser = add_gymdash_arguments(parser)
 
     args = parser.parse_args()

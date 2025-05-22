@@ -216,9 +216,14 @@ class ProjectManager:
         con.commit()
 
     @staticmethod
-    def _setup_loop():
-        # loop = asyncio.get_event_loop()
+    async def _setup_loop_standalone():
         asyncio.create_task(ProjectManager.run_cached_executions_loop())
+    @staticmethod
+    def _setup_loop():
+        try:
+            asyncio.create_task(ProjectManager.run_cached_executions_loop())
+        except RuntimeError:
+            asyncio.run(ProjectManager._setup_loop_standalone())
 
     @staticmethod
     async def run_cached_executions_loop():

@@ -711,7 +711,7 @@ class SimulationTracker:
         """
         found, sim = self.try_get_sim(sim_key)
         if not found: return
-        used = set() if len(self._current_needed_outgoing[sim_key]) < 1 else set.union(*self._current_needed_outgoing[sim_key].values())
+        used = set() if len(self._current_needed_incoming[sim_key]) < 1 else set.union(*self._current_needed_incoming[sim_key].values())
         to_reset = just_freed.difference(used)
         logger.debug(f"SimulationTracker attempting to reset incoming channels for {to_reset}")
         logger.debug(f"SimulationTracker pre-reset status of incoming channels {to_reset}: {[(item[0], item[1].incoming.triggered) for item in sim.interactor.channels.items() if item[0] in to_reset]}")

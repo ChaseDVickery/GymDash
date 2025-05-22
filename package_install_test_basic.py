@@ -7,6 +7,7 @@ import uuid
 import logging
 from typing import List
 
+from gymdash.backend.project import ProjectManager
 from gymdash.backend.core.api.models import SimulationStartConfig
 from gymdash.backend.core.simulation.base import Simulation
 from gymdash.backend.core.simulation.manage import SimulationTracker, SimulationRegistry
@@ -117,6 +118,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(args)
 
+    ProjectManager.setup_from_args(args)
+
     tracker = SimulationTracker()
     
 
@@ -161,7 +164,6 @@ if __name__ == "__main__":
         sims.append(sim)
     done = False
     while(not done):
-        finished = []
         for i in range(len(sims)-1, -1, -1):
             if sims[i].is_done:
                 print(sims.pop(i).result)
@@ -182,12 +184,19 @@ if __name__ == "__main__":
     for i in range(num_sims):
         sim = create_demo_sim()
         id, _ = tracker.start_sim(sim)
-        sim.add_callback(Simulation.END_RUN, functools.partial(print_on_done, sim=sim))
+        # sim.add_callback(Simulation.END_RUN, functools.partial(print_on_done, sim=sim))
+        sim.add_callback(Simulation.END_RUN, functools.partial(
+            lambda sim: print(sim.result), sim=sim
+        ))
         sim.show_timer = False
         ids.append(id)
         sims.append(sim)
-    group_callback_id = tracker.on_all_done(ids, functools.partial(print_on_all_done, simulations=sims))
-    tracker.add_on_all_done(group_callback_id, print_on_all_done2)
+    # group_callback_id = tracker.on_all_done(ids, functools.partial(print_on_all_done, simulations=sims))
+    group_callback_id = tracker.on_all_done(ids, functools.partial(
+        lambda simulations: list(map(lambda s: print(s.result), sims)), simulations=sims
+    ))
+    # tracker.add_on_all_done(group_callback_id, print_on_all_done2)
+    tracker.add_on_all_done(group_callback_id, lambda: print("Hooray! All done!"))
     while(tracker.any_running(ids)):
         pass
     et = time.time()
