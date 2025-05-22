@@ -413,10 +413,12 @@ def get_recent_from_simulation(
     logger.info(f"get_recent_from_simulation: {sim._project_sim_id}, tags={media_tags}, keys={stat_keys}, exclusion_mode={exclusion_mode}")
     tag_key_map = sim.streamer.get_tag_key_map()
     tag_key_set = set()
+    logger.debug(f"get_recent_from_simulation: {sim._project_sim_id}, tag_key_map={tag_key_map}, streamer.get_all_keys={sim.streamer.get_all_keys()}")
     for tag in media_tags:
         if tag in tag_key_map:
             tag_key_set.update([key for key_list in tag_key_map[tag] for key in key_list])
     specific_key_set = set(stat_keys)
+    logger.debug(f"get_recent_from_simulation: {sim._project_sim_id}, curr tag_key_set={tag_key_set}, specific_key_set={specific_key_set}")
     # In exclusion_mode, we include all keys by default
     if exclusion_mode:
         final_keys = set([key for key, tag in sim.streamer.get_all_keys()])

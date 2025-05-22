@@ -365,6 +365,10 @@ class SimulationStreamer:
         self._mutex = Lock()
         
 
+    def set_dirty(self):
+        self._dirty_keys = True
+        self._dirty_tag_key_map = True
+        self._dirty_key_tag_map = True
     def key_has_tag(self, key: str, tag: str) -> bool:
         return key in self.get_key_tag_map() and tag in self.get_key_tag_map()[key]
     def tag_has_key(self, tag: str, key: str) -> bool:
@@ -426,6 +430,7 @@ class SimulationStreamer:
             self.key_log_map.clear()
             self._cached_tag_key_map.clear()
             self._cached_keys.clear()
+            self.set_dirty()
 
     def get_streamer(self, log_key: str):
         with self._mutex:
@@ -455,6 +460,8 @@ class SimulationStreamer:
             for stat_key, tag in streamer.get_stat_keys():
                 self.key_log_map[stat_key] = log_key
             print(f"Register streamer '{log_key}'")
+            self.set_dirty()
+            logger.info("Set SimulationStreamer dirty")
             return True
     
     def items(self):
