@@ -6,6 +6,7 @@ from typing import Any, Dict, Union
 
 from torch.nn.modules import Module
 
+from gymdash.backend.torch.utils import get_available_accelerator
 from gymdash.backend.core.simulation.callbacks import (BaseCustomCallback,
                                                        EmptyCallback)
 from gymdash.backend.core.simulation.base import StopSimException
@@ -102,13 +103,12 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
         super().__init__(model)
 
     def produce(self, inputs: Union[torch.Tensor, torch.utils.data.Dataset]) -> torch.Tensor:
-        device = torch.accelerator.current_accelerator().type if \
-            torch.accelerator.is_available() else \
-            "cpu"
+        device = get_available_accelerator()
         # Setup
         model               = self.model
         # Train
         model.eval()
+        model.to(device)
         if isinstance(inputs, torch.Tensor):
             with torch.no_grad():
                 inputs = inputs.to(device)
@@ -148,9 +148,7 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
         epoch_callback.push_state("train")
         # Get device
         if device is None:
-            device = torch.accelerator.current_accelerator().type if \
-                torch.accelerator.is_available() else \
-                "cpu"
+            device = get_available_accelerator()
         # Setup tensorboard logger
         if isinstance(tb_logger, str):
             tb_logger = SummaryWriter(tb_logger)
@@ -167,6 +165,7 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
             else torch.optim.SGD(model.parameters(), lr=1e-3)
 
         # Train
+        model.to(device)
         model.train()
         curr_steps = 0
         curr_samples = 0
@@ -244,9 +243,7 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
         print(f"VAL HERE")
         # Get device
         if device is None:
-            device = torch.accelerator.current_accelerator().type if \
-                torch.accelerator.is_available() else \
-                "cpu"
+            device = get_available_accelerator()
         # Setup
         model               = self.model
         val_dataloader      = dataloader
@@ -257,6 +254,7 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
             else nn.CrossEntropyLoss()
 
         # Train
+        model.to(device)
         model.eval()
         correct = 0
         test_loss = 0

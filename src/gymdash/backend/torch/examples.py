@@ -11,7 +11,9 @@ try:
 except ImportError:
     _has_torch = False
 
-device = torch.accelerator.current_accelerator().type if torch.accelerator.is_available() else "cpu"
+from gymdash.backend.torch.utils import get_available_accelerator
+
+device = get_available_accelerator()
 
 class ClassifierMNIST(nn.Module):
     def __init__(self) -> None:
