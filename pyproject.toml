@@ -6,7 +6,7 @@ include-package-data = true
 
 [project]
 name = "gymdash"
-version = "0.1.0"
+version = "0.1.3"
 authors = [
   { name="Chase Vickery", email="chasedvickery@gmail.com" },
 ]
@@ -36,7 +36,6 @@ full = [
   "gymnasium[classic-control]>=1.1.1",
   "moviepy==1.0.3",
   "stable_baselines3[extra]>=2.6.0",
-  "torchvision"
 ]
 
 [project.urls]

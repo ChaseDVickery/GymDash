@@ -11,11 +11,14 @@ registered_sim_info_test.pickle
 *exported_sims*
 *exported_args*
 dist/
+_dist_old/
 build/
 src/gymdash.egg-info/
 testvenv*/
+*venv*
 *vid_projects/
 .gymdash-projects/
 temp_project/
 docs/vids/*.mkv
 docs/vids/mp4/
+0.115.0

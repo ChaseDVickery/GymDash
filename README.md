@@ -30,6 +30,7 @@ This project is still IN DEVELOPMENT. Many frontend and backend features have no
 
 
 ## Installation
+**NOTE: Full Installation requires PyTorch**\
 Option 1 - Local Install: Download the project and install via pip
 locally. Download the repo with:\
 `git clone https://github.com/ChaseDVickery/GymDash.git`
@@ -37,7 +38,7 @@ locally. Download the repo with:\
 Option 2 - pip: Download the project via pip using a full install or a minimal base install:
 
 - **Full Installation**: Full installation includes Tensorboard, Gymnasium,
-Stable Baselines, and PyTorch/Torchvision support and packages:\
+Stable Baselines, and PyTorch/Torchvision support and packages. **<ins>Full installation requires PyTorch installation</ins>**:\
 `python -m pip install gymdash[full]`
 
 - **Minimal Installation**: Minimal installation just includes the base packages
@@ -45,6 +46,33 @@ required to run the frontend and backend. The example Simulations will not
 properly work without a full installation:\
 `python -m pip install gymdash`
 
+### Example Full Install:
+- Windows 10
+- Cuda 11.7
+1. Venv Setup
+```shell
+# Create and activate venv
+python -m venv testvenv
+testvenv\Scripts\activate.bat
+python -m pip install --upgrade pip
+```
+2. Install CUDA via pip
+```shell
+# Install CUDA via pip: https://docs.nvidia.com/cuda/cuda-installation-guide-microsoft-windows/index.html#pip-wheels
+python -m pip install --upgrade setuptools pip wheel
+python -m pip install nvidia-pyindex
+python -m pip install nvidia-cuda-runtime-cu117
+```
+3. Install torch cuda 118
+```shell
+# I know there is a mismatch b/w 11.7 and 11.8, but it still worked for me.
+python -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+# Optionally, you can replace steps 2-3 with `python -m pip install torch torchvision` if you don't need GPU support. See PyTorch installation: pytorch.org/get-started/locally/
+```
+4. Install gymdash via pip
+```shell
+python -m pip install gymdash[full]
+```
 
 ## Getting Started
 ### Running Locally
