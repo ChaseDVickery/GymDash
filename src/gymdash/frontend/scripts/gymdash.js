@@ -1923,8 +1923,8 @@ function getOrCreatePlotAreaForKey(key) {
     }
 }
 function createPlots() {
-    const key = "rollout/ep_rew_mean";
-    // const key = "loss/train";
+    // const key = "rollout/ep_rew_mean";
+    const key = "loss/train";
     // const key = "loss/val";
     // const key = "acc/val";  
     // const key = "my_number";
@@ -2019,12 +2019,12 @@ function createPlots() {
     for (const p of allPlots) {
         p.smoothLines(plotSmoothSpread, plotSmoothFactor);
         p.addOnHoverLine((e) => {
-            if (e.detail && e.detail.simID && e.detail.simID !== "undefined") {
+            if (e.detail && e.detail.simID && e.detail.simID !== "undefined" && simulations.has(e.detail.simID)) {
                 simulations.get(e.detail.simID).selection.element.style.transform = "scale(1.025)";
             }
         });
         p.addOnUnhoverLine((e) => {
-            if (e.detail && e.detail.simID && e.detail.simID !== "undefined") {
+            if (e.detail && e.detail.simID && e.detail.simID !== "undefined" && simulations.has(e.detail.simID)) {
                 simulations.get(e.detail.simID).selection.element.style.transform = null;
             }
         });

@@ -57,15 +57,8 @@ For additional launch options, see the [Appendix - Other Launch Options](#other-
 #### Navigation
 Navigate your web browser to your `localhost` port `8888`: `http://127.0.0.1:8888/src/gymdash/frontend/`. This loads the HTML page used to interact with your GymDash project.
 
-
-
-## Backend
-### Simulations
-The backbone (and entire functionality) of GymDash revolves around the `Simulation`. Simulations are just an abstraction that is wrapped around any kind of process that can be run, stopped, and interacted with. The initial intention is to have Simulations wrap long-running processes like machine learning, but can also work for more arbitrary simulations.
-### StreamableStats
-### API
-These API are
-Simulations, custom simulations & registering, streamers, interactor, custom_query and add_control_request.
+<!-- These API are
+Simulations, custom simulations & registering, streamers, interactor, custom_query and add_control_request. -->
 
 ## NAQ (Nobody Asked Questions)
 **Q: Is the API RESTful?**\

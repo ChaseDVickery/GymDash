@@ -17,8 +17,7 @@ show a checkmark, otherwise, it will show a red "X".
 - Navigate to the "Analyze" tab by clicking the header button.
 - Select the `my simulation` selection (if not selected already), and refresh the
 plots. You should see a plot or plots providing scalar information over the
-lifetime of the simulation. Hopefully, you see the reward value increase over
-time!
+lifetime of the simulation. Hopefully, you see the reward value increase over time! Also try clicking an MMI and watching a recorded episode.
 
 ## Interactive
 Here we use a "custom_control" Simulation which runs for some set amount of time, stopping and waiting for user input at user-denoted time points.
@@ -32,10 +31,18 @@ Here we use a "custom_control" Simulation which runs for some set amount of time
     - name=`total_runtime`, value=`5`. The sim will run for 5 seconds.
     - name=`pause_points`, value=`[2]`. The sim will stop after 2 seconds and request a `continue` flag from a later control response.
 - Send the control response and clear the old request.
-- After a couple seconds, a second control response should show up. You may resend the prior response because it contains the `continue` key. The simulation should them complete.
+- After a couple seconds, a second control request should show up. You may resend the prior response because it contains the `continue` key. The simulation should them complete.
 
 ## ML Model
 This example demonstrates how to train and validate a simple CNN model on the MNIST classification task, using GymDash to start the simulation and analyze the results.
+![](../../vids/webp/example_3.webp)
+- Fill in name=`mnist_classifier` and key=`example_ml`.
+- Add a kwarg with key=`train_kwargs`
+- Add a sub-kwarg to `train_kwargs` by clicking the "+" button next to the value box.
+- In the sub-kwarg, add a key=`epochs` and value=`5`.
+- Start the simulation. This may take some time to run.
+- Once complete, check the "Analyze" tab and look at some of the media samples from early and late in training.
+
 
 
 [Next: Sidebar (Frontend)](../frontend/01-sidebar.md)
