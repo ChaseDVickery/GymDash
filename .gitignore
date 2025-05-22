@@ -17,3 +17,5 @@ testvenv*/
 *vid_projects/
 .gymdash-projects/
 temp_project/
+docs/vids/*.mkv
+docs/vids/mp4/
