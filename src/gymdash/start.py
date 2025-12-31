@@ -8,6 +8,8 @@ import multiprocessing
 import socket
 import time
 import logging
+from pathlib import Path
+from functools import partial
 from gymdash.backend.core.api.config.config import set_global_config
 from gymdash.backend.project import ProjectManager
 
@@ -62,15 +64,43 @@ def setup_frontend(args):
             with open(js_new_path, "w") as output_file:
                 output_file.write(new_content)
 
+# This class taken from:
+# https://stackoverflow.com/questions/21956683/enable-access-control-on-simple-http-server
+# class CORSRequestHandler (http.server.SimpleHTTPRequestHandler):
+#     def end_headers (self):
+#         self.send_header('Access-Control-Allow-Origin', '*')
+#         http.server.SimpleHTTPRequestHandler.end_headers(self)
+class CORSRequestHandler(http.server.SimpleHTTPRequestHandler):
+    def send_response(self, *args, **kwargs):
+        http.server.SimpleHTTPRequestHandler.send_response(self, *args, **kwargs)
+        self.send_header('Access-Control-Allow-Origin', '*')
 # Creates and returns an HTTP server setup to serve
 # the frontend interface
 def get_frontend_server(args) -> http.server.HTTPServer:
-    HandlerClass = http.server.SimpleHTTPRequestHandler
+    # TODO: CORS error occurs & cannot fetch any data through api
+    # when running http server over lan, will have to add headers
+    # maybe, like in:
+    # https://stackoverflow.com/questions/21956683/enable-access-control-on-simple-http-server
+    HandlerClass = CORSRequestHandler
     # Patch in the correct extensions
     HandlerClass.extensions_map['.js'] = 'application/javascript'
     HandlerClass.extensions_map['.mjs'] = 'application/javascript'
     # Run the server (like `python -m http.server` does)
-    httpd = http.server.HTTPServer(("localhost", args.port), HandlerClass)
+    if args.apiserver == "dev":
+        final_host = "127.0.0.1"
+    elif args.apiserver == "lan":
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        final_host = s.getsockname()[0]
+        s.close()
+    elif args.apiserver == "custom_ip":
+        final_host = "127.0.0.1"
+    frontend_index_dir = Path(__file__).parent.joinpath("frontend")
+    print(f"Frontend index folder: '{frontend_index_dir}'")
+    # handler = partial(HandlerClass, directory="src/gymdash/frontend")
+    handler = partial(HandlerClass, directory=str(frontend_index_dir.absolute()))
+    # handler = HandlerClass
+    httpd = http.server.HTTPServer((final_host, args.port), handler)
     return httpd
 
 # Starts an HTTP server
@@ -84,9 +114,18 @@ def run_frontend_server(args):
 
 # Starts a subprocess running the Uvicorn FastAPI server
 def run_backend_server(args):
+    if args.apiserver == "dev":
+        final_host = "127.0.0.1"
+    elif args.apiserver == "lan":
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        final_host = s.getsockname()[0]
+        s.close()
+    elif args.apiserver == "custom_ip":
+        final_host = args.apiaddr
     logger.info("Starting API server")
     # uvicorn.run("src.gymdash.backend.main:app", host=str(args.apiaddr), port=args.apiport, workers=args.apiworkers)
-    subprocess.run(["uvicorn", "src.gymdash.backend.main:app", "--host", str(args.apiaddr), "--port", str(args.apiport), "--workers", str(args.apiworkers)])
+    subprocess.run(["uvicorn", "gymdash.backend.main:app", "--host", str(final_host), "--port", str(args.apiport), "--workers", str(args.apiworkers)])
 
 # Starts the frontend and backend servers
 def start(args):

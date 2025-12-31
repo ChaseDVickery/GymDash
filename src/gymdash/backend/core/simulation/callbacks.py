@@ -1,11 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
-from stable_baselines3.common.evaluation import evaluate_policy
-from stable_baselines3.common.logger import Logger
-from stable_baselines3.common.vec_env import (DummyVecEnv, VecEnv,
-                                              sync_envs_normalization)
-
 if TYPE_CHECKING:
     from stable_baselines3.common import base_class
 try:

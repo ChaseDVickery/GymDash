@@ -1,28 +1,33 @@
-import asyncio
+
 import logging
+logger = logging.getLogger(__name__)
+# logging.basicConfig(level = logging.DEBUG, format = '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s')
+logging.basicConfig(level = logging.INFO, format = '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s')
+
+import asyncio
 from contextlib import asynccontextmanager
 from random import randint
 from threading import Thread
 from typing import Union, List
-from gymdash.backend.core.utils.thread_utils import execute_queued
-
+import os
 import numpy as np
+from fastapi import Request
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import (FileResponse, JSONResponse, Response,
                                StreamingResponse)
 import matplotlib.pyplot as plt
+
 import gymdash
+from gymdash.backend.core.utils.thread_utils import execute_queued
 from gymdash.backend.core.api.config.config import tags
 from gymdash.backend.core.api.models import (SimulationIDModel,
-                                             SimulationIDsModel,
-                                             SimulationInteractionModel,
-                                             SimulationStartConfig,
-                                             StoredSimulationInfo, StatQuery)
+                                            SimulationIDsModel,
+                                            SimulationInteractionModel,
+                                            SimulationStartConfig,
+                                            StoredSimulationInfo, StatQuery)
 from gymdash.backend.core.patch.patcher import apply_extension_patches
-from gymdash.backend.core.simulation.examples import \
-    register_example_simulations
 from gymdash.backend.core.simulation.export import SimulationExporter
 from gymdash.backend.core.simulation.manage import (SimulationRegistry,
                                                     SimulationTracker)
@@ -31,19 +36,19 @@ from gymdash.backend.core.utils.usage import *
 from gymdash.backend.core.utils.zip import \
     get_recent_media_from_simulation_generator, get_recent_from_simulation_generator, get_all_from_simulation_generator
 from gymdash.backend.project import ProjectManager
-
-logger = logging.getLogger(__name__)
-# logging.basicConfig(level = logging.DEBUG, format = '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s')
-logging.basicConfig(level = logging.INFO, format = '[%(asctime)s] %(levelname)s [%(name)s:%(lineno)s] %(message)s')
-
+try:
+    from gymdash.backend.core.simulation.examples import \
+        register_example_simulations
+    # Register default simulations
+    register_example_simulations()
+except ImportError:
+    logger.warning(f"Import Error caught. If you want to use example Simulations and get tensorboard integration, consider installing the full gymdash `gymdash[full]`")
 # Switch matplotlib backend?
 plt.switch_backend('agg')
 
 simulation_tracker = SimulationTracker()
 # Apply patching methods to other packages
 apply_extension_patches()
-# Register default simulations
-register_example_simulations()
 # Register custom simulations
 SimulationExporter.import_and_register()
 # Set up project structure and database
@@ -88,8 +93,18 @@ app = FastAPI(
     title="GymDash",
     description="API for interacting with active simulation environments",
     version="0.0.1",
-    lifespan=lifespan
+    lifespan=lifespan,
+    middleware=[]
 )
+
+# @app.middleware("http")
+# async def cors_handler(request: Request, call_next):
+#     response: Response = await call_next(request)
+#     response.headers['Access-Control-Allow-Credentials'] = 'true'
+#     response.headers['Access-Control-Allow-Origin'] = '*'
+#     response.headers['Access-Control-Allow-Methods'] = '*'
+#     response.headers['Access-Control-Allow-Headers'] = '*'
+#     return response
 
 # Setup CORS middleware so that our API will accept
 # communication from our frontend
@@ -106,6 +121,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+print("Added CORS middleware")
 
 # Setup gzip compression middleware
 # https://fastapi.tiangolo.com/advanced/middleware/#trustedhostmiddleware

@@ -3,10 +3,21 @@
 # https://setuptools.pypa.io/en/latest/userguide/datafiles.html
 # Needed to include frontend files (html, css, js) in MANIFEST.in
 include-package-data = true
+# Using this to try and fix problem of not finding gymdash as
+# a module when using "python -m gymdash.start"
+package-dir = {"" = "src"}
+
+# Needed this so that it would stop ignoring half of my frontend files
+# for some reason:
+# https://stackoverflow.com/questions/76485082/package-and-find-non-python-files-in-a-python-package
+[tool.setuptools.packages.find]
+where = ["src"]
+[tool.setuptools.package-data]
+"*" = ["*.*"]
 
 [project]
 name = "gymdash"
-version = "0.1.3"
+version = "0.1.6.10"
 authors = [
   { name="Chase Vickery", email="chasedvickery@gmail.com" },
 ]
@@ -28,11 +39,11 @@ dependencies = [
   "pydantic>=2.11.3",
   "matplotlib>=3.9.4",
   "box2d",
+  "tensorboard>=2",
 ]
 
 [project.optional-dependencies]
 full = [
-  "tensorboard>=2",
   "gymnasium[classic-control]>=1.1.1",
   "moviepy==1.0.3",
   "stable_baselines3[extra]>=2.6.0",

@@ -10,7 +10,6 @@ from gymdash.backend.core.utils.thread_utils import run_on_main_thread
 
 import matplotlib.pyplot as plt
 from torch import Tensor
-from torch.utils.tensorboard import SummaryWriter
 
 import gymdash.backend.constants as constants
 from gymdash.backend.core.simulation.callbacks import BaseCustomCallback, CallbackCustomList
@@ -21,6 +20,11 @@ from gymdash.backend.torch.base import (InferenceModel,
 from gymdash.backend.enums import SimStatusCode, SimStatusSubcode
 from gymdash.backend.core.api.models import SimStatus
 
+try:
+    from torch.utils.tensorboard import SummaryWriter
+    _has_tb = True
+except ImportError:
+    _has_tb = False
 try:
     import gymnasium as gym
     from gymnasium.wrappers import RecordVideo
@@ -266,6 +270,8 @@ class CustomControlSimulation(Simulation):
     def __init__(self, config: SimulationStartConfig) -> None:
         if not _has_np:
             raise ImportError(f"Install numpy to use example simulation {type(self)}.")
+        if not _has_tb:
+            raise ImportError(f"Install tensorboard to use example simulation {type(self)}.")
         super().__init__(config)
         
     def _create_streamers(self, kwargs: Dict[str, Any]):
