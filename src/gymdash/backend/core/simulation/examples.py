@@ -15,8 +15,7 @@ import gymdash.backend.constants as constants
 from gymdash.backend.core.simulation.callbacks import BaseCustomCallback, CallbackCustomList
 from gymdash.backend.core.simulation.base import StopSimException
 from gymdash.backend.torch.base import (InferenceModel,
-                                        SimpleClassifierMLModel,
-                                        SimulationMLModel)
+                                        SimpleClassifierMLModel)
 from gymdash.backend.enums import SimStatusCode, SimStatusSubcode
 from gymdash.backend.core.api.models import SimStatus
 
@@ -447,11 +446,16 @@ class MLSimulationUpdateCallback(MLSimulationCallback):
         super().__init__(simulation)
     def _on_invoke(self):
         should_continue = True
-        if self.state == "train":
+        print(f"full state = {self.simulation.sm.full_state}")
+        if self.simulation.sm.state == "<<train>>":
             curr_steps = self.locals.get("curr_steps", 0)
             total_steps = self.locals.get("total_steps", 1)
             # HANDLE OUTGOING INFORMATION
+            self.interactor.set_out_if_in("progress_status", "Custom Status: training")
             self.interactor.set_out_if_in("progress", (curr_steps, total_steps))
+            should_continue &= True
+        elif self.simulation.sm.state == "<<val>>":
+            self.interactor.set_out_if_in("progress_status", "Custom Status: validating")
             should_continue &= True
         # Always check for stop flag
         if self.interactor.set_out_if_in("stop_simulation", True):
@@ -477,7 +481,7 @@ class MLSimulationSampleRecordCallback(MLSimulationCallback):
         self.step_trigger = step_trigger
         # Setup output path
         if os.path.isdir(self.media_path):
-            logger.warn(
+            logger.warning(
                 f"Overwriting existing videos at {self.media_path} folder "
                 f"(try specifying a different `media_path` for the `MLSimulationSampleRecordCallback` callback if this is not desired)"
             )
@@ -544,12 +548,10 @@ class MLClassifierRecordCallback(MLSimulationSampleRecordCallback):
             idx = p
             r = idx // ncols
             c = idx % ncols
-            target = ""
             if isinstance(inputs, torch.Tensor):
                 img_tensor = inputs[idx]
             elif isinstance(inputs, torch.utils.data.Dataset):
                 img_tensor = inputs[idx][0]
-                target = str(inputs[idx][1])
             axs[r,c].set_title(f"pred: {outputs[idx].item()}")
             axs[r,c].imshow(torch.permute(img_tensor, (1, 2, 0)).cpu().numpy())
         for r in range(nrows):
@@ -699,6 +701,10 @@ class MLSimulation(Simulation):
         # Setup Model
         # self.model = ClassifierMNIST()
         self.model = SimpleClassifierMLModel(ClassifierMNIST())
+        self.model.add_callback("train", "start", lambda: self.sm.push_state("<<train>>"))
+        self.model.add_callback("val", "start", lambda: self.sm.push_state("<<val>>"))
+        self.model.add_callback("test", "start", lambda: self.sm.push_state("<<test>>"))
+        self.model.add_callback("all", "end", lambda: self.sm.pop_state())
 
         # Get the dataset
         train_data = datasets.MNIST(
@@ -708,7 +714,7 @@ class MLSimulation(Simulation):
             transform=ToTensor(),
         )
         test_data = datasets.MNIST(
-            root=train_path,
+            root=test_path,
             train=False,
             download=True,
             transform=ToTensor(),
@@ -739,9 +745,11 @@ class MLSimulation(Simulation):
                 # val_per_epoch=1,
                 val_per_steps=500,
                 val_kwargs={
-                    "dataloader": test_loader
+                    "dataloader": test_loader,
+                    "step_callback": MLSimulationUpdateCallback(self)
                 },
                 step_callback=step_callback,
+                # val_step_callback=MLSimulationUpdateCallback(self)
             )
             # train_mnist_classifier(self.model, dataset_folder_path, **train_kwargs)
             self.add_status(SimStatus(

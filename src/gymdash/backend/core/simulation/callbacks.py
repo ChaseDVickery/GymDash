@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union
+from gymdash.backend.core.utils.state import SimpleStateStack
 
 if TYPE_CHECKING:
     from stable_baselines3.common import base_class
@@ -28,7 +29,7 @@ class BaseCustomCallback(ABC):
         self.n_calls = 0  # type: int
         self.locals: dict[str, Any] = {}
         self.globals: dict[str, Any] = {}
-        self.state_stack: list[Union[str,Any]] = [BaseCustomCallback.NO_STATE]
+        self.sm: SimpleStateStack = SimpleStateStack()
         # Sometimes, for event callback, it is useful
         # to have access to the parent object
         self.parent = None  # type: Optional[BaseCustomCallback]
@@ -50,18 +51,17 @@ class BaseCustomCallback(ABC):
         pass
 
     def reset_state(self):
-        self.state_stack.clear()
-        self.state_stack.append(BaseCustomCallback.NO_STATE)
+        self.sm.reset_state()
     @property
     def state(self):
-        return self.state_stack[-1]
+        return self.sm.state
     @property
     def full_state(self):
-        return "/".join(self.state_stack[1:])
+        return self.sm.full_state
     def push_state(self, state):
-        self.state_stack.append(state)
+        self.sm.push_state(state)
     def pop_state(self):
-        self.state_stack.pop()
+        self.sm.pop_state()
 
     def on_process_start(self, locals_: dict[str, Any], globals_: dict[str, Any]) -> None:
         # Those are reference and will be updated automatically

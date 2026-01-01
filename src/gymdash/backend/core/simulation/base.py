@@ -16,6 +16,7 @@ from gymdash.backend.core.api.models import (ControlRequestDetails, SimStatus,
                                              SimulationStartConfig,
                                              StoredSimulationInfo)
 from gymdash.backend.core.utils.kwarg_utils import overwrite_new_kwargs
+from gymdash.backend.core.utils.state import SimpleStateStack
 from gymdash.backend.enums import SimStatusCode, SimStatusSubcode
 
 logger = logging.getLogger(__name__)
@@ -163,6 +164,7 @@ class SimulationInteractor:
     ALL_CHANNELS: Set[str] = set((
         "stop_simulation",
         "progress",
+        "progress_status",
         "custom_query",
     ))
 
@@ -510,6 +512,8 @@ class Simulation():
         self._project_info_set: bool            = False
         self._project_sim_id: UUID              = None
         self._project_sim_base_path: str        = None
+
+        self.sm = SimpleStateStack()
 
     @property
     def sim_path(self) -> Union[str, None]:

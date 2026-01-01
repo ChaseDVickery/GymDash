@@ -246,7 +246,8 @@ class SimSelection {
         return queryProgress(this.id, is_done)
             .then((info) => {
                 if (!info) { return Promise.resolve(info); }
-                if (!validID(info.id)) { return Promise.resolve(info); }
+                if (!validID(this.id)) { return Promise.resolve(info); }
+                simulations.get(this.id)?.setProgressReport(info);
                 debug(info);
                 if (info.is_done) {
                     if (info.cancelled || info.failed) {
@@ -279,12 +280,14 @@ class Simulation {
         // data: DataReport holding all the data
         // status: SimStatus object
         // info: meta information associated with sim
+        // lastProgressReport: information holding the last progress query info
         this.id         = simID;
         this.active     = false;
         this.selection  = null;
         this.data       = new dataUtils.DataReport(simID);
         this.status     = null;
         this.info       = null;
+        this.lastProgressReport = null;
 
         this.name       = null;
     }
@@ -313,6 +316,12 @@ class Simulation {
     }
     setStatus(newStatus) {
         this.status = newStatus;
+        if (simulations.isSimHovered(this.id)) {
+            tooltipUpdateToSimSelection(this.id);
+        }
+    }
+    setProgressReport(newProgressStatus) {
+        this.lastProgressReport = newProgressStatus;
         if (simulations.isSimHovered(this.id)) {
             tooltipUpdateToSimSelection(this.id);
         }
@@ -790,24 +799,25 @@ function createQueryBody(simID, timeout=defaultTimeout) {
         timeout: timeout
     };
 }
-function queryProgress(simID, onlyStatus=False) {
+function queryProgress(simID, onlyStatus=false) {
     if (!validID(simID)) { return Promise.resolve({id: noID}); }
     const q = {
         id: simID,
         timeout: defaultTimeout,
-        is_done:    { triggered: true, value: null, },
-        cancelled:  { triggered: true, value: null, },
-        failed:     { triggered: true, value: null, },
+        is_done:            { triggered: true, value: null, },
+        cancelled:          { triggered: true, value: null, },
+        failed:             { triggered: true, value: null, },
     };
     if (!onlyStatus) {
         q.progress = { triggered: true, value: null, };
+        q.progress_status = { triggered: true, value: null, };
     }
     return query(q);
 }
 // Returns a promise of the simulation query
 function query(queryBody) {
     queryBody.error_details = { triggered: true, value: null };
-    console.log(`Sending query: ${queryBody}`);
+    console.trace(`Sending query: ${queryBody}`);
     console.log(queryBody);
     return fetch(apiURL("query-sim"), {
         method: "POST",
@@ -946,7 +956,9 @@ function updateAllSimSelectionStatus() {
             // Dict: simID -> SimStatus
             for (const simID in info) {
                 const statusInfo = info[simID];
-                simulations.get(simID).setStatus(statusInfo);
+                if (statusInfo != null) {
+                    simulations.get(simID).setStatus(statusInfo);
+                }
                 // allRecentStatus[simID] = statusInfo;
                 // // if (isSimHovered(sim_selections[simID])) {
                 // if (simulations.isSimHovered(simID)) {
@@ -1008,7 +1020,9 @@ function tooltipUpdateToSimSelection(simID) {
     if (!selection) { return; }
     const meter = selection.meter;
     // Update tooltip text based on simulation status
-    const status = simulations.get(simID).status;
+    const sim = simulations.get(simID);
+    const status = sim.status;
+    const progressInfo = sim.lastProgressReport;
     if (meter.classList.contains("fail")) {
         let newText = "Failed";
         if (status) {
@@ -1031,6 +1045,12 @@ function tooltipUpdateToSimSelection(simID) {
         const progPer = progressMeter.style.getPropertyValue("--prog");
         const progPerValue = Number(progPer.substring(0, progPer.length-1)).toFixed(2);
         tooltip.textContent = `${progNum}/${progDen} (${progPerValue}%)`;
+        if (progressInfo != null && Object.hasOwn(progressInfo, "progress_status")) {
+            const progStatus = progressInfo.progress_status;
+            tooltip.textContent = tooltip.textContent + `\n${progStatus}`;
+        } else {
+            debug("Simulation lastProgressReport is null or has no progress_status");
+        }
     }
 }
 
