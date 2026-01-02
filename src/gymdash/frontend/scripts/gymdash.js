@@ -17,8 +17,9 @@ const defaultTimeout = 2.5; // (s)
 const noID = "00000000-0000-0000-0000-000000000000"; // (str(UUID))
 
 // Structures
-const mainPlots = [];
-const allPlots = [];
+const mainPlots     = [];
+const scalarPlots   = [];
+const allPlots      = [];
 let canQuerySimStatus = true;
 let draggingSimSelectionLeft = false;
 let draggingSimSelectionRight = false;
@@ -56,10 +57,13 @@ const sendQueryBtn              = document.querySelector("#send-query-btn");
 // Settings
 const settingBarTitle           = document.querySelector("#setting-bar-title");
 const settingBarContent         = document.querySelector("#setting-bar-content");
+const mainSettingButton         = document.querySelector("#main-settings-button");
+const mainSettingContent        = document.querySelector("#main-settings-content");
 const plotSmoothSpreadSlider_Setting  = document.querySelector("#plot-smooth-spread-slider");
 const plotSmoothFactorSlider_Setting  = document.querySelector("#plot-smooth-factor-slider");
 const plotSmoothSpreadLabel_Setting   = document.querySelector("label[for=plot-smooth-spread-slider]");
 const plotSmoothFactorLabel_Setting   = document.querySelector("label[for=plot-smooth-factor-slider]");
+const mainThemeDropdown_Setting       = document.querySelector("#theme-select-dropdown");
 
 const rescaleDetailsY_Setting   = document.querySelector("#rescale-details-axis");
 
@@ -73,9 +77,12 @@ const deleteAllSimsTestBtn      = document.querySelector("#delete-all-sims-test-
 const deleteSelectedSimsTestBtn = document.querySelector("#delete-selected-sims-test-btn");
 // Plots
 const plotArea                  = document.querySelector("#plots-area");
+const mainPlotsPanel            = plotArea.querySelector("#main-plots-panel");
+const scalarPlotsPanel          = plotArea.querySelector("#scalar-plots-panel");
 const overviewPlotArea          = plotArea.querySelector("#overview-plot-panel");
 const detailsPlotArea           = plotArea.querySelector("#details-plot-panel");
 const scalarPlotsArea           = plotArea.querySelector("#scalar-plots-panel");
+const mainPlotKeySelect         = plotArea.querySelector("#main-plot-key-select");
 // Multimedia Filter
 const mmInstancePanel           = document.querySelector(".media-panel");
 const mmFilterSortPanel         = mmInstancePanel.querySelector("#media-filter-sort-panel");
@@ -107,6 +114,7 @@ const prefabcontrolRequestBox   = document.querySelector(".prefab.control-reques
 const prefabFilterDiscrete      = document.querySelector(".prefab.discrete-filter-setting");
 const prefabFilterBetween       = document.querySelector(".prefab.between-filter-setting");
 const prefabPlotKeyPanel        = document.querySelector(".prefab.plot-key-panel");
+const prefabSinglePlotArea      = document.querySelector(".prefab.single-plot-area");
 prefabSimSelectBox.remove();
 prefabKwargPanel.remove();
 prefabKwarg.remove();
@@ -118,6 +126,7 @@ prefabcontrolRequestBox.remove();
 prefabFilterDiscrete.remove();
 prefabFilterBetween.remove();
 prefabPlotKeyPanel.remove();
+prefabSinglePlotArea.remove();
 prefabSimSelectBox.classList.remove("prefab");
 prefabKwargPanel.classList.remove("prefab");
 prefabKwarg.classList.remove("prefab");
@@ -129,6 +138,7 @@ prefabcontrolRequestBox.classList.remove("prefab");
 prefabFilterDiscrete.classList.remove("prefab");
 prefabFilterBetween.classList.remove("prefab");
 prefabPlotKeyPanel.classList.remove("prefab");
+prefabSinglePlotArea.classList.remove("prefab");
 
 class GlobalSettings {
     static defaultColorBad      = "red";
@@ -734,13 +744,17 @@ function deselectAll() {
 function refreshData() {
     updateData(simulations.selections(), dataUtils.getRecent)
         .then((allDataReports) => {
-            createPlots();
+            // createMainPlots();
+            refreshMainPlotKeys();
+            createScalarPlots();
         });
 }
 function displayVideoTest() {
     updateData(simulations.selected(), dataUtils.getRecent)
         .then((allDataReports) => {
-            createPlots();
+            // createMainPlots();
+            refreshMainPlotKeys();
+            createScalarPlots();
         });
 }
 
@@ -1586,6 +1600,9 @@ queueSimBtn.addEventListener("click", queueSimulation);
 sendControlBtn.addEventListener("click", sendQuery);
 sendQueryBtn.addEventListener("click", sendQuery);
 
+// Main Plots
+mainPlotKeySelect.addEventListener("change", createMainPlots);
+
 // MMI Filter Objects
 mmImageHeader.addEventListener("click", toggleMediaType.bind(null, dataUtils.DataReport.IMAGE));
 mmAudioHeader.addEventListener("click", toggleMediaType.bind(null, dataUtils.DataReport.AUDIO));
@@ -1615,8 +1632,11 @@ plotSmoothFactorSlider_Setting.addEventListener("input", (e) => {
 rescaleDetailsY_Setting.addEventListener("change", (e) => {
     changeSetting_RescaleDetailsAxisY(rescaleDetailsY_Setting.checked);
 })
-settingBarTitle.addEventListener("click", toggleDisplay.bind(null, settingBarContent))
+settingBarTitle.addEventListener("click", toggleDisplay.bind(null, settingBarContent));
 toggleDisplay(settingBarContent);
+mainSettingButton.addEventListener("click", toggleDisplay.bind(null, mainSettingContent));
+toggleDisplay(mainSettingContent);
+
 
 // Setup intervals
 // Update progress periodically
@@ -1634,8 +1654,8 @@ const themeBW = new Theme(
         .changeSetting("mainColor", "#ffffff")
         .changeSetting("contrastColor", "#000000"),
     new vizUtils.PlotSettings()
-        .changeSetting("main", "#000000")
-        .changeSetting("secondary", "#ffffff")
+        .changeSetting("mainColor", "#000000")
+        .changeSetting("secondaryColor", "#ffffff")
         .changeSetting("colorScale", (x) => "#000000")
 );
 const themeNeon = new Theme(
@@ -1643,8 +1663,8 @@ const themeNeon = new Theme(
         .changeSetting("mainColor", "#000000")
         .changeSetting("contrastColor", "#f000ff"),
     new vizUtils.PlotSettings()
-        .changeSetting("main", "#ffffff")
-        .changeSetting("secondary", "#000000")
+        .changeSetting("mainColor", "#ffffff")
+        .changeSetting("secondaryColor", "#000000")
         .changeSetting("mmiDefaultColor", "rgba(240,0,255,0.3)")
         .changeSetting("mmiSelectColor", "rgba(240,0,255,1)")
         .changeSetting("mmiHoverColor", "rgba(240,0,255,1)")
@@ -1671,8 +1691,8 @@ const themeSoft = new Theme(
         // .changeSetting("secondary", "#bcd8ec")
         // .changeSetting("main", "#bcd8ec")
         // .changeSetting("secondary", "#000000")
-        .changeSetting("main", "#000000")
-        .changeSetting("secondary", "rgb(239,228,227)")
+        .changeSetting("mainColor", "#000000")
+        .changeSetting("secondaryColor", "rgb(239,228,227)")
         .changeSetting("mmiDefaultColor", "#d6e5bd")
         .changeSetting("mmiSelectColor", "#ffcbe1")
         .changeSetting("mmiHoverColor", "#f9e1a8")
@@ -1683,13 +1703,28 @@ const themePlain = new Theme(
         .changeSetting("contrastColor", "#101020"),
     new vizUtils.PlotSettings()
         .changeSetting("colorScale", d3.schemePaired)
-        .changeSetting("main", "#000000")
-        .changeSetting("secondary", "#ffffff")
+        .changeSetting("mainColor", "#000000")
+        .changeSetting("secondaryColor", "#ffffff")
         .changeSetting("mmiDefaultColor", "rgba(0,255,0,0.2)")
         .changeSetting("mmiHoverColor", "rgba(0,255,0,1)")
         .changeSetting("mmiSelectColor", "rgba(255,50,0,1)")
 );
+const themeMap = {
+    classic:    themeClassic,
+    bw:         themeBW,
+    neon01:     themeNeon,
+    neon02:     themeNeon2,
+    soft01:     themeSoft,
+    plain01:    themePlain,
+};
 applyTheme(themeClassic);
+
+mainThemeDropdown_Setting.addEventListener("change", changeSetting_Theme.bind(null, mainThemeDropdown_Setting));
+function changeSetting_Theme(selectObject) {
+    if (Object.hasOwn(themeMap, selectObject.value)) {
+        applyTheme(themeMap[selectObject.value]);
+    }
+}
 
 
 refreshSimulationSidebar();
@@ -1933,8 +1968,10 @@ function getOrCreatePlotAreaForKey(key) {
     // Look for each key component
     const category = components[0];
     const foundPanel = scalarPlotsArea.querySelector(`.plot-key-panel[data-key="${category}"]`);
+    // Return existing key area if found
     if (foundPanel) {
         return foundPanel;
+    // Otherwise make new key area
     } else {
         const newPlotPanel = prefabPlotKeyPanel.cloneNode(true);
         newPlotPanel.dataset.key = category;
@@ -1942,43 +1979,133 @@ function getOrCreatePlotAreaForKey(key) {
         return newPlotPanel;
     }
 }
-function createPlots() {
-    // const key = "rollout/ep_rew_mean";
-    const key = "loss/train";
-    // const key = "loss/val";
-    // const key = "acc/val";  
-    // const key = "my_number";
-
-    mainPlots.splice(0, mainPlots.length);
-    allPlots.splice(0, allPlots.length);
-    for (const panel of document.querySelectorAll(".plot-key-panel")) {
-        if (panel.id === "default-plot-key-panel") { continue; }
-        panel.remove();
-    }
-    for (const svg of plotArea.querySelectorAll("svg")) {
-        svg.remove();
-    }
-    // clearMainPlot();
-    // for (const panel of document.querySelectorAll(".plot-key-panel")) {
-    //     panel.remove();
-    // }
-
-    const condense = true;
+function refreshMainPlotKeys() {
+    const currentMainKey = getCurrentMainKey();
     const selectedData = simulations.data();
-    console.log("selectedData");
-    console.log(selectedData);
-
+    // Create a set of unique scalar keys using each simulations' DataReports
     const allScalarKeys = new Set();
-    // console.log(allScalarKeys);
     for (const simID in selectedData) {
         const report = selectedData[simID];
         report.scalar_keys.forEach(k => allScalarKeys.add(k));
     }
     console.log(allScalarKeys);
 
-    if (Object.keys(selectedData).length <= 0) { return; }
+    // Clear main plot key selection
+    if (allScalarKeys.size > 0) {
+        const m = mainPlotKeySelect.options.length - 1;
+        for (let i = m; i >= 0; i--) {
+            mainPlotKeySelect.remove(i);
+        }
+    }
+    // Populate main key selection
+    for (const k of allScalarKeys) {
+        console.log("pop w/key= " + k);
+        mainPlotKeySelect.add(new Option(k, k))
+    }
+    // Retry getting original key, otherwise get first key
+    mainPlotKeySelect.selectedIndex = 0;
+    for (let i = 0; i < mainPlotKeySelect.options.length-1; i++) {
+        console.log("key checking " + mainPlotKeySelect[i].value + " against main key " + currentMainKey);
+        if (mainPlotKeySelect[i].value == currentMainKey) {
+            mainPlotKeySelect.selectedIndex = i;
+            break;
+        }
+    }
+    createMainPlots();
+}
+function getCurrentMainKey() {
+    const mainKey = mainPlotKeySelect.value;
+    return mainKey;
+}
+function createMainPlots() {
+    console.log("createMainPlots");
+    const key = getCurrentMainKey();
+    console.log(key);
+    mainPlots.splice(0, mainPlots.length);
+    for (const svg of mainPlotsPanel.querySelectorAll("svg")) {
+        svg.remove();
+    }
+    const condense = true;
+    const selectedData = simulations.data();
+    console.log("selectedData");
+    console.log(selectedData);
+    // Plot in Main Panels and setup interactions
+    const plot = vizUtils.SimPlot.createLinePlot(simulations, key);
+    const detailsPlot = vizUtils.SimPlot.createLinePlot(simulations, key);
+    mainPlots.push(plot);
+    mainPlots.push(detailsPlot);
+    allPlots.push(plot);
+    allPlots.push(detailsPlot);
+    // Enable and add main plot MMIs
+    plot.enableMMIs();
+    detailsPlot.enableMMIs();
+    plot.addAllMMIs(selectedData, onClickMMI, condense);
+    detailsPlot.addAllMMIs(selectedData, onClickMMI, condense);
+    plot.refreshMMIs();
+    detailsPlot.refreshMMIs();
+    // Brushing interaction
+    plot.addBrushX(function(event) {
+        detailsPlot.updatePlotEvent(event, plot);
+    }, "brush");
+    
+    console.log(overviewPlotArea);
+    console.log(detailsPlotArea);
+    d3.select(overviewPlotArea).append(() => plot.svg.node());
+    d3.select(detailsPlotArea).append(() => detailsPlot.svg.node());
 
-    // Create new scalar plot areas
+    document.querySelector("#main-plots-title-panel").textContent = key;
+
+    // Add interactions for main key plots
+    for (const p of mainPlots) {
+        p.smoothLines(plotSmoothSpread, plotSmoothFactor);
+        p.addOnHoverLine((e) => {
+            if (e.detail && e.detail.simID && e.detail.simID !== "undefined" && simulations.has(e.detail.simID)) {
+                simulations.get(e.detail.simID).selection.element.style.transform = "scale(1.025)";
+            }
+        });
+        p.addOnUnhoverLine((e) => {
+            if (e.detail && e.detail.simID && e.detail.simID !== "undefined" && simulations.has(e.detail.simID)) {
+                simulations.get(e.detail.simID).selection.element.style.transform = null;
+            }
+        });
+        p.addOnEnter((e) => {
+            if (!e.detail || !e.detail.plot) { return; }
+            selectionsToPlotColors(e.detail.plot);
+        });
+        p.addOnLeave((e) => {
+            for (const simID in simulations.selections()) {
+                simulations.get(simID).selection.element.style.transform = null;
+            }
+        });
+    }
+}
+function createScalarPlots() {
+    const currentMainKey = getCurrentMainKey();
+    // Destroy non-default plot key areas
+    scalarPlots.splice(0, scalarPlots.length);
+    for (const panel of document.querySelectorAll(".plot-key-panel")) {
+        if (panel.id === "default-plot-key-panel") { continue; }
+        panel.remove();
+    }
+    for (const svg of scalarPlotsPanel.querySelectorAll("svg")) {
+        svg.remove();
+    }
+
+    const selectedData = simulations.data();
+    console.log("selectedData");
+    console.log(selectedData);
+
+    // Create a set of unique scalar keys using each simulations' DataReports
+    const allScalarKeys = new Set();
+    for (const simID in selectedData) {
+        const report = selectedData[simID];
+        report.scalar_keys.forEach(k => allScalarKeys.add(k));
+    }
+    console.log(allScalarKeys);
+
+    // No need to make plots with no scalar data
+    if (Object.keys(selectedData).length <= 0) { return; }
+    // Create new key areas
     const keyPanels = {};
     const panels = new Set();
     for (const key of allScalarKeys) {
@@ -1986,6 +2113,7 @@ function createPlots() {
         keyPanels[key] = newPlotPanel;
         panels.add(newPlotPanel);
     }
+    console.log("Plot key panels:");
     console.log(keyPanels);
     console.log(panels);
     for (const panel of panels) {
@@ -2000,43 +2128,25 @@ function createPlots() {
     }
     
 
-    // const plot = vizUtils.createLinePlotForKey(key, selectedData);
-    // const detailsPlot = vizUtils.createLinePlotForKey(key, selectedData);
-    const plot = vizUtils.SimPlot.createLinePlot(simulations, key);
-    const detailsPlot = vizUtils.SimPlot.createLinePlot(simulations, key);
-    mainPlots.push(plot);
-    mainPlots.push(detailsPlot);
-    allPlots.push(plot);
-    allPlots.push(detailsPlot);
-
-    plot.enableMMIs();
-    detailsPlot.enableMMIs();
-    plot.addAllMMIs(selectedData, onClickMMI, condense);
-    detailsPlot.addAllMMIs(selectedData, onClickMMI, condense);
-    plot.refreshMMIs();
-    detailsPlot.refreshMMIs();
-    plot.addBrushX(function(event) {
-        detailsPlot.updatePlotEvent(event, plot);
-    }, "brush");
     
-    console.log(overviewPlotArea);
-    console.log(detailsPlotArea);
-    d3.select(overviewPlotArea).append(() => plot.svg.node());
-    d3.select(detailsPlotArea).append(() => detailsPlot.svg.node());
 
+    // Create plots for all scalar keys
     for (const k of allScalarKeys) {
         console.log("making new plot for key " + k);
         // const p = vizUtils.createLinePlotForKey(k, selectedData);
         const p = vizUtils.SimPlot.createLinePlot(simulations, k);
         allPlots.push(p);
+        scalarPlots.push(p);
         console.log(keyPanels[k]);
-        d3.select(keyPanels[k].querySelector(".plot-key-area")).append(() => p.svg.node());
+        const newSinglePlotPanel = prefabSinglePlotArea.cloneNode(true);
+        newSinglePlotPanel.querySelector(".single-plot-title-area").textContent = k;
+        keyPanels[k].querySelector(".plot-key-area").appendChild(newSinglePlotPanel);
+        // d3.select(keyPanels[k].querySelector(".plot-key-area"))
+        d3.select(newSinglePlotPanel.querySelector(".single-plot-svg-area")).append(() => p.svg.node());
         // d3.select(newPlotArea).append(() => p.svg.node());
     }
-
-
-
-    for (const p of allPlots) {
+    // Add interactions for all scalar key plots
+    for (const p of scalarPlots) {
         p.smoothLines(plotSmoothSpread, plotSmoothFactor);
         p.addOnHoverLine((e) => {
             if (e.detail && e.detail.simID && e.detail.simID !== "undefined" && simulations.has(e.detail.simID)) {

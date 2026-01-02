@@ -446,16 +446,18 @@ class MLSimulationUpdateCallback(MLSimulationCallback):
         super().__init__(simulation)
     def _on_invoke(self):
         should_continue = True
-        print(f"full state = {self.simulation.sm.full_state}")
         if self.simulation.sm.state == "<<train>>":
             curr_steps = self.locals.get("curr_steps", 0)
             total_steps = self.locals.get("total_steps", 1)
             # HANDLE OUTGOING INFORMATION
-            self.interactor.set_out_if_in("progress_status", "Custom Status: training")
+            self.interactor.set_out_if_in("progress_status", "Training")
             self.interactor.set_out_if_in("progress", (curr_steps, total_steps))
             should_continue &= True
         elif self.simulation.sm.state == "<<val>>":
-            self.interactor.set_out_if_in("progress_status", "Custom Status: validating")
+            self.interactor.set_out_if_in("progress_status", "Validating")
+            should_continue &= True
+        elif self.simulation.sm.state == "<<test>>":
+            self.interactor.set_out_if_in("progress_status", "Testing")
             should_continue &= True
         # Always check for stop flag
         if self.interactor.set_out_if_in("stop_simulation", True):

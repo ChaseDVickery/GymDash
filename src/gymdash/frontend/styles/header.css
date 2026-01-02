@@ -36,3 +36,11 @@
 
     
 }
+
+#setting-gear-icon path {
+    fill: var(--main-bg-color);
+}
+#setting-gear-icon {
+    stroke: var(--main-contrast-color);
+    stroke-width: 15px;
+}

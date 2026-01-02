@@ -95,7 +95,7 @@ class RecordVideoCustom(gym.Wrapper[ObsType, ActType, ObsType, ActType], gym.uti
 
         self.video_folder = os.path.abspath(video_folder)
         if os.path.isdir(self.video_folder):
-            logger.warn(
+            logger.warning(
                 f"Overwriting existing videos at {self.video_folder} folder "
                 f"(try specifying a different `video_folder` for the `RecordVideo` wrapper if this is not desired)"
             )
@@ -135,7 +135,7 @@ class RecordVideoCustom(gym.Wrapper[ObsType, ActType, ObsType, ActType], gym.uti
             self.recorded_frames.append(frame)
         else:
             self.stop_recording()
-            logger.warn(
+            logger.warning(
                 f"Recording stopped: expected type of frame returned by render to be a numpy array, got instead {type(frame)}."
             )
 
@@ -207,7 +207,7 @@ class RecordVideoCustom(gym.Wrapper[ObsType, ActType, ObsType, ActType], gym.uti
         assert self.recording, "stop_recording was called, but no recording was started"
 
         if len(self.recorded_frames) == 0:
-            logger.warn("Ignored saving a video as there were zero frames to save.")
+            logger.warning("Ignored saving a video as there were zero frames to save.")
         else:
             try:
                 from moviepy.video.io.ImageSequenceClip import \
@@ -229,4 +229,4 @@ class RecordVideoCustom(gym.Wrapper[ObsType, ActType, ObsType, ActType], gym.uti
     def __del__(self):
         """Warn the user in case last video wasn't saved."""
         if len(self.recorded_frames) > 0:
-            logger.warn("Unable to save last video! Did you call close()?")
+            logger.warning("Unable to save last video! Did you call close()?")

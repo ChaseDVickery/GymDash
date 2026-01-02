@@ -77,6 +77,17 @@
 
         </div>
     </div>
+    <!-- SCALAR PLOTS -->
+     <!-- Single Key Area -->
+    <div class="prefab plot-key-panel content-panel">
+        <div class="plot-key-area-label">Key</div>
+        <div class="plot-key-area"></div>
+    </div>
+    <!-- Single Scalar Plot Area -->
+    <div class="prefab single-plot-area">
+        <div class="single-plot-title-area"></div>
+        <div class="single-plot-svg-area"></div>
+    </div>
     <!-- MEDIA DISPLAY -->
     <!-- Image media instance -->
     <div class="prefab multimedia-instance-panel image-instance-panel">
@@ -149,15 +160,40 @@
                     <button class="tablinks contrast-box hoverable" data-tab="tab-analyze" onclick="openTab(event, 'tab-analyze')">ANALYZE</button>
                     <button class="tablinks contrast-box hoverable" data-tab="tab-configs" onclick="openTab(event, 'tab-configs')">CONFIGS</button>
                 </div>
-                
-                
-                
+            </div>
+
+            <div class="bar-right">
+                <button id="main-settings-button" class="contrast-box hoverable">
+                    <!-- gear svg from: https://fontawesome.com/icons/gear?s=solid -->
+                    <svg id="setting-gear-icon" width="50px" height="50px" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640"><!--!Font Awesome Free v7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2026 Fonticons, Inc.--><path d="M259.1 73.5C262.1 58.7 275.2 48 290.4 48L350.2 48C365.4 48 378.5 58.7 381.5 73.5L396 143.5C410.1 149.5 423.3 157.2 435.3 166.3L503.1 143.8C517.5 139 533.3 145 540.9 158.2L570.8 210C578.4 223.2 575.7 239.8 564.3 249.9L511 297.3C511.9 304.7 512.3 312.3 512.3 320C512.3 327.7 511.8 335.3 511 342.7L564.4 390.2C575.8 400.3 578.4 417 570.9 430.1L541 481.9C533.4 495 517.6 501.1 503.2 496.3L435.4 473.8C423.3 482.9 410.1 490.5 396.1 496.6L381.7 566.5C378.6 581.4 365.5 592 350.4 592L290.6 592C275.4 592 262.3 581.3 259.3 566.5L244.9 496.6C230.8 490.6 217.7 482.9 205.6 473.8L137.5 496.3C123.1 501.1 107.3 495.1 99.7 481.9L69.8 430.1C62.2 416.9 64.9 400.3 76.3 390.2L129.7 342.7C128.8 335.3 128.4 327.7 128.4 320C128.4 312.3 128.9 304.7 129.7 297.3L76.3 249.8C64.9 239.7 62.3 223 69.8 209.9L99.7 158.1C107.3 144.9 123.1 138.9 137.5 143.7L205.3 166.2C217.4 157.1 230.6 149.5 244.6 143.4L259.1 73.5zM320.3 400C364.5 399.8 400.2 363.9 400 319.7C399.8 275.5 363.9 239.8 319.7 240C275.5 240.2 239.8 276.1 240 320.3C240.2 364.5 276.1 400.2 320.3 400z"/></svg>
+                </button>
             </div>
         </div>
     </header>
 
+    <div id="main-settings-content" class="contrast-box-opp">
+        <div>MAIN SETTINGS</div>
+        <div class="settings settings-main">
+            <div class="setting">
+                <label for="theme-select-dropdown">Theme</label>
+                <select id="theme-select-dropdown" class="dropdown">
+                    <option value="classic">Classic</option>
+                    <option value="bw">Black&White</option>
+                    <option value="neon01">Neon_01</option>
+                    <option value="neon02">Neon_02</option>
+                    <option value="soft01">Soft_01</option>
+                    <option value="plain01">Plain_01</option>
+                </select>
+            </div>
+            <!-- <div class="setting">
+                <label for="plot-smooth-factor-slider">Smooth Factor</label>
+                <input type="range" min="1" max="5" value="1" step="1" id="plot-smooth-factor-slider" class="slider">
+            </div> -->
+        </div>
+    </div>
+
     <div class="setting-bar contrast-box-opp">
-        <div id="setting-bar-title">Settings</div>
+        <div id="setting-bar-title">Viz Settings &#9881</div>
         <div id="setting-bar-content">
             <div class="settings settings-general"></div>
             <div class="settings settings-control"></div>
@@ -204,9 +240,9 @@
         </div>
     
         <div class="main-content content-panel">
+            <!-- TAB: CONTROL -->
             <div class="tabcontent" id="tab-control">
-                
-                
+                <!-- Start Simulation Panel -->
                 <div class="control-panel content-panel" id="start-panel">
                     <h2 style="text-align: center;">Start</h2>
                     <div class="config-details-panel">
@@ -240,7 +276,7 @@
                         </div>
                     </div>
                 </div>
-                
+                <!-- Control Simulation Panel -->
                 <div class="control-column">
                     <h2 style="text-align: center;">Control</h2>
                     <!-- Send Control queries. Do not need to wait for response. -->
@@ -264,7 +300,7 @@
 
                     </div>
                 </div>
-                
+                <!-- Query Simulation Panel -->
                 <div class="query-column">
                     <h2 style="text-align: center;">Query</h2>
                     <!-- Send information queries. We want to wait for a response or timeout. -->
@@ -286,21 +322,31 @@
                 </div>
             </div>
         
-        
+            <!-- TAB: ANALYZE -->
             <div class="tabcontent" id="tab-analyze">
                 <div class="plots-panel analyze-panel content-panel" id="plots-area">
                     <div id="main-plots-panel">
-                        <div id="overview-plot-panel"></div>
-                        <div id="details-plot-panel"></div>
+                        <div id="main-plots-header">
+                            <div>Main Plots</div>
+                            <div class="setting">
+                                <label for="main-plot-key-select">Key: </label>
+                                <select id="main-plot-key-select" class="dropdown">
+                                    <option value="none">NONE</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div id="main-plots-title-panel"></div>
+                        <div id="main-plots-area">
+                            <div id="overview-plot-panel"></div>
+                            <div id="details-plot-panel"></div>
+                        </div>
                     </div>
                     <div id="scalar-plots-panel">
                         <div class="plot-key-panel content-panel" id="default-plot-key-panel" data-key="Default">
                             <div class="plot-key-area-label">Default</div>
-                            <div class="plot-key-area"></div>
-                        </div>
-                        <div class="prefab plot-key-panel content-panel">
-                            <div class="plot-key-area-label">Key</div>
-                            <div class="plot-key-area"></div>
+                            <div class="plot-key-area">
+                                <div class="single-plot-area"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -378,7 +424,7 @@
                 </div>
             </div>
         
-        
+            <!-- TAB: CONFIGS -->
             <div class="tabcontent" id="tab-configs">
                 <h3>CONFIGS</h3>
             </div>

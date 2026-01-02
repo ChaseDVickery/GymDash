@@ -226,6 +226,7 @@ const vizUtils = (
             static defaultColorTitle;
             static defaultColorAxis;
             static defaultColorAxisText;
+            static defaultSizeAxisText;
             static defaultColorScale;
             static defaultColorStep;
 
@@ -245,6 +246,7 @@ const vizUtils = (
                 this.titleColor     = PlotSettings.defaultColorTitle;
                 this.axisColor      = PlotSettings.defaultColorAxis;
                 this.axisTextColor  = PlotSettings.defaultColorAxisText;
+                this.axisTextSize   = PlotSettings.defaultSizeAxisText;
                 this.colorScale     = PlotSettings.defaultColorScale;
                 this.colorScaleStep = PlotSettings.defaultColorStep;
 
@@ -311,6 +313,9 @@ const vizUtils = (
                 // Axis tick color
                 axisSelection.selectAll(".tick > line")
                     .attr("stroke", this.axisColor);
+                // Axis font size
+                axisSelection
+                    .style("font-size", this.axisTextSize);
             }
 
             /**
@@ -325,18 +330,18 @@ const vizUtils = (
                 if (Object.hasOwn(this, settingName)) {
                     this[settingName]   = settingValue;
                 }
-                else if (settingName === "axis") {
+                else if (settingName === "axisColor") {
                     this.axisColor      = settingValue;
                     this.axisTextColor  = settingValue;
                 }
-                else if (settingName === "main") {
+                else if (settingName === "mainColor") {
                     this.titleColor     = settingValue;
                     this.axisColor      = settingValue;
                     this.axisTextColor  = settingValue;
                     this.mmiSelectColor = settingValue;
                     this.mmiHoverColor  = settingValue;
                 }
-                else if (settingName === "secondary") {
+                else if (settingName === "secondaryColor") {
                     this.bgColor        = settingValue;
                     this.mmiDefaultColor= invertColor(this.bgColor);
                 }
@@ -503,6 +508,14 @@ const vizUtils = (
                 return this.settings.colorAt(idx);
             }
 
+            /**
+             * Static method to create a line plot for a given SimulationMap
+             * and scalar data key.
+             * 
+             * @param {SimulationMap} simulation_map Simulation map.
+             * @param {string} key Scalar key.
+             * @returns {SimPlot} new SimPlot with scalar key data.
+             */
             static createLinePlot(simulation_map, key) {
                 const svg = getPlotOrMakeNew(undefined);
                 const defaultSettings = new PlotSettings();
@@ -1420,8 +1433,9 @@ const vizUtils = (
         const setupStaticFields = function() {
             PlotSettings.defaultColorBackground = "rgb(230,230,230,0)";
             PlotSettings.defaultColorTitle      = "rgb(25,25,25)";
-            PlotSettings.defaultColorAxis       = "rgb(25,25,25)";
-            PlotSettings.defaultColorAxisText   = "rgb(25,25,25)";
+            PlotSettings.defaultColorAxis       = "var(--main-contrast-color)";
+            PlotSettings.defaultColorAxisText   = "var(--main-contrast-color)";
+            PlotSettings.defaultSizeAxisText    = "1rem";
             PlotSettings.defaultColorScale      = d3.scaleSequential(d3.interpolateSinebow);
             PlotSettings.defaultColorStep       = 0.27;
             _setup_done = true;
