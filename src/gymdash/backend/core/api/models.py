@@ -103,6 +103,7 @@ class SimulationInteractionModel(BaseModel):
     stop_simulation:    Union[InteractorChannelModel,None]  = None
     progress:           Union[InteractorChannelModel,None]  = None
     progress_status:    Union[InteractorChannelModel,None]  = None
+    help_request:       Union[InteractorChannelModel,None]  = None
     is_done:            Union[InteractorChannelModel,None]  = None
     cancelled:          Union[InteractorChannelModel,None]  = None
     failed:             Union[InteractorChannelModel,None]  = None
@@ -119,6 +120,7 @@ class SimulationInteractionModel(BaseModel):
             ("stop_simulation", self.stop_simulation),
             ("progress",        self.progress),
             ("progress_status", self.progress_status),
+            ("help_request",    self.help_request),
             ("is_done",         self.is_done),
             ("cancelled",       self.cancelled),
             ("failed",          self.failed),
@@ -130,4 +132,4 @@ class SimulationInteractionModel(BaseModel):
         return filter(lambda channel: channel[1] is not None and channel[1].triggered, self.channels)
     
     def __str__(self) -> str:
-        return f"SimulationInteractionModel(id={self.id}, timeout={self.timeout}, channels=(stop_simulation={str(self.stop_simulation)}, progress={str(self.progress)}, progress_status={str(self.progress_status)}, is_done={str(self.is_done)}, cancelled={str(self.cancelled)}, failed={str(self.failed)}, custom_query={str(self.custom_query)}))"
+        return f"SimulationInteractionModel(id={self.id}, timeout={self.timeout}, channels=(stop_simulation={str(self.stop_simulation)}, progress={str(self.progress)}, progress_status={str(self.progress_status)}, help_request={str(self.help_request)}, is_done={str(self.is_done)}, cancelled={str(self.cancelled)}, failed={str(self.failed)}, custom_query={str(self.custom_query)}))"

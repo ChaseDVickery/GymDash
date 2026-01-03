@@ -52,6 +52,7 @@ class SimulationInteractionCallback(BaseCallback):
         # HANDLE OUTGOING INFORMATION
         # Return progress value equivalent to the one used in ProgressBarCallback
         self.curr_timesteps += self.training_env.num_envs
+        self.simulation.base_step()
         self.interactor.set_out_if_in("progress", (self.curr_timesteps, self.total_timesteps))
         # HANDLE INCOMING INFORMATION
         if self.interactor.set_out_if_in("stop_simulation", True):

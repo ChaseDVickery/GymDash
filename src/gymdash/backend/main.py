@@ -26,7 +26,8 @@ from gymdash.backend.core.api.models import (SimulationIDModel,
                                             SimulationIDsModel,
                                             SimulationInteractionModel,
                                             SimulationStartConfig,
-                                            StoredSimulationInfo, StatQuery)
+                                            StoredSimulationInfo, StatQuery,
+                                            ControlRequestBatch, ControlRequestDetails)
 from gymdash.backend.core.patch.patcher import apply_extension_patches
 from gymdash.backend.core.simulation.export import SimulationExporter
 from gymdash.backend.core.simulation.manage import (SimulationRegistry,
@@ -121,7 +122,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-print("Added CORS middleware")
 
 # Setup gzip compression middleware
 # https://fastapi.tiangolo.com/advanced/middleware/#trustedhostmiddleware
@@ -133,6 +133,7 @@ app.add_middleware(
     # Compression level 1-9 (1 lowest compression, 9 highest compression)
     compresslevel=1
 )
+print("App started")
 
 @app.get("/resource-usage-simple")
 async def get_resource_usage_simple():
@@ -217,8 +218,27 @@ async def cancel_sim(sim_query: Union[SimulationInteractionModel, SimulationIDMo
 async def get_sim_progress(sim_query: SimulationInteractionModel):
     if simulation_tracker.is_clearing:
         return {}
-    query_response = await simulation_tracker.fulfill_query_interaction(sim_query)
+    # Valid Sim ID = simulation query interaction
+    if simulation_tracker.is_valid(sim_query.id):
+        query_response = await simulation_tracker.fulfill_query_interaction(sim_query)
+    # Invalid Sim ID = general-purpose query
+    else:
+        if sim_query.custom_query is None:
+            query_response = {}
+        else:
+            cq: dict = sim_query.custom_query.value
+            if "get_registered_sim_keys" in cq:
+                requests = ControlRequestBatch(
+                    requests={SimulationTracker.no_id: {"custom_query": [
+                        ControlRequestDetails(key="custom_query", details="Registered Simulation Keys:\n"+"\n".join(SimulationRegistry.list_simulations()), subkeys=[])
+                    ]}}
+                )
+                query_response = requests.model_dump_json()
     return query_response
+
+# @app.get("/get-registered-sims")
+# async def get_registered_sims() -> List[str]:
+#     return SimulationRegistry.list_simulations()
 
 @app.get("/get-sims-history")
 async def get_stored_simulations() -> List[StoredSimulationInfo]:

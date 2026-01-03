@@ -221,11 +221,11 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
         epochs:     int                             = 1,
         tb_logger:  Union[SummaryWriter, str, None] = None,
         log_step:   int                             = -1,
-        loss_fn:    _Loss                           = None,
+        loss_fn:    _Loss                           = nn.CrossEntropyLoss(),
         optimizer:  Optimizer                       = None,
         do_val:     bool                            = False,
         val_per_steps:  int                         = -1,
-        val_per_epoch:  int                         = -1,
+        val_per_epochs:  int                         = -1,
         val_kwargs:     Dict[str, Any]              = {},
         step_callback: BaseCustomCallback           = EmptyCallback(),
         epoch_callback: BaseCustomCallback          = EmptyCallback(),
@@ -253,7 +253,7 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
             else nn.CrossEntropyLoss()
         optimizer           = optimizer \
             if optimizer is not None \
-            else torch.optim.SGD(model.parameters(), lr=1e-3)
+            else torch.optim.SGD(model.parameters())
 
         # Train
         model.to(device)
@@ -298,8 +298,8 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
                 step_callback.update_locals(locals())
                 if not step_callback.on_invoke():
                     raise StopSimException(f"Invocation of training step_callback at state '{step_callback.state}' terminated training.")
-            # Validate every val_per_epoch epochs
-            if do_val and val_per_epoch > 0 and (epoch % val_per_epoch == 0):
+            # Validate every val_per_epochs epochs
+            if do_val and val_per_epochs > 0 and (epoch % val_per_epochs == 0):
                 model.eval()
                 val_results = self.validate(
                     device=device,

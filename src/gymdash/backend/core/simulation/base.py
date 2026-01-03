@@ -165,6 +165,7 @@ class SimulationInteractor:
         "stop_simulation",
         "progress",
         "progress_status",
+        "help_request",
         "custom_query",
     ))
 
@@ -508,12 +509,19 @@ class Simulation():
         self._meta_create_time                  = datetime.now()
         self._meta_start_time                   = None
         self._meta_end_time                     = None
+        self._meta_has_run                      = False
 
         self._project_info_set: bool            = False
         self._project_sim_id: UUID              = None
         self._project_sim_base_path: str        = None
 
         self.sm = SimpleStateStack()
+    
+    @abstractmethod
+    def _get_help_text(self):
+        return f"Simulation {type(self)} has no help text"
+    def send_help_request(self):
+        self.interactor.add_control_request("custom_query", self._get_help_text())
 
     @property
     def sim_path(self) -> Union[str, None]:
@@ -606,8 +614,14 @@ class Simulation():
     def is_done(self) -> bool:
         return  self.from_disk or \
                 self.force_stopped or \
-                self.thread is None or \
-                not self.thread.is_alive()
+                self._meta_cancelled or \
+                self._meta_has_run
+                # self.thread is None or \
+                # not self.thread.is_alive()
+
+    @property
+    def can_run(self) -> bool:
+        return  not self.from_disk
 
     def _overwrite_new_kwargs(self, old_kwargs, *args) -> Dict[str, Any]:
         """
@@ -724,6 +738,9 @@ class Simulation():
 
     def run(self, **kwargs) -> None:
         logger.debug(f"Simulation run() kwargs: {kwargs}.")
+        if not self.can_run:
+            logger.warning("Simulation run() could not run. can_run evaluated to False")
+            return
         # Start run callbacks
         try:
             self.trigger_callbacks(Simulation.START_RUN)
@@ -732,13 +749,14 @@ class Simulation():
         # Run
         try:
             # ONLY RUN IF YOU WERE NOT LOADED FROM DISK
-            if not self.from_disk:
+            if self.can_run:
                 self._meta_start_time = datetime.now()
                 self._run(**kwargs)
         except Exception:
             logger.exception(f"Exception when calling Simulation _run().")
-        # End run callbacks
+        self._meta_has_run = True
         self._meta_end_time = datetime.now()
+        # End run callbacks
         self.trigger_callbacks(Simulation.END_RUN)
         # If we are here and the stop_simulation flag has been raised
         # and not dealt with, then we can deal with it now.
@@ -746,6 +764,11 @@ class Simulation():
         # funny business.
         self.interactor.set_out_if_in("stop_simulation", True)
     
+    def base_step(self) -> None:
+        # If we received a help request, then try to fulfill it
+        if self.interactor.set_out_if_in("help_request", True):
+            self.send_help_request()
+
     @abstractmethod
     def _setup(self, **kwargs):
         raise NotImplementedError

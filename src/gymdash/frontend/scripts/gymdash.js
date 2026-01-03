@@ -53,6 +53,9 @@ const startSimBtn               = startPanel.querySelector("#start-sim-btn");
 const queueSimBtn               = startPanel.querySelector("#queue-sim-btn");
 const sendControlBtn            = document.querySelector("#send-control-btn");
 const sendQueryBtn              = document.querySelector("#send-query-btn");
+const sendQuerySimulationKeysBtn= document.querySelector("#query-simulation-keys-btn");
+const sendQuerySimulationHelpBtn= document.querySelector("#query-simulation-help-btn");
+
 
 // Settings
 const settingBarTitle           = document.querySelector("#setting-bar-title");
@@ -258,6 +261,7 @@ class SimSelection {
                 if (!info) { return Promise.resolve(info); }
                 if (!validID(this.id)) { return Promise.resolve(info); }
                 simulations.get(this.id)?.setProgressReport(info);
+                debug("updateProgress info: " + this.label.textContent);
                 debug(info);
                 if (info.is_done) {
                     if (info.cancelled || info.failed) {
@@ -266,7 +270,7 @@ class SimSelection {
                         this.completeProgress("success");
                     }
                 }
-                if (Object.hasOwn(info, "progress")) {
+                if (Object.hasOwn(info, "progress") && info.progress != null) {
                     if (info.progress[1] === 0) { return info; }
                     outer.style.setProperty("--prog-num", `${info.progress[0]}`);
                     outer.style.setProperty("--prog-den", `${info.progress[1]}`);
@@ -1001,11 +1005,30 @@ function sendQuery() {
     for (const simID in selections) {
         promises.push(sendSingleQuery(simID));
     }
-    Promise.all(promises)
-        .then((queryInfos) => {
-            console.log("QUERY INFOS:");
-            console.log(queryInfos);
-        })
+    return Promise.all(promises);
+        // .then((queryInfos) => {
+        //     console.log("QUERY INFOS:");
+        //     console.log(queryInfos);
+        // })
+}
+function sendGetRegisteredSimulationKeysQuery() {
+    const queryBody = createQueryBody(noID);
+    queryBody.custom_query = {triggered: true, value: {"get_registered_sim_keys": true}}
+    query(queryBody).then((request_model) => {
+        const obj = JSON.parse(request_model);
+        console.log(obj);
+        updateControlRequestQueue(obj);
+    });
+}
+function sendGetSimulationHelpQuery() {
+    const selections = simulations.selected();
+    const promises = [];
+    for (const simID in selections) {
+        const queryBody = createQueryBody(simID);
+        queryBody.help_request = {triggered: true, value: null};
+        promises.push(query(queryBody));
+    }
+    return Promise.all(promises);
 }
 
 function repositionTooltip(tt, element, direction="right") {
@@ -1485,6 +1508,7 @@ function selectControlRequest(requestBox, detailsString) {
     controlRequestDetails.textContent = detailsString;
 }
 function setupControlRequest(simID, request_data) {
+    console.log("setupControlRequest");
     const requestBox = prefabcontrolRequestBox.cloneNode(true);
     const previewText = `${getSimName(simID)}: ${request_data.details}`;
     const detailText =
@@ -1509,6 +1533,7 @@ subkeys=${request_data.subkeys}`;
     controlResponsePanel.appendChild(requestBox);
 }
 function updateControlRequestQueue(requests_model) {
+    if (requests_model == null) { return; }
     const requests = requests_model.requests;
     for (const simID in requests) {
         for (const channel_key in requests[simID]) {
@@ -1599,6 +1624,8 @@ startSimBtn.addEventListener("click", startSimulation);
 queueSimBtn.addEventListener("click", queueSimulation);
 sendControlBtn.addEventListener("click", sendQuery);
 sendQueryBtn.addEventListener("click", sendQuery);
+sendQuerySimulationKeysBtn.addEventListener("click", sendGetRegisteredSimulationKeysQuery);
+sendQuerySimulationHelpBtn.addEventListener("click", sendGetSimulationHelpQuery);
 
 // Main Plots
 mainPlotKeySelect.addEventListener("change", createMainPlots);
@@ -2004,7 +2031,7 @@ function refreshMainPlotKeys() {
     }
     // Retry getting original key, otherwise get first key
     mainPlotKeySelect.selectedIndex = 0;
-    for (let i = 0; i < mainPlotKeySelect.options.length-1; i++) {
+    for (let i = 0; i < mainPlotKeySelect.options.length; i++) {
         console.log("key checking " + mainPlotKeySelect[i].value + " against main key " + currentMainKey);
         if (mainPlotKeySelect[i].value == currentMainKey) {
             mainPlotKeySelect.selectedIndex = i;
@@ -2087,6 +2114,12 @@ function createScalarPlots() {
         if (panel.id === "default-plot-key-panel") { continue; }
         panel.remove();
     }
+    for (const area of document.querySelector("#default-plot-key-panel").querySelectorAll(".single-plot-area")) {
+        area.remove();
+    }
+    // for (const title_area in document.querySelector("#default-plot-key-panel").querySelectorAll(".single-plot-title-area")) {
+    //     title_area.textContent = "";
+    // }
     for (const svg of scalarPlotsPanel.querySelectorAll("svg")) {
         svg.remove();
     }

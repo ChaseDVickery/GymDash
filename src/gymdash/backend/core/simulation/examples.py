@@ -101,6 +101,25 @@ class StableBaselinesSimulation(Simulation):
             # stat_tags.TB_IMAGES: ["episode_video"]
         }
 
+    def _get_help_text(self):
+        help_text = f"""
+{type(self)}:
+
+Description: Run a limited number of StableBaselines simulations.
+
+Supported Start Kwargs:
+    num_steps: (int) Minimum number of steps to run simulation. Default 5000
+    episode_trigger: (int) Input a value to record a video every x episodes. Input x<=0 for no recording. Default= 0.
+    step_trigger: (int) Input a value to record a video every x steps. Input x<=0 for no recording. Default= 0.
+    video_length: (int) Length of recorded episodes. Input x==0 for full episode. Default= 0.
+    fps: (int) Frames-per-second of recorded video. Default= 30.
+    env: (str) Name of Gymnasium environment to simulate. Default= CartPole-v1
+    policy: (str) Name of stable baselines policy network to use. Default= MlpPolicy
+    algorithm: (str) Name of RL algorithm to use. Options are ppo, a2c, dqn, ddpg, td3, sac. Default= ppo
+    algorithm_kwargs: (dict) Dictionary of kwargs to pass to the algorithm. Default= {{}}
+"""
+        return help_text
+
     def _to_alg_initializer(self, alg_key: str):
         return self.algs.get(alg_key, self.algs["ppo"])
 
@@ -272,6 +291,21 @@ class CustomControlSimulation(Simulation):
         if not _has_tb:
             raise ImportError(f"Install tensorboard to use example simulation {type(self)}.")
         super().__init__(config)
+
+    def _get_help_text(self):
+        help_text = f"""
+{type(self)}:
+
+Description: Run a custom simulation demonstrating interactive control requests. Every period, the simulation alters a scalar value (my_number). This occurs for some runtime, pausing a points specified by the user to wait for input before continuing.
+
+Supported Start Kwargs:
+    interactive: (bool) Boolean describing whether to use the interactive setup. Default= False.
+    poll_period: (float) Time between each step. Default= 0.5.
+    total_runtime: (float) Minimum runtime of the simulation. Default= 30.
+    pause_points: (list[float]) List of values where the simulation pauses and asks for user input. Default= []
+    other_kwargs: (None) N/A. Default= {{}}.
+"""
+        return help_text
         
     def _create_streamers(self, kwargs: Dict[str, Any]):
         experiment_name = f"custom"
@@ -293,14 +327,6 @@ class CustomControlSimulation(Simulation):
             "pause_points":     [],
             "other_kwargs":     {}
         }
-    
-    def handle_interactions(self):
-        self.interactor.set_out_if_in("progress", (self.curr_timesteps, self.total_timesteps))
-        # HANDLE INCOMING INFORMATION
-        if self.interactor.set_out_if_in("stop_simulation", True):
-            self.simulation.set_cancelled()
-            return False
-        return True
 
     def _setup(self, **kwargs):
         kwargs = self._overwrite_new_kwargs(self.kwarg_defaults, self.config.kwargs, kwargs)
@@ -348,6 +374,7 @@ class CustomControlSimulation(Simulation):
             self.interactor.add_control_request("custom_query", interactive_text)
             while True:
                 # HANDLE INCOMING INFORMATION
+                self.base_step()
                 if self.interactor.set_out_if_in("stop_simulation", True):
                     self.set_cancelled()
                     writer.close()
@@ -374,6 +401,7 @@ class CustomControlSimulation(Simulation):
             timer = 0
             curr_pause_point = 0
             while (timer < total_runtime):
+                self.base_step()
                 # Manage pause points
                 # Pause if we are at the next pause point time
                 if curr_pause_point < len(pause_points) and timer >= pause_points[curr_pause_point]:
@@ -382,6 +410,7 @@ class CustomControlSimulation(Simulation):
                     # we can increment the pause point index and move on
                     while True:
                         # Handle normal
+                        self.base_step()
                         self.interactor.set_out_if_in("progress", (timer, total_runtime))
                         # Handle custom
                         triggered, custom = self.interactor.get_in("custom_query")
@@ -445,6 +474,7 @@ class MLSimulationUpdateCallback(MLSimulationCallback):
     def __init__(self, simulation: Simulation):
         super().__init__(simulation)
     def _on_invoke(self):
+        self.simulation.base_step()
         should_continue = True
         if self.simulation.sm.state == "<<train>>":
             curr_steps = self.locals.get("curr_steps", 0)
@@ -576,6 +606,59 @@ class MLSimulation(Simulation):
             stat_tags.TB_SCALARS: ["loss/train", "loss/val", "acc/val",],
             stat_tags.TB_IMAGES: ["example_outputs"]
         }
+        self.torch_loss_fns = {
+            "L1Loss".lower(): torch.nn.L1Loss,
+            "NLLLoss".lower(): torch.nn.NLLLoss,
+            "PoissonNLLLoss".lower(): torch.nn.PoissonNLLLoss,
+            "GaussianNLLLoss".lower(): torch.nn.GaussianNLLLoss,
+            "KLDivLoss".lower(): torch.nn.KLDivLoss,
+            "MSELoss".lower(): torch.nn.MSELoss,
+            "BCELoss".lower(): torch.nn.BCELoss,
+            "BCEWithLogitsLoss".lower(): torch.nn.BCEWithLogitsLoss,
+            "HingeEmbeddingLoss".lower(): torch.nn.HingeEmbeddingLoss,
+            "MultiLabelMarginLoss".lower(): torch.nn.MultiLabelMarginLoss,
+            "SmoothL1Loss".lower(): torch.nn.SmoothL1Loss,
+            "HuberLoss".lower(): torch.nn.HuberLoss,
+            "SoftMarginLoss".lower(): torch.nn.SoftMarginLoss,
+            "CrossEntropyLoss".lower(): torch.nn.CrossEntropyLoss,
+            "MultiLabelSoftMarginLoss".lower(): torch.nn.MultiLabelSoftMarginLoss,
+            "CosineEmbeddingLoss".lower(): torch.nn.CosineEmbeddingLoss,
+            "MarginRankingLoss".lower(): torch.nn.MarginRankingLoss,
+            "MultiMarginLoss".lower(): torch.nn.MultiMarginLoss,
+            "TripletMarginLoss".lower(): torch.nn.TripletMarginLoss,
+            "TripletMarginWithDistanceLoss".lower(): torch.nn.TripletMarginWithDistanceLoss,
+            "CTCLoss".lower(): torch.nn.CTCLoss,
+        }
+        self.torch_optimizers = {
+            "SGD".lower(): torch.optim.SGD,
+            "Adam".lower(): torch.optim.Adam,
+        }
+
+    def _get_help_text(self):
+        help_text = f"""
+{type(self)}:
+
+Description: Run a standard machine learning training process.
+
+Supported Start Kwargs:
+    train: (bool) Whether to run the training loop. Default= True.
+    val: (bool) Whether to run a validation loop. Default= True.
+    test: (bool) Whether to run a test loop. Default= False.
+    inference: (bool) Whether to run in inference mode. Default= False.
+    train_kwargs: (dict) Kwargs to be passed into the training loop:
+        epochs: (int) Number of training epochs. Default= 1,
+        log_step: (int) Number of steps between logging values. Value<=0 does not log values. Default= 5.
+        val_per_steps: (int) Number of steps between validation loops during training. Negative does not validate per steps. Default= 500.
+        val_per_epochs: (int) Number of epochs between validation loops during training. Negative does not validate per epochs. Default= -1.
+        loss_fn: (str) Name of PyTorch (torch.nn) loss function to use. Default= CrossEntropyLoss.
+        loss_fn_kwargs: (dict) Kwargs to pass into loss_fn creation. Default= {{}}
+        optimizer: (str) Name of PyTorch (torch.optim) optimizer to use. Default= SGD.
+        optimizer_kwargs: (dict) Kwargs to pass into optimizer creation. Default= {{"lr": 1e-3}}
+    val_kwargs: (dict) Kwargs to be passed into the validation loop:
+    test_kwargs: (dict)  Kwargs to be passed into the test loop:
+    inference_kwargs: (dict)  Kwargs to be passed into the inference loop:
+"""
+        return help_text
 
     @abstractmethod
     def _create_model(**model_kwargs) -> nn.Module:
@@ -616,7 +699,7 @@ class MLSimulation(Simulation):
     def create_kwarg_defaults(self):
         return {
             "train": True,
-            "val": False,
+            "val": True,
             "test": False,
             "inference": False,
             "train_kwargs": {},
@@ -637,17 +720,25 @@ class MLSimulation(Simulation):
         # self._create_model(**model_kwargs)
 
         do_train = kwargs.get("train", True)
-        do_val = kwargs.get("val", False)
+        do_val = kwargs.get("val", True)
         do_test = kwargs.get("test", False)
         do_inference = kwargs.get("inference", False)
         train_kwargs = kwargs.get("train_kwargs", {})
-
         val_kwargs = kwargs.get("val_kwargs", {})
         test_kwargs = kwargs.get("test_kwargs", {})
         inference_kwargs = kwargs.get("inference_kwargs", {})
 
         # Train kwargs
         epochs = train_kwargs.get("epochs", 1)
+        log_step = train_kwargs.get("log_step", 5)
+        val_per_steps = train_kwargs.get("val_per_steps", 500)
+        val_per_epochs = train_kwargs.get("val_per_epochs", -1)
+        loss_fn = train_kwargs.get("loss_fn", None)
+        loss_fn = self.torch_loss_fns.get(loss_fn, self.torch_loss_fns["CrossEntropyLoss".lower()])
+        loss_fn_kwargs = train_kwargs.get("loss_fn_kwargs", {})
+        optimizer = train_kwargs.get("optimizer", None)
+        optimizer = self.torch_loss_fns.get(optimizer, self.torch_optimizers["SGD".lower()])
+        optimizer_kwargs = train_kwargs.get("optimizer_kwargs", {"lr": 1e-3})
         
         if (do_train):
             pass
@@ -742,10 +833,12 @@ class MLSimulation(Simulation):
                 dataloader=train_loader,
                 epochs=epochs,
                 tb_logger=tb_path,
-                log_step=5,
-                do_val=True,
-                # val_per_epoch=1,
-                val_per_steps=500,
+                log_step=log_step,
+                loss_fn=loss_fn(**loss_fn_kwargs),
+                optimizer=optimizer(self.model.model.parameters(), **optimizer_kwargs),
+                do_val=do_val,
+                val_per_steps=val_per_steps,
+                val_per_epochs=val_per_epochs,
                 val_kwargs={
                     "dataloader": test_loader,
                     "step_callback": MLSimulationUpdateCallback(self)
