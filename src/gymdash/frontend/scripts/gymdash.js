@@ -51,6 +51,7 @@ const configFamilyEntry         = startPanel.querySelector("#config-family1");
 const configTypeEntry           = startPanel.querySelector("#config-type1");
 const startSimBtn               = startPanel.querySelector("#start-sim-btn");
 const queueSimBtn               = startPanel.querySelector("#queue-sim-btn");
+const rerunSimBtn               = startPanel.querySelector("#rerun-sim-btn");
 const sendControlBtn            = document.querySelector("#send-control-btn");
 const sendQueryBtn              = document.querySelector("#send-query-btn");
 const sendQuerySimulationKeysBtn= document.querySelector("#query-simulation-keys-btn");
@@ -1291,6 +1292,54 @@ function startSimulation() {
         console.error("Error: " + error);
     });
 }
+function rerunSelectedSimulation() {
+    // Check selections
+    const selections = simulations.selected();
+    const numSelected = Object.keys(selections).length;
+    if (numSelected > 1) {
+        gd_warn("Cannot rerun more than 1 selected simulation at the same time.");
+        return;
+    }
+    if (numSelected <= 0) {
+        gd_info("Select a simulation to rerun.");
+        return;
+    }
+    const simulation = simulations.get(Object.keys(selections)[0]);
+    const simID = simulation.id;
+    if (simID == noID) {
+        gd_warn("Selected simulation had invalid simulation ID. Try selecting a different Simulation");
+        return;
+    }
+    const selection = selections[simID];
+    // Read relevant information and gather kwargs
+    const startConfig = entryToConfig();
+    // Convert SimulationStartConfig into
+    // model matching SimulationRestartConfig
+    const config = {id: simID, config: startConfig};
+    fetch(apiURL("rerun-existing"), {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+        },
+        body: JSON.stringify(config),
+    })
+    .then((response) => response.json())
+    .then((info) => {
+        debug(info);
+        const simID = info.sim_id;
+        if (!validID(simID)) {
+            gd_warn(`Problem rerunning simulation ${simulation.name} (${simID})`);
+            return info;
+        }
+        const newSelection = selection;
+        simulation.setActive(true);
+        simulation.setInfo(info);
+        return info;
+    })
+    .catch((error) => {
+        console.error("Error: " + error);
+    });
+}
 /**
  * Attempts to stop a simulation given a SimSelection.
  * 
@@ -1622,6 +1671,7 @@ deselectAllBtn.addEventListener("click", deselectAll);
 selectAllBtn.addEventListener("click", selectAll);
 startSimBtn.addEventListener("click", startSimulation);
 queueSimBtn.addEventListener("click", queueSimulation);
+rerunSimBtn.addEventListener("click", rerunSelectedSimulation);
 sendControlBtn.addEventListener("click", sendQuery);
 sendQueryBtn.addEventListener("click", sendQuery);
 sendQuerySimulationKeysBtn.addEventListener("click", sendGetRegisteredSimulationKeysQuery);

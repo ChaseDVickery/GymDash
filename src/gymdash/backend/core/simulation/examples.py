@@ -184,6 +184,7 @@ Supported Start Kwargs:
         if self._project_info_set:
             tb_path = os.path.join(self.sim_path, tb_path)
         video_path = os.path.join(self.sim_path, "media", "episode_video")
+        ckpt_path = os.path.join(self.sim_path, "checkpoints")
 
         try:
             env = gym.make(env_name, render_mode="rgb_array")
@@ -602,8 +603,10 @@ class MLSimulation(Simulation):
 
         super().__init__(config)
 
+        self.can_rerun = True
+
         self.tb_tag_key_map = {
-            stat_tags.TB_SCALARS: ["loss/train", "loss/val", "acc/val",],
+            stat_tags.TB_SCALARS: ["loss/train", "loss/val", "acc/val", "acc/test"],
             stat_tags.TB_IMAGES: ["example_outputs"]
         }
         self.torch_loss_fns = {
@@ -642,12 +645,14 @@ Description: Run a standard machine learning training process.
 
 Supported Start Kwargs:
     train: (bool) Whether to run the training loop. Default= True.
-    val: (bool) Whether to run a validation loop. Default= True.
+    val: (bool) Whether to run a validation loop. Default= False.
     test: (bool) Whether to run a test loop. Default= False.
     inference: (bool) Whether to run in inference mode. Default= False.
     train_kwargs: (dict) Kwargs to be passed into the training loop:
+        ckpt_per_epochs: (int) Number of epochs between saving model checkpoint. Values <=0 do not save checkpoints. Default= 1.
         epochs: (int) Number of training epochs. Default= 1,
         log_step: (int) Number of steps between logging values. Value<=0 does not log values. Default= 5.
+        do_val: (bool) Whether to run a validation loop within the training loop. Default= True.
         val_per_steps: (int) Number of steps between validation loops during training. Negative does not validate per steps. Default= 500.
         val_per_epochs: (int) Number of epochs between validation loops during training. Negative does not validate per epochs. Default= -1.
         loss_fn: (str) Name of PyTorch (torch.nn) loss function to use. Default= CrossEntropyLoss.
@@ -655,7 +660,9 @@ Supported Start Kwargs:
         optimizer: (str) Name of PyTorch (torch.optim) optimizer to use. Default= SGD.
         optimizer_kwargs: (dict) Kwargs to pass into optimizer creation. Default= {{"lr": 1e-3}}
     val_kwargs: (dict) Kwargs to be passed into the validation loop:
+        ckpt: (int) Which number checkpoint to load for validation, starting at 1. Use -1 for latest checkpoint. Default= -1.
     test_kwargs: (dict)  Kwargs to be passed into the test loop:
+        ckpt: (int) Which number checkpoint to load for validation, starting at 1. Use -1 for latest checkpoint. Default= -1.
     inference_kwargs: (dict)  Kwargs to be passed into the inference loop:
 """
         return help_text
@@ -699,7 +706,7 @@ Supported Start Kwargs:
     def create_kwarg_defaults(self):
         return {
             "train": True,
-            "val": True,
+            "val": False,
             "test": False,
             "inference": False,
             "train_kwargs": {},
@@ -713,14 +720,26 @@ Supported Start Kwargs:
     def _setup(self, **kwargs):
         kwargs = self._overwrite_new_kwargs(self.kwarg_defaults, self.config.kwargs, kwargs)
 
+    def _get_checkpoint_path(self, folder_path: pathlib.Path, ckpt: int) -> Union[pathlib.Path, None]:
+        files = os.listdir(folder_path)
+        ckpt_files = [f for f in files if SimpleClassifierMLModel.TRAINING_CKPT_PATTERN.match(f)]
+        if len(ckpt_files) < 1:
+            return None
+        if ckpt > 0:
+            # Check for specific checkpoint file
+            for f in ckpt_files:
+                if f == SimpleClassifierMLModel.TRAINING_CKPT_FORMAT.format(ckpt):
+                    return folder_path.joinpath(f)
+        # Otherwise, just extract all the checkpoint values and find the largest
+        max_ckpt = max(SimpleClassifierMLModel.TRAINING_CKPT_EXTRACTOR(f) for f in ckpt_files)
+        return folder_path.joinpath(SimpleClassifierMLModel.TRAINING_CKPT_FORMAT.format(max_ckpt))
+
+
     def _run(self, **kwargs):
         kwargs = self._overwrite_new_kwargs(self.kwarg_defaults, self.config.kwargs, kwargs)
-        model_kwargs = kwargs.get("model_kwargs", {})
-
-        # self._create_model(**model_kwargs)
 
         do_train = kwargs.get("train", True)
-        do_val = kwargs.get("val", True)
+        do_val = kwargs.get("val", False)
         do_test = kwargs.get("test", False)
         do_inference = kwargs.get("inference", False)
         train_kwargs = kwargs.get("train_kwargs", {})
@@ -728,9 +747,14 @@ Supported Start Kwargs:
         test_kwargs = kwargs.get("test_kwargs", {})
         inference_kwargs = kwargs.get("inference_kwargs", {})
 
+        logger.info(f"MLSimulation run kwargs: {kwargs}")
+        logger.info(f"MLSimulation train={do_train}, val={do_val}, test={do_test}")
+
         # Train kwargs
+        ckpt_per_epochs = train_kwargs.get("ckpt_per_epochs", 1)
         epochs = train_kwargs.get("epochs", 1)
         log_step = train_kwargs.get("log_step", 5)
+        val_in_train = train_kwargs.get("do_val", True)
         val_per_steps = train_kwargs.get("val_per_steps", 500)
         val_per_epochs = train_kwargs.get("val_per_epochs", -1)
         loss_fn = train_kwargs.get("loss_fn", None)
@@ -739,6 +763,11 @@ Supported Start Kwargs:
         optimizer = train_kwargs.get("optimizer", None)
         optimizer = self.torch_loss_fns.get(optimizer, self.torch_optimizers["SGD".lower()])
         optimizer_kwargs = train_kwargs.get("optimizer_kwargs", {"lr": 1e-3})
+
+        # Val kwargs
+        val_ckpt_num = val_kwargs.get("ckpt", -1)
+        # Test kwargs
+        test_ckpt_num = test_kwargs.get("ckpt", -1)
         
         if (do_train):
             pass
@@ -765,6 +794,12 @@ Supported Start Kwargs:
         pathlib.Path(train_path).mkdir(parents=True, exist_ok=True)
         pathlib.Path(test_path).mkdir(parents=True, exist_ok=True)
         logger.info(f"Created folder: {train_path}")
+        logger.info(f"Created folder: {test_path}")
+
+        # Setup Checkpoint Folder
+        ckpt_folder = pathlib.Path(self.sim_path, "checkpoints", "train")
+        ckpt_folder.mkdir(parents=True, exist_ok=True)
+        logger.info(f"Created folder: {ckpt_folder}")
 
         # Use StreamerRegistry to see if there is an existing Streamer with
         # the same streamer_name. In this case, the streamer_name checked is
@@ -793,6 +828,7 @@ Supported Start Kwargs:
 
         # Setup Model
         # self.model = ClassifierMNIST()
+        internal_model = ClassifierMNIST()
         self.model = SimpleClassifierMLModel(ClassifierMNIST())
         self.model.add_callback("train", "start", lambda: self.sm.push_state("<<train>>"))
         self.model.add_callback("val", "start", lambda: self.sm.push_state("<<val>>"))
@@ -800,12 +836,16 @@ Supported Start Kwargs:
         self.model.add_callback("all", "end", lambda: self.sm.pop_state())
 
         # Get the dataset
+        val_set_size = 10000
+        val_split_generator = torch.Generator().manual_seed(42)
         train_data = datasets.MNIST(
             root=train_path,
             train=True,
             download=True,
             transform=ToTensor(),
         )
+        # train_data, val_data = torch.utils.data.random_split(train_data, [len(train_data)-val_set_size, val_set_size], val_split_generator)
+        train_data, val_data = torch.utils.data.random_split(torch.utils.data.Subset(train_data, range(6000)), [5000, 1000], val_split_generator)
         test_data = datasets.MNIST(
             root=test_path,
             train=False,
@@ -814,7 +854,8 @@ Supported Start Kwargs:
         )
         # train_loader = DataLoader(torch.utils.data.Subset(train_data, torch.arange(0,3000)), 32)
         train_loader = DataLoader(train_data, 32)
-        test_loader = DataLoader(test_data, 32)
+        val_loader = DataLoader(val_data, 32, shuffle=False)
+        test_loader = DataLoader(test_data, 32, shuffle=False)
 
         
         step_callback = CallbackCustomList([
@@ -828,34 +869,76 @@ Supported Start Kwargs:
             )
         ])
 
+        # Attempt Training
         try:
-            self.model.train(
-                dataloader=train_loader,
-                epochs=epochs,
-                tb_logger=tb_path,
-                log_step=log_step,
-                loss_fn=loss_fn(**loss_fn_kwargs),
-                optimizer=optimizer(self.model.model.parameters(), **optimizer_kwargs),
-                do_val=do_val,
-                val_per_steps=val_per_steps,
-                val_per_epochs=val_per_epochs,
-                val_kwargs={
-                    "dataloader": test_loader,
-                    "step_callback": MLSimulationUpdateCallback(self)
-                },
-                step_callback=step_callback,
-                # val_step_callback=MLSimulationUpdateCallback(self)
-            )
-            # train_mnist_classifier(self.model, dataset_folder_path, **train_kwargs)
-            self.add_status(SimStatus(
-                code=SimStatusCode.SUCCESS,
-                details="Model successfully trained."
-            ))
+            if do_train:
+                self.model.train(
+                    dataloader=train_loader,
+                    epochs=epochs,
+                    tb_logger=tb_path,
+                    log_step=log_step,
+                    loss_fn=loss_fn(**loss_fn_kwargs),
+                    optimizer=optimizer(self.model.model.parameters(), **optimizer_kwargs),
+                    do_val=val_in_train,
+                    val_per_steps=val_per_steps,
+                    val_per_epochs=val_per_epochs,
+                    val_kwargs={
+                        "dataloader": val_loader,
+                        "step_callback": MLSimulationUpdateCallback(self)
+                    },
+                    ckpt_per_epochs=ckpt_per_epochs,
+                    ckpt_folder=ckpt_folder,
+                    step_callback=step_callback,
+                    # val_step_callback=MLSimulationUpdateCallback(self)
+                )
+                # train_mnist_classifier(self.model, dataset_folder_path, **train_kwargs)
+                self.add_status(SimStatus(
+                    code=SimStatusCode.SUCCESS,
+                    details="Model successfully trained."
+                ))
         except StopSimException as se:
             self.add_status(SimStatus(
                 code=SimStatusCode.FAIL,
                 subcode=SimStatusSubcode.STOPPED,
                 details="Model training stopped."
+            ))
+            self._meta_failed = True
+            del self.model
+            torch.cuda.empty_cache()
+        except Exception as e:
+            logger.error(e)
+            self._meta_failed = True
+            self.add_error_details(str(e))
+            del self.model
+            torch.cuda.empty_cache()
+
+        # Attempt Validation
+        try:
+            if do_val:
+                ckpt_path = self._get_checkpoint_path(ckpt_folder, val_ckpt_num)
+                if ckpt_path is not None:
+                    model_state = torch.load(ckpt_path)
+                    self.model.model.load_state_dict(model_state)
+                    results = self.model.validate(
+                        dataloader=val_loader,
+                        loss_fn=loss_fn(**loss_fn_kwargs),
+                        step_callback=MLSimulationUpdateCallback(self),
+                    )
+                    self.add_status(SimStatus(
+                        code=SimStatusCode.SUCCESS,
+                        details="Model validation complete."
+                    ))
+                else:
+                    self.add_status(SimStatus(
+                        code=SimStatusCode.INFO,
+                        subcode=SimStatusSubcode.NONE,
+                        details="Unable to validate model with no checkpoints."
+                    ))
+        except StopSimException as se:
+            self.add_status(SimStatus(
+                code=SimStatusCode.FAIL,
+                subcode=SimStatusSubcode.STOPPED,
+                details="Model validation stopped."
             ))
             self._meta_failed = True
             del self.model

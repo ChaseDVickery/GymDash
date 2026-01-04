@@ -12,6 +12,7 @@ import queue
 from gymdash.backend.core.api.models import (InteractorChannelModel,
                                              SimulationInteractionModel,
                                              SimulationStartConfig,
+                                             SimulationRestartConfig,
                                              StoredSimulationInfo,
                                              ControlRequestBatch)
 from gymdash.backend.core.simulation.base import Simulation
@@ -182,7 +183,7 @@ class SimulationTracker:
         # self.queued_sims:               List[Tuple[Simulation, Dict[str,Any]]] = []
         self.queued_sims:               List[QueuedSimulation] = []
         self.queued_sim_map:            Dict[UUID, QueuedSimulation] = {}
-        
+        self._setup_simulations:        set = set()
 
         self._access_mutex:             Lock = Lock()
         
@@ -561,6 +562,28 @@ class SimulationTracker:
         self.update_simulation_db(new_id, simulation)
         return (new_id, simulation)
 
+    def _setup_sim_to_run(self, sim: Union[Simulation, SimulationGroup]):
+        if isinstance(sim, Simulation):
+            id = sim._project_sim_id
+            if id in self._setup_simulations:
+                return
+            # Add other callbacks. Mostly to update sim db at certain points/
+            on_done = functools.partial(self.on_sim_done, sim_ids=[id])
+            on_start_setup = functools.partial(self.update_sim_dbs, sim_ids=[id])
+            sim.add_callback(Simulation.END_RUN, on_done)
+            sim.add_callback(Simulation.START_SETUP, on_start_setup)
+            self._setup_simulations.add(id)
+        elif isinstance(sim, SimulationGroup):
+            for id, sim in sim.infos:
+                if id in self._setup_simulations:
+                    continue
+                # Add other callbacks. Mostly to update sim db at certain points/
+                on_done = functools.partial(self.on_sim_done, sim_ids=[id])
+                on_start_setup = functools.partial(self.update_sim_dbs, sim_ids=[id])
+                sim.add_callback(Simulation.END_RUN, on_done)
+                sim.add_callback(Simulation.START_SETUP, on_start_setup)
+                self._setup_simulations.add(id)
+
 
     def start_sims(
         self, 
@@ -577,18 +600,12 @@ class SimulationTracker:
             group: SimulationGroup of all started simulations.
         """
         group = self.create_simulations(to_start)
-        for info in group.infos:
-            sim_id = info[0]
-            sim = info[1]
-            # Add callbacks. Mostly to update sim db at certain points
-            on_done = functools.partial(self.on_sim_done, sim_ids=[sim_id])
-            on_start_setup = functools.partial(self.update_sim_dbs, sim_ids=[sim_id])
-            sim.add_callback(Simulation.END_RUN, on_done)
-            sim.add_callback(Simulation.START_SETUP, on_start_setup)
+        self._setup_sim_to_run(group)
+        for id, sim in group.infos:
             # Begin simulation
             sim.start(**kwargs)
-            self.add_running_sim(sim_id, sim)
-            logger.info(f"Started simulation (id='{sim_id}') in group '{group.id}'")
+            self.add_running_sim(id, sim)
+            logger.info(f"Started simulation (id='{id}') in group '{group.id}'")
         return group
     
     def start_sim(
@@ -607,13 +624,7 @@ class SimulationTracker:
         """
         id, simulation = self.create_simulation(to_start)
         if simulation is not None:
-            # Upon simulation finishing,
-            # trigger its removal from running simulations
-            # Add other callbacks. Mostly to update sim db at certain points/
-            on_done = functools.partial(self.on_sim_done, sim_ids=[id])
-            on_start_setup = functools.partial(self.update_sim_dbs, sim_ids=[id])
-            simulation.add_callback(Simulation.END_RUN, on_done)
-            simulation.add_callback(Simulation.START_SETUP, on_start_setup)
+            self._setup_sim_to_run(simulation)
             # Begin simulation/
             simulation.start(**kwargs)
             self.add_running_sim(id, simulation)
@@ -622,6 +633,32 @@ class SimulationTracker:
         
         logger.warning(f"Could not start simulation (key='{id}')")
         return (SimulationTracker.no_id, None)
+    
+    def restart_sim(
+        self,
+        to_start: SimulationRestartConfig,
+        **kwargs
+    ) -> Tuple[UUID, Simulation]:
+        key = to_start.id
+        existing_sim = self.get_sim(key)
+        if existing_sim is None:
+            logger.warning(f"Could not find existing simulation (key='{key}')")
+            return (SimulationTracker.no_id, None)
+        # Get simulation ready to run again
+        self._setup_sim_to_run(existing_sim)
+        # Update last times start kwargs with newly-input start kwargs
+        new_start_kwargs = {k: v for k, v in existing_sim.start_kwargs.items()}
+        new_start_kwargs.update(to_start.config.kwargs)
+        logger.info(f"Restarting simulation with kwargs: {new_start_kwargs}")
+        # Begin simulation
+        existing_sim.start(**new_start_kwargs)
+        # Move simulation back to running_simulations
+        with self._access_mutex:
+            if key in self.done_sim_map:
+                existing_sim = self.done_sim_map.pop(key)
+                self.running_sim_map[key] = existing_sim
+        logger.info(f"Restarted simulation (id='{key}')")
+        return (key, existing_sim)
     
     def start_next_queued_sim(self) -> Tuple[UUID, Simulation]:
         if self._is_clearing:

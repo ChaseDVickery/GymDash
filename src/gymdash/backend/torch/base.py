@@ -1,9 +1,10 @@
 import os
 import pathlib
+import re
 from abc import abstractmethod, ABC
 from collections import OrderedDict
 from typing import Any, Dict, Union, Callable, Literal
-
+from pathlib import Path
 from torch.nn.modules import Module
 
 from gymdash.backend.torch.utils import get_available_accelerator
@@ -189,6 +190,11 @@ class SimulationMLModel():
     
 
 class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
+
+    TRAINING_CKPT_PATTERN: re.Pattern = re.compile("train_ckpt_[0-9]+\.pt")
+    TRAINING_CKPT_FORMAT: str = "train_ckpt_{0}.pt"
+    TRAINING_CKPT_EXTRACTOR = lambda n: int(n.split("_")[-1].split(".")[0])
+
     def __init__(self, model: Module) -> None:
         super().__init__(model)
 
@@ -230,6 +236,8 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
         step_callback: BaseCustomCallback           = EmptyCallback(),
         epoch_callback: BaseCustomCallback          = EmptyCallback(),
         val_step_callback: BaseCustomCallback       = EmptyCallback(),
+        ckpt_per_epochs: int                        = -1,
+        ckpt_folder: Union[None, str, Path]         = None,
         device                                      = None,
         **kwargs
     ):
@@ -244,6 +252,8 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
         if isinstance(tb_logger, str):
             tb_logger = SummaryWriter(tb_logger)
         # Setup
+        do_save_ckpt        = (ckpt_per_epochs > 0) and (ckpt_folder is not None)
+        ckpt                = 1
         model               = self.model
         train_dataloader    = dataloader
         size                = len(train_dataloader.dataset)
@@ -254,7 +264,9 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
         optimizer           = optimizer \
             if optimizer is not None \
             else torch.optim.SGD(model.parameters())
-
+        if do_save_ckpt:
+            ckpt_folder: Path = Path(ckpt_folder)
+            ckpt_folder.mkdir(parents=True, exist_ok=True)
         # Train
         model.to(device)
         model.train()
@@ -298,6 +310,10 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
                 step_callback.update_locals(locals())
                 if not step_callback.on_invoke():
                     raise StopSimException(f"Invocation of training step_callback at state '{step_callback.state}' terminated training.")
+            # Save checkpoint every ckpt_per_epochs epochs
+            if do_save_ckpt and (epoch % ckpt_per_epochs == 0):
+                torch.save(self.model.state_dict(), ckpt_folder.joinpath(f"train_ckpt_{ckpt}.pt"))
+                ckpt += 1
             # Validate every val_per_epochs epochs
             if do_val and val_per_epochs > 0 and (epoch % val_per_epochs == 0):
                 model.eval()

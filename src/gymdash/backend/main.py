@@ -26,6 +26,7 @@ from gymdash.backend.core.api.models import (SimulationIDModel,
                                             SimulationIDsModel,
                                             SimulationInteractionModel,
                                             SimulationStartConfig,
+                                            SimulationRestartConfig,
                                             StoredSimulationInfo, StatQuery,
                                             ControlRequestBatch, ControlRequestDetails)
 from gymdash.backend.core.patch.patcher import apply_extension_patches
@@ -192,6 +193,22 @@ async def start_new_simulation_call(config: SimulationStartConfig):
         sim_id = id,
         config = config
     )
+@app.post("/rerun-existing")
+async def rerun_simulation_call(config: SimulationRestartConfig):
+    logger.info(f"API called rerun-existing with config: {config}")
+    if simulation_tracker.is_clearing:
+        return StoredSimulationInfo(
+            name = config.config.name,
+            sim_id = str(simulation_tracker.no_id),
+            config = config
+        )
+    id, _ = simulation_tracker.restart_sim(config)
+    return StoredSimulationInfo(
+        name = config.config.name,
+        sim_id = id,
+        config = config.config
+    )
+
 @app.post("/queue-new-sim")
 async def queue_new_simulation_call(config: SimulationStartConfig):
     logger.debug(f"API called queue-new-sim with config: {config}")

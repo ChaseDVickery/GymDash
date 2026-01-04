@@ -2,6 +2,7 @@ from collections.abc import Callable
 from datetime import datetime
 from uuid import UUID
 from typing import Any, Dict, Iterable, List, Tuple, Union
+from typing_extensions import Self
 import json
 from gymdash.backend.enums import SimStatusCode
 from pydantic import BaseModel
@@ -38,7 +39,11 @@ class SimulationStartConfig(BaseModel):
             )
         else:
             return obj
-        
+    def update(self, other_config: Self):
+        self.kwargs.update(other_config.kwargs)
+class SimulationRestartConfig(BaseModel):
+    id:         UUID
+    config:     SimulationStartConfig
 class SimStatus(BaseModel):
     code:       SimStatusCode
     time:       Union[datetime,None] = None

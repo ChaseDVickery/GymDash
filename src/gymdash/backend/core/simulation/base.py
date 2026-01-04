@@ -499,6 +499,7 @@ class Simulation():
         }
         self.force_stopped: bool                = False
         self.from_disk: bool                    = False
+        self.can_rerun: bool                    = False
 
         self._meta_mutex: Lock                  = Lock()
         self._meta_cancelled: bool              = False
@@ -531,7 +532,7 @@ class Simulation():
             return None
         
     def fill_from_stored_info(self, info: StoredSimulationInfo):
-        logger.debug(f"fill_from_stored_info config: {info.config}")
+        logger.info(f"fill_from_stored_info config: {info.config}")
         self.from_disk = True
         self._project_sim_id = info.sim_id
         self.start_kwargs = info.start_kwargs
@@ -621,7 +622,8 @@ class Simulation():
 
     @property
     def can_run(self) -> bool:
-        return  not self.from_disk
+        return  not self.from_disk or \
+                self.can_rerun
 
     def _overwrite_new_kwargs(self, old_kwargs, *args) -> Dict[str, Any]:
         """
@@ -662,8 +664,8 @@ class Simulation():
         """
         self.start_kwargs = kwargs
         self.setup(**kwargs)
-        self.thread = Thread(target=self.run)
-        self.thread.start(**kwargs)
+        self.thread = Thread(target=self.run, kwargs=kwargs)
+        self.thread.start()
         return self.thread
 
     def reset_interactions(self):

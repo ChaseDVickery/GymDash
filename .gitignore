@@ -18,6 +18,7 @@ testvenv*/
 *venv*
 *vid_projects/
 .gymdash-projects/
+.gymdash-projects-test/
 temp_project/
 docs/vids/*.mkv
 docs/vids/mp4/
