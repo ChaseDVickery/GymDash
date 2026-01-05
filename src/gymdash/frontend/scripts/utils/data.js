@@ -556,6 +556,30 @@ const dataUtils = (
             return smoothed;
         }
 
+        /**
+         * Returns a mapping from all simIDs to their
+         * first data value at the given key. Only returns
+         * those mappings whose Simulations contain at least
+         * 1 value for the given key.
+         * 
+         * @param {SimulationMap} simulation_map 
+         * @param {string} key 
+         * @returns {Object}
+         */
+        const getFirstValuesForKey = function(simulation_map, key) {
+            const allData = simulation_map.data();
+            const firstValueMap = {};
+            for (const simID in simulation_map.simulations) {
+                const sim = simulation_map.get(simID);
+                const data = sim.data;
+                const datapoints = data.getData(key);
+                if (datapoints.length > 0) {
+                    firstValueMap[simID] = datapoints[0];
+                }
+            }
+            return firstValueMap;
+        }
+
         return {
             getAllNewScalars,
             getAllNewImages,
@@ -564,6 +588,7 @@ const dataUtils = (
             getAll,
             createEmptyDataReport,
             smoothData,
+            getFirstValuesForKey,
             DataReport,
         };
     }

@@ -81,12 +81,30 @@
      <!-- Single Key Area -->
     <div class="prefab plot-key-panel content-panel">
         <div class="plot-key-area-label">Key</div>
-        <div class="plot-key-area"></div>
+        <div class="plot-key-content-area">
+            <div class="plot-key-area"></div>
+            <div class="value-key-area"></div>
+        </div>
     </div>
     <!-- Single Scalar Plot Area -->
     <div class="prefab single-plot-area">
         <div class="single-plot-title-area"></div>
         <div class="single-plot-svg-area"></div>
+    </div>
+    <!-- Single Scalar Value Area -->
+    <div class="prefab single-value-area content-panel">
+        <div class="single-value-header-area">
+            <div class="single-value-title-area"></div>
+            <div class="single-value-button-area">
+                <button class="single-value-sort-value contrast-box-opp hoverable">&#x25B2</button>
+                <button class="single-value-sort-lex contrast-box-opp hoverable">A</button>
+            </div>
+        </div>
+        <div class="single-value-svg-area"></div>
+    </div>
+    <div class="prefab single-scalar-box">
+        <div></div>
+        <div></div>
     </div>
     <!-- MEDIA DISPLAY -->
     <!-- Image media instance -->
@@ -182,6 +200,7 @@
                     <option value="neon01">Neon_01</option>
                     <option value="neon02">Neon_02</option>
                     <option value="soft01">Soft_01</option>
+                    <option value="soft02">Soft_02</option>
                     <option value="plain01">Plain_01</option>
                 </select>
             </div>

@@ -301,6 +301,7 @@ const vizUtils = (
                         .attr("stroke", plot.colorFor(simID));
                 }
                 plot.refreshMMIs();
+                // plot.refreshMMIVisuals();
             }
 
             applyAxisSettings(axisSelection) {
@@ -411,6 +412,17 @@ const vizUtils = (
                 }
             }
 
+            refreshMMIVisuals() {
+                this.svg.selectAll(".mmi-marker")
+                    .attr("fill", this.settings.mmiDefaultColor)
+                    .attr("stroke", this.settings.mmiDefaultColor);
+                // this.selectedMMI = undefined;
+                // if (this.mmiExtentRect) {
+                //     this.mmiExtentRect
+                //         .attr("x", 0)
+                //         .attr("width", 0);
+                // }
+            }
             refreshMMIs() {
                 this.clearMMIs();
                 this.addAllMMIsFromSims(this.onClickMMI, this._mmiCondense);
@@ -780,15 +792,15 @@ const vizUtils = (
                 this.svg.node().dispatchEvent(customEvent);
             }
             #hoverLine(line) {
-                if (this.hoveredLine) {
-                    this.hoveredLine
-                        .classed("hovered-line", false);
-                }
+                // if (this.hoveredLine) {
+                //     this.hoveredLine
+                //         .classed("hovered-line", false);
+                // }
                 this.hoveredLine = line;
-                if (this.hoveredLine) {
-                    this.hoveredLine
-                        .classed("hovered-line", true);
-                }
+                // if (this.hoveredLine) {
+                //     this.hoveredLine
+                //         .classed("hovered-line", true);
+                // }
                 this.#reorderElements();
             }
 

@@ -20,6 +20,7 @@ const noID = "00000000-0000-0000-0000-000000000000"; // (str(UUID))
 const mainPlots     = [];
 const scalarPlots   = [];
 const allPlots      = [];
+const scalarDisplays= [];
 let canQuerySimStatus = true;
 let draggingSimSelectionLeft = false;
 let draggingSimSelectionRight = false;
@@ -119,6 +120,8 @@ const prefabFilterDiscrete      = document.querySelector(".prefab.discrete-filte
 const prefabFilterBetween       = document.querySelector(".prefab.between-filter-setting");
 const prefabPlotKeyPanel        = document.querySelector(".prefab.plot-key-panel");
 const prefabSinglePlotArea      = document.querySelector(".prefab.single-plot-area");
+const prefabSingleValueArea     = document.querySelector(".prefab.single-value-area");
+const prefabSingleScalarBox     = document.querySelector(".prefab.single-scalar-box");
 prefabSimSelectBox.remove();
 prefabKwargPanel.remove();
 prefabKwarg.remove();
@@ -131,6 +134,8 @@ prefabFilterDiscrete.remove();
 prefabFilterBetween.remove();
 prefabPlotKeyPanel.remove();
 prefabSinglePlotArea.remove();
+prefabSingleValueArea.remove();
+prefabSingleScalarBox.remove();
 prefabSimSelectBox.classList.remove("prefab");
 prefabKwargPanel.classList.remove("prefab");
 prefabKwarg.classList.remove("prefab");
@@ -143,6 +148,8 @@ prefabFilterDiscrete.classList.remove("prefab");
 prefabFilterBetween.classList.remove("prefab");
 prefabPlotKeyPanel.classList.remove("prefab");
 prefabSinglePlotArea.classList.remove("prefab");
+prefabSingleValueArea.classList.remove("prefab");
+prefabSingleScalarBox.classList.remove("prefab");
 
 class GlobalSettings {
     static defaultColorBad      = "red";
@@ -207,6 +214,115 @@ class Theme {
             this.globalSettings.copy(),
             this.plotSettings.copy()
         );
+    }
+}
+
+class ScalarValueKeyDisplay {
+    constructor(key) {
+        this.key = key;
+        this.element = prefabSingleValueArea.cloneNode(true);
+        this.element.querySelector(".single-value-title-area").textContent = this.key;
+        this.singleArea = this.element.querySelector(".single-value-svg-area");
+        this.singleInfos = {}; // Maps simIDs to a variety of information related to that single entry
+        this.sortValueButton = this.element.querySelector(".single-value-sort-value");
+        this.sortLexButton = this.element.querySelector(".single-value-sort-lex");
+        this.sortType = "value_asc" // One of "value_asc", "value_desc", "lex_asc", "lex_desc"
+        this.sort();
+
+        // Setup Button listeners
+        this.sortValueButton.addEventListener("click", (e) => {
+            this.toggleValueSort();
+        });
+        this.sortLexButton.addEventListener("click", (e) => {
+            this.toggleLexSort();
+        });
+    }
+
+    destroy() {
+        // for (const e of self.boxElements) {
+        //     e.remove();
+        // }
+        this.element.remove()
+    }
+
+    addSimValue(simID, value) {
+        if (Object.hasOwn(this.singleInfos, simID)) {
+            gd_warn(`Cannot add scalar value for sim, key (${simID}, ${value}) because simID is already tracked in the display.`);
+            return;
+        }
+        // Create new box element and track data
+        const newSingleScalarBox = prefabSingleScalarBox.cloneNode(true);
+        const simName = simulations.get(simID).name;
+        newSingleScalarBox.firstElementChild.textContent = simName;
+        newSingleScalarBox.lastElementChild.textContent = value.toPrecision(3);
+        this.singleArea.appendChild(newSingleScalarBox);
+        this.singleInfos[simID] = {
+            value: value,
+            name: simulations.get(simID).name,
+            element: newSingleScalarBox
+        };
+        // Add event listeners for hovering
+        newSingleScalarBox.addEventListener("mouseover", (e) => {
+            onSimHover(simID);
+        });
+        newSingleScalarBox.addEventListener("mouseout", (e) => {
+            onSimUnhover(simID);
+        });
+        gd_log(`Added Sim (${simName}) to ScalarValueKeyDisplay ${this.key}`);
+    }
+
+    
+    sort(sortFunc) {
+        Object.values(this.singleInfos)
+            .sort(sortFunc)
+            .forEach((info) => this.singleArea.appendChild(info.element));
+    }
+    toggleValueSort() {
+        if (this.sortType !== "value_asc" && this.sortType !== "value_desc") {
+            this.sortType = "value_asc";
+        }
+        else if (this.sortType !== "value_asc") { this.sortType = "value_asc"; }
+        else { this.sortType = "value_desc"; }
+        this.refreshSort();
+    }
+    toggleLexSort() {
+        if (this.sortType !== "lex_asc" && this.sortType !== "lex_desc") {
+            this.sortType = "lex_asc";
+        }
+        else if (this.sortType !== "lex_asc") { this.sortType = "lex_asc"; }
+        else { this.sortType = "lex_desc"; }
+        this.refreshSort();
+    }
+    sortByValue(ascending=true) {
+        if (ascending) {
+            this.sort((a,b) => a.value - b.value);
+        } else {
+            this.sort((a,b) => b.value - a.value);
+        }
+    }
+    sortByName(ascending=true) {
+        if (ascending) {
+            this.sort((a,b) => a.name.localeCompare(b.name));
+        } else {
+            this.sort((a,b) => b.name.localeCompare(a.name));
+        }
+    }
+    refreshSort() {
+        if      (this.sortType === "value_asc") { this.sortByValue(true); }
+        else if (this.sortType === "value_desc") { this.sortByValue(false); }
+        else if (this.sortType === "lex_asc") { this.sortByName(true); }
+        else if (this.sortType === "lex_desc") { this.sortByName(false); }
+    }
+    syncToSelectedSims() {
+        for (const simID in this.singleInfos) {
+            if (simulations.has(simID)) {
+                if (simulations.get(simID).checked()) {
+                    this.singleInfos[simID].element.classList.add("selected-scalar-box");
+                } else {
+                    this.singleInfos[simID].element.classList.remove("selected-scalar-box");
+                }
+            }
+        }
     }
 }
 
@@ -447,6 +563,16 @@ class SimulationMap {
     has(simID) {
         return Object.hasOwn(this.simulations, simID);
     }
+    getIdx(simID) {
+        let idx = 0;
+        for (const id of Object.keys(this.simulations)) {
+            if (simID === id) {
+                break;
+            }
+            idx += 1;
+        }
+        return idx;
+    }
     /**
      * Returns an Array of active Simulations.
      * @returns {Array<Simulation>}
@@ -466,6 +592,17 @@ class SimulationMap {
             curr_map[simID] = sim.data;
             return curr_map;
         }, {});
+    }
+    maxDatapointsForKey(key) {
+        let maxDatapoints = 0;
+        for (const simID in this.simulations) {
+            const data = this.simulations[simID].data;
+            const datapoints = data.getScalar(key);
+            if (datapoints.length > maxDatapoints) {
+                maxDatapoints = datapoints.length;
+            }
+        }
+        return maxDatapoints;
     }
 
     /**
@@ -1054,11 +1191,12 @@ function repositionTooltip(tt, element, direction="right") {
 }
 
 function tooltipUpdateToSimSelection(simID) {
-    const selection = simulations.get(simID).selection;
+    const sim = simulations.get(simID);
+    if (!sim) { return; }
+    const selection = sim.selection;
     if (!selection) { return; }
     const meter = selection.meter;
     // Update tooltip text based on simulation status
-    const sim = simulations.get(simID);
     const status = sim.status;
     const progressInfo = sim.lastProgressReport;
     if (meter.classList.contains("fail")) {
@@ -1108,6 +1246,56 @@ function entryToConfig() {
     };
     return config;
 }
+function onSimHover(simID) {
+    // Sidebar Selection
+    simulations.get(simID).selection.element.style.transform = "scale(1.025)";
+    // Plots
+    const allLines = Array.from(document.querySelectorAll(".plot-line"));
+    const simLines = allLines.filter((v, i) => {
+        return v.dataset.simId === simID;
+    });
+    const simSelections = d3.selectAll(simLines);
+    simSelections
+        .classed("hovered-line", true)
+        .raise();
+    // Scalar values
+    const simIdx = simulations.getIdx(simID);
+    for (const display of scalarDisplays) {
+        if (Object.hasOwn(display.singleInfos, simID)) {
+            const color = currentTheme.plotSettings.colorAt(simIdx);
+            console.log(`Color at idx ${simIdx} = ${color}`);
+            display.singleInfos[simID].element.style.backgroundColor = color;
+            display.singleInfos[simID].element.style.color = vizUtils.invertColor(color, true);
+        }
+    }
+}
+function onSimUnhover(simID) {
+    // Sidebar Selection
+    simulations.get(simID).selection.element.style.transform = null;
+    // Plots
+    const allLines = Array.from(document.querySelectorAll(".plot-line"));
+    const simLines = allLines.filter((v, i) => {
+        return v.dataset.simId === simID;
+    });
+    const simSelections = d3.selectAll(simLines);
+    simSelections
+        .classed("hovered-line", false)
+        .raise();
+    // Scalar values
+    const simIdx = simulations.getIdx(simID);
+    for (const display of scalarDisplays) {
+        if (Object.hasOwn(display.singleInfos, simID)) {
+            console.log("Resetting color for sim idx " + simIdx);
+            display.singleInfos[simID].element.style.backgroundColor = '';
+            display.singleInfos[simID].element.style.color = '';
+        }
+    }
+}
+function unhoverAllSims() {
+    for (const simID in simulations.simulations) {
+        onSimUnhover(simID);
+    }
+}
 function createSimSelection(config, simID, startChecked=true) {
     const newSelectionElement = prefabSimSelectBox.cloneNode(true);
     const newSelection = new SimSelection(newSelectionElement, config, simID, startChecked);
@@ -1124,6 +1312,9 @@ function createSimSelection(config, simID, startChecked=true) {
             // Toggle Plot Lines
             for (const plot of allPlots) {
                 plot.modifyToSelectedSims();
+            }
+            for (const display of scalarDisplays) {
+                display.syncToSelectedSims();
             }
             // const event = new Event("customSelectDeselectSingle");
             // e.target.dispatchEvent(event);
@@ -1200,15 +1391,6 @@ function createSimSelection(config, simID, startChecked=true) {
                 tooltipUpdateToSimSelection(simID);
                 repositionTooltip(tooltip, newSelection.element, "right");
             });
-            // Plots
-            const allLines = Array.from(document.querySelectorAll(".plot-line"));
-            const simLines = allLines.filter((v, i) => {
-                return v.dataset.simId === simID;
-            });
-            const simSelections = d3.selectAll(simLines);
-            simSelections
-                .classed("selection-hovered-line", true)
-                .raise();
         }
     );
     newSelection.element.addEventListener(
@@ -1218,15 +1400,6 @@ function createSimSelection(config, simID, startChecked=true) {
             // Tooltip
             tooltip.style.visibility = null;
             tooltip.textContent = "";
-            // Plots
-            const allLines = Array.from(document.querySelectorAll(".plot-line"));
-            const simLines = allLines.filter((v, i) => {
-                return v.dataset.simId === simID;
-            });
-            const simSelections = d3.selectAll(simLines);
-            simSelections
-                .classed("selection-hovered-line", false)
-                .raise();
         }
     );
     // Return selection box
@@ -1735,7 +1908,7 @@ const themeBW = new Theme(
         .changeSetting("secondaryColor", "#ffffff")
         .changeSetting("colorScale", (x) => "#000000")
 );
-const themeNeon = new Theme(
+const themeNeon01 = new Theme(
     new GlobalSettings()
         .changeSetting("mainColor", "#000000")
         .changeSetting("contrastColor", "#f000ff"),
@@ -1747,8 +1920,8 @@ const themeNeon = new Theme(
         .changeSetting("mmiHoverColor", "rgba(240,0,255,1)")
         .changeSetting("colorScale", d3.interpolateSinebow)
 );
-const themeNeon2 = themeNeon.copy();
-themeNeon2.globalSettings
+const themeNeon02 = themeNeon01.copy();
+themeNeon02.globalSettings
     .changeSetting("contrastColor", "rgb(116,238,21)");
 const myTheme = new Theme(
     new GlobalSettings()
@@ -1757,7 +1930,7 @@ const myTheme = new Theme(
     new vizUtils.PlotSettings()
 );
 // Some theme colors from: https://designpixie.com/blogs/creative-design-ideas/pastel-color-palettes-with-color-codes
-const themeSoft = new Theme(
+const themeSoft01 = new Theme(
     new GlobalSettings()
         .changeSetting("mainColor", "rgb(249,238,237)")
         .changeSetting("contrastColor", "#7c5c8c"),
@@ -1774,7 +1947,23 @@ const themeSoft = new Theme(
         .changeSetting("mmiSelectColor", "#ffcbe1")
         .changeSetting("mmiHoverColor", "#f9e1a8")
 );
-const themePlain = new Theme(
+const themeSoft02 = new Theme(
+    new GlobalSettings()
+        // .changeSetting("mainColor", "#FFFFFF")
+        .changeSetting("mainColor", "#FFE9E8")
+        .changeSetting("contrastColor", "#40AEDA"),
+        // F5A9B8
+        // 5BCEFA
+    new vizUtils.PlotSettings()
+        // .changeSetting("colorScale", d3.schemeDark2)
+        .changeSetting("colorScale", d3.scaleOrdinal().range(["#5BCEFA", "#F5A9B8", "#FFFFFF", "#F5A9B8", "#5BCEFA"]))
+        .changeSetting("mainColor", "#000000")
+        .changeSetting("secondaryColor", "#FFE9E8")
+        .changeSetting("mmiDefaultColor", "#5BCEFA50")
+        .changeSetting("mmiSelectColor", "#FFFFFF")
+        .changeSetting("mmiHoverColor", "#40AEDA")
+);
+const themePlain01 = new Theme(
     new GlobalSettings()
         .changeSetting("mainColor", "rgb(239,238,237)")
         .changeSetting("contrastColor", "#101020"),
@@ -1789,10 +1978,11 @@ const themePlain = new Theme(
 const themeMap = {
     classic:    themeClassic,
     bw:         themeBW,
-    neon01:     themeNeon,
-    neon02:     themeNeon2,
-    soft01:     themeSoft,
-    plain01:    themePlain,
+    neon01:     themeNeon01,
+    neon02:     themeNeon02,
+    soft01:     themeSoft01,
+    soft02:     themeSoft02,
+    plain01:    themePlain01,
 };
 applyTheme(themeClassic);
 
@@ -2132,17 +2322,23 @@ function createMainPlots() {
 
     document.querySelector("#main-plots-title-panel").textContent = key;
 
+    // applyTheme(currentTheme);
+    plot.useSettings(currentTheme.plotSettings);
+    detailsPlot.useSettings(currentTheme.plotSettings);
+
     // Add interactions for main key plots
     for (const p of mainPlots) {
         p.smoothLines(plotSmoothSpread, plotSmoothFactor);
         p.addOnHoverLine((e) => {
             if (e.detail && e.detail.simID && e.detail.simID !== "undefined" && simulations.has(e.detail.simID)) {
-                simulations.get(e.detail.simID).selection.element.style.transform = "scale(1.025)";
+                // simulations.get(e.detail.simID).selection.element.style.transform = "scale(1.025)";
+                onSimHover(e.detail.simID);
             }
         });
         p.addOnUnhoverLine((e) => {
             if (e.detail && e.detail.simID && e.detail.simID !== "undefined" && simulations.has(e.detail.simID)) {
-                simulations.get(e.detail.simID).selection.element.style.transform = null;
+                // simulations.get(e.detail.simID).selection.element.style.transform = null;
+                onSimUnhover(e.detail.simID);
             }
         });
         p.addOnEnter((e) => {
@@ -2150,14 +2346,19 @@ function createMainPlots() {
             selectionsToPlotColors(e.detail.plot);
         });
         p.addOnLeave((e) => {
-            for (const simID in simulations.selections()) {
-                simulations.get(simID).selection.element.style.transform = null;
-            }
+            unhoverAllSims();
+            // for (const simID in simulations.selections()) {
+            //     simulations.get(simID).selection.element.style.transform = null;
+            // }
         });
     }
 }
 function createScalarPlots() {
-    const currentMainKey = getCurrentMainKey();
+    // Destroy all scalar value displays
+    for (const display of scalarDisplays) {
+        display.destroy();
+    }
+    scalarDisplays.splice(0, scalarDisplays.length);
     // Destroy non-default plot key areas
     scalarPlots.splice(0, scalarPlots.length);
     for (const panel of document.querySelectorAll(".plot-key-panel")) {
@@ -2202,11 +2403,13 @@ function createScalarPlots() {
     for (const panel of panels) {
         const newPlotPanel = panel;
         const newPlotArea = newPlotPanel.querySelector(".plot-key-area");
+        const newValueArea = newPlotPanel.querySelector(".value-key-area");
         const newPlotAreaLabel = newPlotPanel.querySelector(".plot-key-area-label");
         console.log("making new plot area with label: " + newPlotPanel.dataset.key);
         newPlotAreaLabel.textContent = newPlotPanel.dataset.key;
         newPlotAreaLabel.addEventListener("click", (e) => {
             toggleDisplay(newPlotArea);
+            toggleDisplay(newValueArea);
         });
     }
     
@@ -2215,30 +2418,57 @@ function createScalarPlots() {
 
     // Create plots for all scalar keys
     for (const k of allScalarKeys) {
-        console.log("making new plot for key " + k);
-        // const p = vizUtils.createLinePlotForKey(k, selectedData);
-        const p = vizUtils.SimPlot.createLinePlot(simulations, k);
-        allPlots.push(p);
-        scalarPlots.push(p);
-        console.log(keyPanels[k]);
-        const newSinglePlotPanel = prefabSinglePlotArea.cloneNode(true);
-        newSinglePlotPanel.querySelector(".single-plot-title-area").textContent = k;
-        keyPanels[k].querySelector(".plot-key-area").appendChild(newSinglePlotPanel);
-        // d3.select(keyPanels[k].querySelector(".plot-key-area"))
-        d3.select(newSinglePlotPanel.querySelector(".single-plot-svg-area")).append(() => p.svg.node());
-        // d3.select(newPlotArea).append(() => p.svg.node());
+        const maxDatapoints = simulations.maxDatapointsForKey(k);
+        if (maxDatapoints == 0) { continue; }
+        else if (maxDatapoints > 1) {
+            console.log("making new plot for key " + k);
+            // const p = vizUtils.createLinePlotForKey(k, selectedData);
+            const p = vizUtils.SimPlot.createLinePlot(simulations, k);
+            allPlots.push(p);
+            scalarPlots.push(p);
+            console.log(keyPanels[k]);
+            const newSinglePlotPanel = prefabSinglePlotArea.cloneNode(true);
+            newSinglePlotPanel.querySelector(".single-plot-title-area").textContent = k;
+            keyPanels[k].querySelector(".plot-key-area").appendChild(newSinglePlotPanel);
+            // d3.select(keyPanels[k].querySelector(".plot-key-area"))
+            d3.select(newSinglePlotPanel.querySelector(".single-plot-svg-area")).append(() => p.svg.node());
+            // d3.select(newPlotArea).append(() => p.svg.node());
+        }
+        else {
+            console.log("making new single-value display for key " + k);
+            const display = new ScalarValueKeyDisplay(k);
+            // const newSingleValuePanel = prefabSingleValueArea.cloneNode(true);
+            // newSingleValuePanel.querySelector(".single-value-title-area").textContent = k;
+            // keyPanels[k].querySelector(".value-key-area").appendChild(newSingleValuePanel);
+            keyPanels[k].querySelector(".value-key-area").appendChild(display.element);
+            const firstValues = dataUtils.getFirstValuesForKey(simulations, k);
+            for (const simID in firstValues) {
+                const firstValue = firstValues[simID];
+                display.addSimValue(simID, firstValue.value);
+                scalarDisplays.push(display);
+                // const newSingleScalarBox = prefabSingleScalarBox.cloneNode(true);
+                // newSingleScalarBox.firstElementChild.textContent = simulations.get(simID).name;
+                // newSingleScalarBox.lastElementChild.textContent = firstValue.value.toPrecision(3);
+                // console.log(firstValue);
+                // newSingleValuePanel.querySelector(".single-value-svg-area").appendChild(newSingleScalarBox);
+            }
+            display.sortByValue();
+            display.syncToSelectedSims();
+        }
     }
     // Add interactions for all scalar key plots
     for (const p of scalarPlots) {
         p.smoothLines(plotSmoothSpread, plotSmoothFactor);
         p.addOnHoverLine((e) => {
             if (e.detail && e.detail.simID && e.detail.simID !== "undefined" && simulations.has(e.detail.simID)) {
-                simulations.get(e.detail.simID).selection.element.style.transform = "scale(1.025)";
+                // simulations.get(e.detail.simID).selection.element.style.transform = "scale(1.025)";
+                onSimHover(e.detail.simID);
             }
         });
         p.addOnUnhoverLine((e) => {
             if (e.detail && e.detail.simID && e.detail.simID !== "undefined" && simulations.has(e.detail.simID)) {
-                simulations.get(e.detail.simID).selection.element.style.transform = null;
+                // simulations.get(e.detail.simID).selection.element.style.transform = null;
+                onSimUnhover(e.detail.simID);
             }
         });
         p.addOnEnter((e) => {
@@ -2246,9 +2476,10 @@ function createScalarPlots() {
             selectionsToPlotColors(e.detail.plot);
         });
         p.addOnLeave((e) => {
-            for (const simID in simulations.selections()) {
-                simulations.get(simID).selection.element.style.transform = null;
-            }
+            unhoverAllSims();
+            // for (const simID in simulations.selections()) {
+            //     simulations.get(simID).selection.element.style.transform = null;
+            // }
         });
     }
 

@@ -198,7 +198,12 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
     def __init__(self, model: Module) -> None:
         super().__init__(model)
 
-    def produce(self, inputs: Union[torch.Tensor, torch.utils.data.Dataset]) -> torch.Tensor:
+    def produce(self, inputs: Union[torch.Tensor, torch.utils.data.Dataset]) -> tuple[torch.Tensor, torch.Tensor]:
+        """Given an input dataset, returns a tuple containing the classifier
+        predictions and the ground-truth values of each sample, if provided.
+        If 'inputs' is a Dataset, then both predictions and ground truth values
+        are returned. If 'inputs' is a Tensor, then it is treated as only inputs,
+        returning a tuple where the ground truth element is None."""
         device = get_available_accelerator()
         # Setup
         model               = self.model
@@ -210,9 +215,10 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
                 inputs = inputs.to(device)
                 pred = model(inputs)
                 predictions = pred.argmax(1)
-                return predictions
+                return (predictions, None)
         elif isinstance(inputs, torch.utils.data.Dataset):
             tensors = []
+            gts = []
             dl = DataLoader(inputs, batch_size=1, shuffle=False)
             with torch.no_grad():
                 for (x,y) in dl:
@@ -220,7 +226,8 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
                     pred = model(x)
                     predictions = pred.argmax(1)
                     tensors.append(predictions)
-            return torch.cat(tensors)
+                    gts.append(y)
+            return (torch.cat(tensors), torch.cat(gts))
 
     def _train(self,
         dataloader: DataLoader,
@@ -272,25 +279,42 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
         model.train()
         curr_steps = 0
         curr_samples = 0
+        logged_correct = 0
+        logged_samples = 0
+        logged_batches = 0
+        logged_loss = 0
         for epoch in range(1, epochs+1):
             for batch, (x, y) in enumerate(train_dataloader):
                 x, y = x.to(device), y.to(device)
 
                 pred = model(x)
                 loss = loss_fn(pred, y)
+                # Calculate summed logs
+                logged_loss += loss.item()
+                logged_correct += (pred.argmax(1) == y).type(torch.float).sum().item()
 
                 loss.backward()
                 optimizer.step()
                 optimizer.zero_grad()
 
-                curr_steps += 1
-                curr_samples += len(x)
+                curr_steps      += 1
+                logged_batches  += 1
+                curr_samples    += len(x)
+                logged_samples  += len(x)
                 
                 # Log loss
                 if log_step > 0 and batch%log_step == 0:
-                    train_loss = loss.item()
+                    # train_loss = loss.item()
+                    l_loss      = logged_loss / logged_batches
+                    l_accuracy  = logged_correct / logged_samples
+                    logged_loss     = 0
+                    logged_correct  = 0
+                    logged_samples  = 0
+                    logged_batches  = 0
                     if tb_logger is not None:
-                        tb_logger.add_scalar("loss/train", train_loss, curr_samples)
+                        tb_logger.add_scalar("loss/train/train", l_loss, curr_samples)
+                        tb_logger.add_scalar("acc/train/train", l_accuracy, curr_samples)
+                        
                 # Validate every val_per_steps steps
                 if do_val and val_per_steps > 0 and (curr_steps % val_per_steps  == 0):
                     model.eval()
@@ -302,10 +326,9 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
                     model.train()
                     if tb_logger is not None and val_results is not None:
                         val_loss = val_results["loss"]
-                        accuracy = val_results["correct_samples"] \
-                            / val_results["total_samples"]
-                        tb_logger.add_scalar("loss/val", val_loss, curr_samples)
-                        tb_logger.add_scalar("acc/val", accuracy, curr_samples)
+                        val_accuracy = val_results["accuracy"]
+                        tb_logger.add_scalar("loss/train/val", val_loss, curr_samples)
+                        tb_logger.add_scalar("acc/train/val", val_accuracy, curr_samples)
                 # Perform callback
                 step_callback.update_locals(locals())
                 if not step_callback.on_invoke():
@@ -326,10 +349,9 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
                 model.train()
                 if tb_logger is not None and val_results is not None:
                     val_loss = val_results["loss"]
-                    accuracy = val_results["correct_samples"] \
-                        / val_results["total_samples"]
-                    tb_logger.add_scalar("loss/val", val_loss, curr_samples)
-                    tb_logger.add_scalar("acc/val", accuracy, curr_samples)
+                    val_accuracy = val_results["accuracy"]
+                    tb_logger.add_scalar("loss/train/val", val_loss, curr_samples)
+                    tb_logger.add_scalar("acc/train/val", val_accuracy, curr_samples)
             # Perform callback
             epoch_callback.update_locals(locals())
             if not epoch_callback.on_invoke():
@@ -338,8 +360,7 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
         step_callback.pop_state()
         epoch_callback.pop_state()
         
-
-    def _validate(
+    def _testing_loop(
         self,
         dataloader: DataLoader,
         loss_fn:    _Loss                           = None,
@@ -347,11 +368,8 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
         device                                      = None,
         **kwargs
     ):
-        print(f"THIS IS VAL DATALOADER: {dataloader}")
-        print(f"THIS IS VAL KWARGS: {kwargs}")
         if dataloader is None:
             return None
-        print(f"VAL HERE")
         # Get device
         if device is None:
             device = get_available_accelerator()
@@ -364,7 +382,7 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
             if loss_fn is not None \
             else nn.CrossEntropyLoss()
 
-        # Train
+        # Test batches
         model.to(device)
         model.eval()
         correct = 0
@@ -379,15 +397,68 @@ class SimpleClassifierMLModel(SimulationMLModel, InferenceModel):
                 test_loss += loss.item()
                 # Sum up total correct samples. We divide by total samples later
                 correct += (pred.argmax(1) == y).type(torch.float).sum().item()
-                # Custom validation callback
+                # Custom validation/test callback
                 step_callback.update_locals(locals())
                 if not step_callback.on_invoke():
                     raise StopSimException(f"Invocation of validation step_callback terminated training.")
 
         test_loss /= num_batches
-        print(f"VAL DONE: {correct}")
+        accuracy = correct / num_samples
         return {
             "loss": test_loss,
             "correct_samples": correct,
-            "total_samples": num_samples
+            "total_samples": num_samples,
+            "accuracy": accuracy
         }
+
+    def _validate(
+        self,
+        dataloader: DataLoader,
+        loss_fn:    _Loss                           = None,
+        step_callback: BaseCustomCallback           = EmptyCallback(),
+        tb_logger:  Union[SummaryWriter, str, None] = None,
+        device                                      = None,
+        **kwargs
+    ):
+        # Setup tensorboard logger
+        if isinstance(tb_logger, str):
+            tb_logger = SummaryWriter(tb_logger)
+        # Run tests
+        test_results = self._testing_loop(
+            dataloader,
+            loss_fn,
+            step_callback,
+            device,
+            **kwargs
+        )
+        has_logger = tb_logger is not None
+        if has_logger:
+            tb_logger.add_scalar("loss/val/val", test_results["loss"], 0)
+            tb_logger.add_scalar("acc/val/val", test_results["accuracy"], 0)
+        return test_results
+    
+    def _test(
+        self,
+        dataloader: DataLoader,
+        loss_fn:    _Loss                           = None,
+        step_callback: BaseCustomCallback           = EmptyCallback(),
+        tb_logger:  Union[SummaryWriter, str, None] = None,
+        device                                      = None,
+        **kwargs
+    ):
+        # Setup tensorboard logger
+        if isinstance(tb_logger, str):
+            tb_logger = SummaryWriter(tb_logger)
+        # Run tests
+        test_results = self._testing_loop(
+            dataloader,
+            loss_fn,
+            step_callback,
+            device,
+            **kwargs
+        )
+        has_logger = tb_logger is not None
+        if has_logger:
+            tb_logger.add_scalar("loss/test/test", test_results["loss"], 0)
+            tb_logger.add_scalar("acc/test/test", test_results["accuracy"], 0)
+        return test_results

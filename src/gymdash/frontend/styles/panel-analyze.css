@@ -97,13 +97,13 @@
     filter: saturate(80%);
 }
 .plot-line.hovered-line {
-    filter: saturate(120%);
+    filter: saturate(130%);
     stroke-width: 3.5px;
 }
-.plot-line.selection-hovered-line {
+/* .plot-line.selection-hovered-line {
     filter: saturate(140%);
     stroke-width: 3.5px;
-}
+} */
 
 #main-plots-area {
     display: flex;
@@ -123,6 +123,17 @@
     flex-direction: column;
     gap: var(--std-gap);
 }
+.plot-key-content-area {
+    /* display: flex;
+    flex-direction: column;
+    gap: var(--std-gap); */
+    display: grid;
+    padding: var(--std-gap);
+    grid-template-rows: 1fr;
+    grid-template-columns: 2fr 1fr;
+    /* grid-auto-columns: repeat(auto-fill, minmax(300px, 1fr)); */
+    gap: var(--extra-gap);
+}
 .plot-key-area{
     display: grid;
     padding: var(--std-gap);
@@ -141,7 +152,50 @@
 .single-plot-title-area {
     text-align: center;
 }
+.value-key-area {
+    display: flex;
+    flex-direction: column;
+    /* display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-auto-rows: 30px; */
+    padding: 5px;
+    gap: var(--std-gap);
+}
+.single-value-header-area {
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+}
+.single-value-title-area {
+    text-align: center;
+}
+.single-value-button-area {
+    display: grid;
+    /* grid-template-rows: 20px;
+    grid-auto-columns: 20px; */
+    grid-template: 20px / 20px 20px;
+    column-gap: var(--std-gap);
+}
+.single-value-area {
+    display: flex;
+    flex-direction: column;
+    /* display: grid;
+    grid-template-columns: 1fr 100px;
+    grid-template-rows: 1f;
+    padding: 5px; */
+}
+.single-scalar-box {
+    display: grid;
+    grid-template-columns: 1fr 50px;
+    grid-template-rows: 1f;
+    padding: 5px;
+    border-bottom: 1px var(--main-contrast-color) dashed;
+}
 #main-plots-header {
     display: flex;
     justify-content: space-around;
+}
+
+.selected-scalar-box {
+
 }

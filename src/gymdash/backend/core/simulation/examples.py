@@ -527,8 +527,8 @@ class MLSimulationSampleRecordCallback(MLSimulationCallback):
         if self.model is None or self.inference_data is None:
             return (None, None)
         if self.random_samples <= 0:
-            outputs = self.sim_model.produce(self.inference_data)
-            return (self.inference_data, outputs)
+            outputs, gt = self.sim_model.produce(self.inference_data)
+            return (self.inference_data, outputs, gt)
         else:
             # self.inference_data should be an N-by-any tensor where each of
             # N is an individual sample
@@ -536,22 +536,22 @@ class MLSimulationSampleRecordCallback(MLSimulationCallback):
             num_samples = min(self.random_samples, len(self.inference_data))
             idxs = torch.multinomial(torch.ones((num_samples,)))
             if isinstance(self.inference_data, torch.Tensor):
-                inputs = self.inference_data[idxs]
+                inputs = torch.utils.data.TensorDataset(self.inference_data[idxs])
             elif isinstance(self.inference_data, torch.utils.data.Dataset):
                 inputs = torch.utils.data.Subset(self.inference_data[idxs], idxs)
-            outputs = self.sim_model.produce(inputs)
-            return (inputs, outputs)
+            outputs, gt = self.sim_model.produce(inputs)
+            return (inputs, outputs, gt)
         
     @abstractmethod
-    def create_media_savable(self, inputs, outputs):
+    def create_media_savable(self, inputs, outputs, gt=None):
         pass
 
     @abstractmethod
     def save_media_to_folder(self, media_savable, step):
         pass
 
-    def media_on_main_thread(self, inputs, outputs, curr_samples):
-        media = self.create_media_savable(inputs, outputs)
+    def media_on_main_thread(self, inputs, outputs, curr_samples, gt=None):
+        media = self.create_media_savable(inputs, outputs, gt)
         self.save_media_to_folder(media, curr_samples)
         
     def _on_invoke(self):
@@ -562,8 +562,8 @@ class MLSimulationSampleRecordCallback(MLSimulationCallback):
             curr_samples > 0 and \
             curr_samples %self.step_trigger == 0):
         # Generate outputs upon trigger activation
-            inputs, outputs = self._generate_outputs()
-            run_on_main_thread(self.media_on_main_thread, inputs, outputs, curr_samples)
+            inputs, outputs, gt = self._generate_outputs()
+            run_on_main_thread(self.media_on_main_thread, inputs, outputs, curr_samples, gt)
             # media = self.create_media_savable(inputs, outputs)
             # self.save_media_to_folder(media, curr_samples)
         return True
@@ -572,7 +572,7 @@ class MLClassifierRecordCallback(MLSimulationSampleRecordCallback):
     def __init__(self, simulation: Simulation, sim_model: InferenceModel, inputs: Union[None, Tensor], media_path: str, step_trigger=1, random_samples: int = -1):
         super().__init__(simulation, sim_model, inputs, media_path, step_trigger, random_samples)
 
-    def create_media_savable(self, inputs:Union[torch.Tensor, torch.utils.data.Dataset], outputs):
+    def create_media_savable(self, inputs:Union[torch.Tensor, torch.utils.data.Dataset], outputs, gt=None):
         num_plots = len(inputs)
         ncols = math.ceil(math.sqrt(num_plots))
         nrows = math.ceil(num_plots / ncols)
@@ -590,6 +590,11 @@ class MLClassifierRecordCallback(MLSimulationSampleRecordCallback):
         for r in range(nrows):
             for c in range(ncols):
                 axs[r,c].set_axis_off()
+        if gt is not None:
+            # Calc accuracy to show
+            correct = (outputs == gt).type(torch.float).sum().item()
+            accuracy = correct / num_plots
+            fig.suptitle(f"Sample Accuracy: {accuracy*100:.1f}%")
         return fig
     def save_media_to_folder(self, media_savable:plt.Figure, step):
         fname = os.path.join(self.media_path, f"sample_{step}.png")
@@ -606,7 +611,19 @@ class MLSimulation(Simulation):
         self.can_rerun = True
 
         self.tb_tag_key_map = {
-            stat_tags.TB_SCALARS: ["loss/train", "loss/val", "acc/val", "acc/test"],
+            stat_tags.TB_SCALARS: [
+                "loss/train",
+                "loss/val",
+                "acc/val",
+                "loss/train/train",
+                "loss/train/val",
+                "loss/val/val",
+                "loss/test/test",
+                "acc/train/train",
+                "acc/train/val",
+                "acc/val/val",
+                "acc/test/test"
+            ],
             stat_tags.TB_IMAGES: ["example_outputs"]
         }
         self.torch_loss_fns = {
@@ -844,8 +861,8 @@ Supported Start Kwargs:
             download=True,
             transform=ToTensor(),
         )
-        # train_data, val_data = torch.utils.data.random_split(train_data, [len(train_data)-val_set_size, val_set_size], val_split_generator)
-        train_data, val_data = torch.utils.data.random_split(torch.utils.data.Subset(train_data, range(6000)), [5000, 1000], val_split_generator)
+        train_data, val_data = torch.utils.data.random_split(train_data, [len(train_data)-val_set_size, val_set_size], val_split_generator)
+        # train_data, val_data = torch.utils.data.random_split(torch.utils.data.Subset(train_data, range(6000)), [5000, 1000], val_split_generator)
         test_data = datasets.MNIST(
             root=test_path,
             train=False,
@@ -863,7 +880,7 @@ Supported Start Kwargs:
             MLClassifierRecordCallback(
                 self,
                 self.model,
-                torch.utils.data.Subset(train_data, torch.arange(0,10)),
+                torch.utils.data.Subset(train_data, torch.arange(0,16)),
                 image_path,
                 100,
             )
@@ -919,11 +936,14 @@ Supported Start Kwargs:
                 if ckpt_path is not None:
                     model_state = torch.load(ckpt_path)
                     self.model.model.load_state_dict(model_state)
+                    logger.info(f"Loaded model from '{ckpt_path}' for validation.")
                     results = self.model.validate(
                         dataloader=val_loader,
                         loss_fn=loss_fn(**loss_fn_kwargs),
                         step_callback=MLSimulationUpdateCallback(self),
+                        tb_logger=tb_path,
                     )
+                    logger.info(f"Validation results= {results}")
                     self.add_status(SimStatus(
                         code=SimStatusCode.SUCCESS,
                         details="Model validation complete."
@@ -939,6 +959,47 @@ Supported Start Kwargs:
                 code=SimStatusCode.FAIL,
                 subcode=SimStatusSubcode.STOPPED,
                 details="Model validation stopped."
+            ))
+            self._meta_failed = True
+            del self.model
+            torch.cuda.empty_cache()
+        except Exception as e:
+            logger.error(e)
+            self._meta_failed = True
+            self.add_error_details(str(e))
+            del self.model
+            torch.cuda.empty_cache()
+
+        # Attempt Testing
+        try:
+            if do_test:
+                ckpt_path = self._get_checkpoint_path(ckpt_folder, val_ckpt_num)
+                if ckpt_path is not None:
+                    model_state = torch.load(ckpt_path)
+                    self.model.model.load_state_dict(model_state)
+                    logger.info(f"Loaded model from '{ckpt_path}' for testing.")
+                    results = self.model.test(
+                        dataloader=val_loader,
+                        loss_fn=loss_fn(**loss_fn_kwargs),
+                        step_callback=MLSimulationUpdateCallback(self),
+                        tb_logger=tb_path,
+                    )
+                    logger.info(f"Test results= {results}")
+                    self.add_status(SimStatus(
+                        code=SimStatusCode.SUCCESS,
+                        details="Model testing complete."
+                    ))
+                else:
+                    self.add_status(SimStatus(
+                        code=SimStatusCode.INFO,
+                        subcode=SimStatusSubcode.NONE,
+                        details="Unable to test model with no checkpoints."
+                    ))
+        except StopSimException as se:
+            self.add_status(SimStatus(
+                code=SimStatusCode.FAIL,
+                subcode=SimStatusSubcode.STOPPED,
+                details="Model testing stopped."
             ))
             self._meta_failed = True
             del self.model
