@@ -160,7 +160,7 @@ class SimulationMLModel():
         try:
             self.on_test_start(*args, **kwargs)
             self.sm.push_state(SimulationMLModel.STATE_TEST)
-            self._test(**kwargs)
+            test_results = self._test(**kwargs)
             self.sm.pop_state()
         except Exception as e:
             self._is_testing = False
@@ -168,7 +168,8 @@ class SimulationMLModel():
         finally:
             self.on_test_end(*args, **kwargs)
             self.sm.pop_state()
-            self._is_testing = False
+        self._is_testing = False
+        return test_results
     def validate(self, *args, **kwargs):
         print(f"validate called: args=({args}), kwargs=({kwargs})")
         self._is_validating = True

@@ -196,6 +196,7 @@
     justify-content: space-around;
 }
 
-.selected-scalar-box {
-
+.single-scalar-box.unselected-sim {
+    filter: saturate(40%);
+    filter: opacity(40%);
 }

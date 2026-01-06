@@ -70,11 +70,14 @@ const plotSmoothSpreadLabel_Setting   = document.querySelector("label[for=plot-s
 const plotSmoothFactorLabel_Setting   = document.querySelector("label[for=plot-smooth-factor-slider]");
 const mainThemeDropdown_Setting       = document.querySelector("#theme-select-dropdown");
 
-const rescaleDetailsY_Setting   = document.querySelector("#rescale-details-axis");
+const rescaleDetailsY_Setting           = document.querySelector("#rescale-details-axis");
+const hideUnselectedScalars_Setting     = document.querySelector("#hide-unselected-scalar-values");
+
 
 let plotSmoothSpread            = 0;
 let plotSmoothFactor            = 1;
 let rescaleDetailsAxisY         = false;
+let shouldHideUnselectedScalars = true;
 
 // General
 const tooltip                   = document.querySelector(".tooltip")
@@ -227,7 +230,7 @@ class ScalarValueKeyDisplay {
         this.sortValueButton = this.element.querySelector(".single-value-sort-value");
         this.sortLexButton = this.element.querySelector(".single-value-sort-lex");
         this.sortType = "value_asc" // One of "value_asc", "value_desc", "lex_asc", "lex_desc"
-        this.sort();
+        this.refreshSort();
 
         // Setup Button listeners
         this.sortValueButton.addEventListener("click", (e) => {
@@ -274,6 +277,7 @@ class ScalarValueKeyDisplay {
     
     sort(sortFunc) {
         Object.values(this.singleInfos)
+            // .filter((info) => info.element.classList.contains("selected-sim"))
             .sort(sortFunc)
             .forEach((info) => this.singleArea.appendChild(info.element));
     }
@@ -313,16 +317,31 @@ class ScalarValueKeyDisplay {
         else if (this.sortType === "lex_asc") { this.sortByName(true); }
         else if (this.sortType === "lex_desc") { this.sortByName(false); }
     }
+    refreshInclusion() {
+        if (shouldHideUnselectedScalars) {
+            Object.values(this.singleInfos)
+                .filter((info) => info.element.classList.contains("unselected-sim"))
+                .forEach((info) => info.element.remove());
+        }
+    }
+    refreshDisplay() {
+        this.refreshSort();
+        this.refreshInclusion();
+    }
+
     syncToSelectedSims() {
         for (const simID in this.singleInfos) {
             if (simulations.has(simID)) {
                 if (simulations.get(simID).checked()) {
-                    this.singleInfos[simID].element.classList.add("selected-scalar-box");
+                    this.singleInfos[simID].element.classList.add("selected-sim");
+                    this.singleInfos[simID].element.classList.remove("unselected-sim");
                 } else {
-                    this.singleInfos[simID].element.classList.remove("selected-scalar-box");
+                    this.singleInfos[simID].element.classList.remove("selected-sim");
+                    this.singleInfos[simID].element.classList.add("unselected-sim");
                 }
             }
         }
+        this.refreshDisplay();
     }
 }
 
@@ -367,6 +386,12 @@ class SimSelection {
         if (failOrSuccess === "fail" || failOrSuccess === "success") {
             this.meter.classList.add(failOrSuccess);
         }
+    }
+    uncompleteProgress() {
+        this.meter.classList.remove("complete");
+        this.meter.classList.add("incomplete");
+        this.meter.classList.remove("fail");
+        this.meter.classList.remove("success");
     }
     updateProgress() {
         const meter = this.meter;
@@ -1263,7 +1288,6 @@ function onSimHover(simID) {
     for (const display of scalarDisplays) {
         if (Object.hasOwn(display.singleInfos, simID)) {
             const color = currentTheme.plotSettings.colorAt(simIdx);
-            console.log(`Color at idx ${simIdx} = ${color}`);
             display.singleInfos[simID].element.style.backgroundColor = color;
             display.singleInfos[simID].element.style.color = vizUtils.invertColor(color, true);
         }
@@ -1285,7 +1309,6 @@ function onSimUnhover(simID) {
     const simIdx = simulations.getIdx(simID);
     for (const display of scalarDisplays) {
         if (Object.hasOwn(display.singleInfos, simID)) {
-            console.log("Resetting color for sim idx " + simIdx);
             display.singleInfos[simID].element.style.backgroundColor = '';
             display.singleInfos[simID].element.style.color = '';
         }
@@ -1391,6 +1414,7 @@ function createSimSelection(config, simID, startChecked=true) {
                 tooltipUpdateToSimSelection(simID);
                 repositionTooltip(tooltip, newSelection.element, "right");
             });
+            onSimHover(simID);
         }
     );
     newSelection.element.addEventListener(
@@ -1400,6 +1424,7 @@ function createSimSelection(config, simID, startChecked=true) {
             // Tooltip
             tooltip.style.visibility = null;
             tooltip.textContent = "";
+            onSimUnhover(simID);
         }
     );
     // Return selection box
@@ -1504,7 +1529,7 @@ function rerunSelectedSimulation() {
             gd_warn(`Problem rerunning simulation ${simulation.name} (${simID})`);
             return info;
         }
-        const newSelection = selection;
+        selection.uncompleteProgress();
         simulation.setActive(true);
         simulation.setInfo(info);
         return info;
@@ -1882,6 +1907,9 @@ plotSmoothFactorSlider_Setting.addEventListener("input", (e) => {
 rescaleDetailsY_Setting.addEventListener("change", (e) => {
     changeSetting_RescaleDetailsAxisY(rescaleDetailsY_Setting.checked);
 })
+hideUnselectedScalars_Setting.addEventListener("change", (e) => {
+    changeSetting_HideUnselectedScalars(hideUnselectedScalars_Setting.checked);
+})
 settingBarTitle.addEventListener("click", toggleDisplay.bind(null, settingBarContent));
 toggleDisplay(settingBarContent);
 mainSettingButton.addEventListener("click", toggleDisplay.bind(null, mainSettingContent));
@@ -1998,6 +2026,7 @@ refreshSimulationSidebar();
 openTab(null, "tab-analyze");
 
 
+// Settings
 function changeSetting_PlotSmoothSpread(newSmoothSpread) {
     // Clamp smoothing value
     plotSmoothSpread = 0.5 * Math.min(1, Math.max(0, newSmoothSpread));
@@ -2017,6 +2046,12 @@ function changeSetting_RescaleDetailsAxisY(shouldRescale) {
     for (const plot of allPlots) {
         plot.setSetting_RescaleY(shouldRescale);
         plot.updatePlot(plot.scaleX.domain(), shouldRescale);
+    }
+}
+function changeSetting_HideUnselectedScalars(shouldHide) {
+    shouldHideUnselectedScalars = shouldHide;
+    for (const display of scalarDisplays) {
+        display.refreshDisplay();
     }
 }
 
@@ -2437,20 +2472,12 @@ function createScalarPlots() {
         else {
             console.log("making new single-value display for key " + k);
             const display = new ScalarValueKeyDisplay(k);
-            // const newSingleValuePanel = prefabSingleValueArea.cloneNode(true);
-            // newSingleValuePanel.querySelector(".single-value-title-area").textContent = k;
-            // keyPanels[k].querySelector(".value-key-area").appendChild(newSingleValuePanel);
             keyPanels[k].querySelector(".value-key-area").appendChild(display.element);
             const firstValues = dataUtils.getFirstValuesForKey(simulations, k);
             for (const simID in firstValues) {
                 const firstValue = firstValues[simID];
                 display.addSimValue(simID, firstValue.value);
                 scalarDisplays.push(display);
-                // const newSingleScalarBox = prefabSingleScalarBox.cloneNode(true);
-                // newSingleScalarBox.firstElementChild.textContent = simulations.get(simID).name;
-                // newSingleScalarBox.lastElementChild.textContent = firstValue.value.toPrecision(3);
-                // console.log(firstValue);
-                // newSingleValuePanel.querySelector(".single-value-svg-area").appendChild(newSingleScalarBox);
             }
             display.sortByValue();
             display.syncToSelectedSims();

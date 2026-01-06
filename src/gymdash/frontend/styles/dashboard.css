@@ -53,9 +53,9 @@ h1 {
         /* max-width: 300px; */
         display: flex;
         justify-content: space-between;
-        border: var(--main-contrast-color) solid 1px;
+        border: var(--main-bg-color) solid 1px;
         border-radius: var(--panel-br);
-        padding: 2px;
+        padding: 3px 5px;
         label {
             min-width: 200px;
             flex: 1 1 auto;

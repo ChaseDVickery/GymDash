@@ -516,6 +516,10 @@ class Simulation():
         self._project_sim_id: UUID              = None
         self._project_sim_base_path: str        = None
 
+        self._flag_mutex: Lock                   = Lock()
+        self._is_running: bool                   = False
+        self._is_setting_up: bool                = False
+
         self.sm = SimpleStateStack()
     
     @abstractmethod
@@ -530,7 +534,11 @@ class Simulation():
             return os.path.join(self._project_sim_base_path, str(self._project_sim_id))
         else:
             return None
-        
+
+    def reset_meta_status(self):
+        self._meta_cancelled = False
+        self._meta_failed = False
+        self._meta_has_run = False
     def fill_from_stored_info(self, info: StoredSimulationInfo):
         logger.info(f"fill_from_stored_info config: {info.config}")
         self.from_disk = True
@@ -612,11 +620,28 @@ class Simulation():
     def name(self) -> str:
         return self.config.name
     @property
+    def is_running(self) -> bool:
+        return self._is_running
+    @is_running.setter
+    def is_running(self, value: bool) -> bool:
+        with self._flag_mutex:
+            self._is_running = value
+    @property
+    def is_setting_up(self) -> bool:
+        return self._is_setting_up
+    @is_setting_up.setter
+    def is_setting_up(self, value: bool) -> bool:
+        with self._flag_mutex:
+            self._is_setting_up = value
+    @property
     def is_done(self) -> bool:
-        return  self.from_disk or \
+        return  (self.from_disk or \
                 self.force_stopped or \
                 self._meta_cancelled or \
-                self._meta_has_run
+                self._meta_has_run) and \
+                not self.is_running and \
+                not self.is_setting_up
+    
                 # self.thread is None or \
                 # not self.thread.is_alive()
 
@@ -721,6 +746,7 @@ class Simulation():
             callback()
 
     def setup(self, **kwargs) -> None:
+        self.is_setting_up = True
         logger.debug(f"Simulation setup() kwargs: {kwargs}.")
         # Start setup callbacks
         try:
@@ -737,8 +763,10 @@ class Simulation():
             self.trigger_callbacks(Simulation.END_SETUP)
         except Exception:
             logger.exception(f"Exception when running Simulation '{Simulation.END_SETUP}' callbacks.")
+        self.is_setting_up = False
 
     def run(self, **kwargs) -> None:
+        self.is_running = True
         logger.debug(f"Simulation run() kwargs: {kwargs}.")
         if not self.can_run:
             logger.warning("Simulation run() could not run. can_run evaluated to False")
@@ -765,6 +793,7 @@ class Simulation():
         # Make sure it's after all the callbacks so we don't have any
         # funny business.
         self.interactor.set_out_if_in("stop_simulation", True)
+        self.is_running = False
     
     def base_step(self) -> None:
         # If we received a help request, then try to fulfill it

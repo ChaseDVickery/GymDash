@@ -651,6 +651,7 @@ class SimulationTracker:
         new_start_kwargs.update(to_start.config.kwargs)
         logger.info(f"Restarting simulation with kwargs: {new_start_kwargs}")
         # Begin simulation
+        existing_sim.reset_meta_status()
         existing_sim.start(**new_start_kwargs)
         # Move simulation back to running_simulations
         with self._access_mutex:

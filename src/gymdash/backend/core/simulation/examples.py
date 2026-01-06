@@ -751,7 +751,9 @@ Supported Start Kwargs:
         max_ckpt = max(SimpleClassifierMLModel.TRAINING_CKPT_EXTRACTOR(f) for f in ckpt_files)
         return folder_path.joinpath(SimpleClassifierMLModel.TRAINING_CKPT_FORMAT.format(max_ckpt))
 
-
+    def _cleanup_run(self):
+        del self.model
+        torch.cuda.empty_cache()
     def _run(self, **kwargs):
         kwargs = self._overwrite_new_kwargs(self.kwarg_defaults, self.config.kwargs, kwargs)
 
@@ -886,6 +888,8 @@ Supported Start Kwargs:
             )
         ])
 
+        just_stopped: bool = False
+
         # Attempt Training
         try:
             if do_train:
@@ -920,15 +924,16 @@ Supported Start Kwargs:
                 details="Model training stopped."
             ))
             self._meta_failed = True
-            del self.model
-            torch.cuda.empty_cache()
+            just_stopped = True
         except Exception as e:
             logger.error(e)
             self._meta_failed = True
+            just_stopped = True
             self.add_error_details(str(e))
-            del self.model
-            torch.cuda.empty_cache()
-
+        if just_stopped:
+            self._cleanup_run()
+            return
+        
         # Attempt Validation
         try:
             if do_val:
@@ -961,14 +966,15 @@ Supported Start Kwargs:
                 details="Model validation stopped."
             ))
             self._meta_failed = True
-            del self.model
-            torch.cuda.empty_cache()
+            just_stopped = True
         except Exception as e:
             logger.error(e)
             self._meta_failed = True
+            just_stopped = True
             self.add_error_details(str(e))
-            del self.model
-            torch.cuda.empty_cache()
+        if just_stopped:
+            self._cleanup_run()
+            return
 
         # Attempt Testing
         try:
@@ -979,7 +985,7 @@ Supported Start Kwargs:
                     self.model.model.load_state_dict(model_state)
                     logger.info(f"Loaded model from '{ckpt_path}' for testing.")
                     results = self.model.test(
-                        dataloader=val_loader,
+                        dataloader=test_loader,
                         loss_fn=loss_fn(**loss_fn_kwargs),
                         step_callback=MLSimulationUpdateCallback(self),
                         tb_logger=tb_path,
@@ -1002,14 +1008,15 @@ Supported Start Kwargs:
                 details="Model testing stopped."
             ))
             self._meta_failed = True
-            del self.model
-            torch.cuda.empty_cache()
+            just_stopped = True
         except Exception as e:
             logger.error(e)
             self._meta_failed = True
+            just_stopped = True
             self.add_error_details(str(e))
-            del self.model
-            torch.cuda.empty_cache()
+
+        self._cleanup_run()
+        return
 
 def register_example_simulations():
     SimulationRegistry.register("stable_baselines", StableBaselinesSimulation)

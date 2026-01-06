@@ -101,7 +101,3 @@ input[type="text"] {
 .between-filter-setting {
     
 }
-
-.unselected {
-    filter: saturate(50%);
-}
