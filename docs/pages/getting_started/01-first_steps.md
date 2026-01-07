@@ -6,7 +6,7 @@
 # and starts a frontend HTTP server and a backend API server.
 python -m gymdash.start
 ```
-For additional launch options, see the [Appendix - Other Launch Options](#other-launch-options).
+For additional launch options, see the [Launch Options](#launch-options).
 
 ### Navigation
 Navigate your web browser to your `localhost` port `8888`: `http://127.0.0.1:8888/src/gymdash/frontend/`. This loads the HTML page used to interact with your GymDash project.
@@ -21,7 +21,7 @@ Navigate your web browser to your `localhost` port `8888`: `http://127.0.0.1:888
 | apiworkers  | -w | `1` | Number of API server workers. This is the number of workers set ONLY for the Uvicorn server, not for any of the simulation work that may launch.
 | apiserver   | -  | `dev` | The locality of the launched frontend server. Can be one of `dev`, `lan`, or `custom_ip`. On `dev`, only `localhost` (`127.0.0.1`) will be useable. On `lan` local IPs on the same network (usually `192.168.x.x`). On `custom_ip`, the IP in `apiserver-ip` is used.
 | apiserver-ip| -  | `127.0.0.1` | - |
-| no-frontend | -  | - | Launch only the backend API server. |
+| no-frontend | -  | - | Launch only the backend API server and simulation runner. |
 | no-backend  | -  | - | Launch only the frontend HTTP server. |
 
 [Next: Page Controls](02-controls.md)

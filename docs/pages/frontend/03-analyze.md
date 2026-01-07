@@ -4,7 +4,7 @@ plots for scalar data, but also a multimedia panel for media like videos, images
 and audio.
 
 ## Overview
-The Analyze tab has 2 main features - the scalar plotting panel, and the multimedia panel.\
+The Analyze tab has 2 main features - the scalar plotting panel, and the multimedia panel.
 
 ![](../../imgs/tab_analyze.png)
 
@@ -24,14 +24,14 @@ All other plots are organized by their logged "key". These keys should use a dir
 MMIs can be hovered to show the region of the plot for which there exists media that can be shown in the multimedia panel. Because many different media points can be condensed into a single MMI, you can also click on the highlighted region to zoom in. Clicking on an MMI causes all media in it to show up in the multimedia panel.
 
 ### Multimedia Panel
-The panel is separated into various types of media like video, images, and audio. Each section can be minimized or maximized by clicking on the title. At the top is also a panel for filtering media results. Currently you may filter by key, simulation, or for a timestep range.\
+The panel is separated into various types of media like video, images, and audio. Each section can be minimized or maximized by clicking on the title. At the top is also a panel for filtering media results. Currently you may filter by key, simulation, or for a timestep range.
 
 ![](../../imgs/analyze_media.png)
 
 <!-- TODO: Text media. -->
 
 ## Settings
-Access the settings bar that floats under the header bar.
+Access the visualization settings bar that floats under the header bar.
 #### **Smooth Spread:**
 If above 0, attempts to smooth scalar plots. Smoothed lines will show on top of the original data, which will be translucent. This works by averaging each point with a percentage of surrounding points. Plots with more datapoints will have better smoothing results.
 #### **Smooth Factor:**

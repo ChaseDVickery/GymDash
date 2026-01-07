@@ -17,7 +17,9 @@ where = ["src"]
 
 [project]
 name = "gymdash"
-version = "0.1.6.15"
+# Last test version: version = "0.1.6.17"
+# Last release version: version = "0.1.4"
+version = "0.1.4"
 authors = [
   { name="Chase Vickery", email="chasedvickery@gmail.com" },
 ]

@@ -82,7 +82,7 @@ python -m pip install gymdash[full]
 # and starts a frontend HTTP server and a backend API server.
 python -m gymdash.start
 ```
-For additional launch options, see the [Appendix - Other Launch Options](#other-launch-options).
+For additional launch options, see the [Launch Options](docs/pages/getting_started/01-first_steps.md#launch-options).
 #### Navigation
 Navigate your web browser to your `localhost` port `8888`: `http://127.0.0.1:8888/src/gymdash/frontend/`. This loads the HTML page used to interact with your GymDash project.
 
